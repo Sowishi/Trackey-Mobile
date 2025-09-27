@@ -4,14 +4,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -122,7 +122,7 @@ export default function LoginScreen() {
       marginRight: 8,
     },
     loginButtonText: {
-      color: 'white',
+      color: 'black',
       fontSize: 18,
       fontWeight: '600',
     },
@@ -199,7 +199,7 @@ export default function LoginScreen() {
             </View>
 
             <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-              <Ionicons name="log-in-outline" size={20} color="white" style={styles.buttonIcon} />
+              <Ionicons name="log-in-outline" size={20} color="black" style={styles.buttonIcon} />
               <Text style={styles.loginButtonText}>Sign In</Text>
             </TouchableOpacity>
 

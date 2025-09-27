@@ -279,7 +279,7 @@ export default function AboutScreen() {
               <ThemedText style={styles.sectionTitle}>Credits</ThemedText>
             </View>
             <ThemedText style={styles.infoText}>
-              Developed for BNHS (Bataan National High School){'\n'}
+              Developed for BNHS (Basud National High School){'\n'}
               Structural Health Monitoring Project{'\n\n'}
               Built with React Native, Expo, and Firebase{'\n'}
               Maps powered by Google Maps API{'\n'}
