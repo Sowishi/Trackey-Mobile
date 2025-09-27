@@ -34,7 +34,8 @@
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
-      ]
+      ],
+      "package": "com.sowishi1738.Struxis"
     },
     "web": {
       "output": "static",
@@ -58,6 +59,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "77aae039-ffd4-40e9-a382-cc38ca5fe609"
+      }
     }
   }
 }

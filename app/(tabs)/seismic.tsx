@@ -3,163 +3,285 @@ import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
-import { Dimensions, ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Dimensions, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { LineChart } from 'react-native-chart-kit';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { database, off, onValue, ref } from '../../firebase';
 
 const { width } = Dimensions.get('window');
 
+interface SeismicData {
+  value: number;
+  timestamp: string;
+}
+
 export default function SeismicVibrationScreen() {
   const colorScheme = useColorScheme();
+  const [activeTab, setActiveTab] = useState<'VCS1' | 'VCS2'>('VCS1');
+  const [vcs1FirebaseData, setVcs1FirebaseData] = useState<SeismicData[]>([]);
+  const [vcs2FirebaseData, setVcs2FirebaseData] = useState<SeismicData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const styles = StyleSheet.create({
-    safeArea: {
-      flex: 1,
-      backgroundColor: Colors[colorScheme ?? 'light'].background,
+  useEffect(() => {
+    // Set up Firebase realtime database listeners
+    const vcs1Ref = ref(database, 'BNHS-Struxis/seismic/vcs1/values');
+    const vcs2Ref = ref(database, 'BNHS-Struxis/seismic/vcs2/values');
+
+    const vcs1Listener = onValue(vcs1Ref, (snapshot: any) => {
+      const data = snapshot.val();
+      if (data) {
+        const formattedData: SeismicData[] = Object.keys(data).map(key => ({
+          value: data[key].value || 0,
+          timestamp: data[key].timestamp || new Date().toISOString(),
+        })).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+        
+        setVcs1FirebaseData(formattedData);
+        console.log('VCS1 Firebase data updated:', formattedData.length, 'records');
+      }
+      setIsLoading(false);
+    });
+
+    const vcs2Listener = onValue(vcs2Ref, (snapshot: any) => {
+      const data = snapshot.val();
+      if (data) {
+        const formattedData: SeismicData[] = Object.keys(data).map(key => ({
+          value: data[key].value || 0,
+          timestamp: data[key].timestamp || new Date().toISOString(),
+        })).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+        
+        setVcs2FirebaseData(formattedData);
+        console.log('VCS2 Firebase data updated:', formattedData.length, 'records');
+      }
+    });
+
+    // Cleanup listeners on unmount
+    return () => {
+      off(vcs1Ref, 'value', vcs1Listener);
+      off(vcs2Ref, 'value', vcs2Listener);
+    };
+  }, []);
+
+  // Helper function to format timestamp for chart labels
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: false 
+    });
+  };
+
+  // Prepare chart data from Firebase data
+  const getChartData = (data: SeismicData[]) => {
+    if (data.length === 0) {
+      // Fallback data when no Firebase data is available
+      return {
+        labels: ['No Data'],
+        datasets: [{
+          data: [0],
+          color: (opacity = 1) => `rgba(128, 128, 128, ${opacity})`,
+          strokeWidth: 2,
+        }],
+      };
+    }
+
+    // Take last 10 data points for better chart readability
+    const recentData = data.slice(-10);
+    
+    return {
+      labels: recentData.map(item => formatTimestamp(item.timestamp)),
+      datasets: [{
+        data: recentData.map(item => item.value),
+        color: (opacity = 1) => activeTab === 'VCS1' 
+          ? `rgba(255, 68, 68, ${opacity})` 
+          : `rgba(68, 133, 244, ${opacity})`,
+        strokeWidth: 3,
+      }],
+    };
+  };
+
+  // Get current data based on active tab
+  const vcs1Data = getChartData(vcs1FirebaseData);
+  const vcs2Data = getChartData(vcs2FirebaseData);
+
+  const chartConfig = {
+    backgroundColor: Colors[colorScheme ?? 'light'].background,
+    backgroundGradientFrom: Colors[colorScheme ?? 'light'].background,
+    backgroundGradientTo: Colors[colorScheme ?? 'light'].background,
+    decimalPlaces: 1,
+    color: (opacity = 1) => Colors[colorScheme ?? 'light'].text + Math.round(opacity * 255).toString(16),
+    labelColor: (opacity = 1) => Colors[colorScheme ?? 'light'].text + Math.round(opacity * 255).toString(16),
+    style: {
+      borderRadius: 16,
     },
-    container: {
-      flex: 1,
-      padding: 20,
+    propsForDots: {
+      r: '6',
+      strokeWidth: '2',
+      stroke: Colors[colorScheme ?? 'light'].background,
     },
-    header: {
+  };
+
+  const getCurrentData = () => {
+    return activeTab === 'VCS1' ? vcs1Data : vcs2Data;
+  };
+
+  const getCurrentStats = () => {
+    const firebaseData = activeTab === 'VCS1' ? vcs1FirebaseData : vcs2FirebaseData;
+    
+    if (firebaseData.length === 0) {
+      return {
+        current: '0.0',
+        max: '0.0',
+        min: '0.0',
+        avg: '0.0',
+        trend: 'same' as const,
+        lastUpdate: 'No data',
+      };
+    }
+
+    const values = firebaseData.map(item => item.value);
+    const current = values[values.length - 1];
+    const previous = values.length > 1 ? values[values.length - 2] : current;
+    const trend = current > previous ? 'up' : current < previous ? 'down' : 'same';
+    const lastTimestamp = firebaseData[firebaseData.length - 1]?.timestamp;
+    
+    return {
+      current: current.toFixed(1),
+      max: Math.max(...values).toFixed(1),
+      min: Math.min(...values).toFixed(1),
+      avg: (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1),
+      trend,
+      lastUpdate: lastTimestamp ? formatTimestamp(lastTimestamp) : 'Unknown',
+    };
+  };
+
+  const stats = getCurrentStats();
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: Colors[colorScheme ?? 'light'].background,
+  },
+  container: {
+    flex: 1,
+    padding: 20,
+  },
+  header: {
+    marginBottom: 20,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  headerIcon: {
+    marginRight: 12,
+  },
+  subtitle: {
+    opacity: 0.7,
+  },
+    tabContainer: {
+      flexDirection: 'row',
+      backgroundColor: Colors[colorScheme ?? 'light'].tabIconDefault + '20',
+    borderRadius: 12,
+      padding: 4,
       marginBottom: 20,
     },
-    titleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 8,
+    tab: {
+      flex: 1,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+    alignItems: 'center',
     },
-    headerIcon: {
-      marginRight: 12,
+    activeTab: {
+      backgroundColor: Colors[colorScheme ?? 'light'].tint,
     },
-    subtitle: {
-      opacity: 0.7,
+    tabText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+    activeTabText: {
+      color: 'white',
+    },
+    inactiveTabText: {
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
     },
     scrollView: {
-      flex: 1,
+    flex: 1,
+  },
+    chartContainer: {
+      marginBottom: 20,
+  },
+  chartHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+      marginBottom: 16,
+  },
+  chartIcon: {
+    marginRight: 8,
+  },
+  chartTitle: {
+      fontSize: 20,
+    fontWeight: '600',
+  },
+    chartWrapper: {
+      borderRadius: 16,
+      overflow: 'hidden',
     },
-    dataCard: {
-      padding: 16,
-      borderRadius: 12,
-      marginBottom: 12,
-      borderWidth: 1,
-      borderColor: 'rgba(0,0,0,0.1)',
-    },
-    cardHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 12,
-    },
-    sensorRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      flex: 1,
-    },
-    sensorIcon: {
-      marginRight: 8,
-    },
-    sensorText: {
-      fontSize: 16,
-      fontWeight: '600',
-    },
-    magnitudeBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 12,
-    },
-    magnitudeIcon: {
-      marginRight: 4,
-    },
-    magnitudeText: {
-      fontSize: 12,
-      fontWeight: '600',
-    },
-    metricsContainer: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginBottom: 12,
-    },
-    metricItem: {
-      flex: 1,
-    },
-    metricHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 4,
-    },
-    metricIcon: {
-      marginRight: 6,
-    },
-    metricLabel: {
-      fontSize: 12,
-      opacity: 0.6,
-    },
-    metricValue: {
-      fontSize: 18,
-      fontWeight: 'bold',
-    },
-    timestampRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    timeIcon: {
-      marginRight: 6,
-    },
-    timestampText: {
-      fontSize: 12,
-      opacity: 0.6,
-    },
-    chartPlaceholder: {
+    statsContainer: {
       marginTop: 20,
     },
-    chartHeader: {
+    statsGrid: {
       flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 12,
+      flexWrap: 'wrap',
+      justifyContent: 'space-between',
     },
-    chartIcon: {
+    statCard: {
+      width: '48%',
+      padding: 16,
+    borderRadius: 12,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].tabIconDefault + '20',
+    },
+    statHeader: {
+      flexDirection: 'row',
+    alignItems: 'center',
+      marginBottom: 8,
+  },
+    statIcon: {
       marginRight: 8,
+  },
+    statLabel: {
+    fontSize: 14,
+      opacity: 0.7,
     },
-    chartTitle: {
-      fontSize: 18,
-      fontWeight: '600',
+    statValue: {
+      fontSize: 20,
+      fontWeight: 'bold',
     },
-    chartArea: {
-      height: 200,
-      borderRadius: 12,
-      justifyContent: 'center',
-      alignItems: 'center',
+    trendIcon: {
+      marginLeft: 8,
     },
-    chartPlaceholderIcon: {
-      marginBottom: 12,
-    },
-    chartPlaceholderText: {
+    lastUpdate: {
       fontSize: 14,
       opacity: 0.6,
-      textAlign: 'center',
+      fontWeight: 'normal',
     },
-  });
-
-  const vibrationData = [
-    { id: 1, location: 'Sensor A', magnitude: 2.3, frequency: '15 Hz', timestamp: '14:30:15' },
-    { id: 2, location: 'Sensor B', magnitude: 1.8, frequency: '12 Hz', timestamp: '14:30:10' },
-    { id: 3, location: 'Sensor C', magnitude: 3.1, frequency: '18 Hz', timestamp: '14:30:05' },
-    { id: 4, location: 'Sensor D', magnitude: 0.9, frequency: '8 Hz', timestamp: '14:30:00' },
-  ];
-
-  const getMagnitudeColor = (magnitude: number) => {
-    if (magnitude >= 3.0) return '#ff4444';
-    if (magnitude >= 2.0) return '#ffaa00';
-    return '#44ff44';
-  };
-
-  const getMagnitudeLevel = (magnitude: number) => {
-    if (magnitude >= 3.0) return 'High';
-    if (magnitude >= 2.0) return 'Medium';
-    return 'Low';
-  };
+    loadingContainer: {
+      height: 220,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: Colors[colorScheme ?? 'light'].tabIconDefault + '10',
+      borderRadius: 16,
+    },
+    loadingText: {
+      marginTop: 12,
+      opacity: 0.6,
+    },
+});
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -175,97 +297,152 @@ export default function SeismicVibrationScreen() {
             <ThemedText type="title">Seismic Vibration</ThemedText>
           </View>
           <ThemedText style={styles.subtitle}>
-            Real-time vibration monitoring and analysis
+            {isLoading 
+              ? 'Connecting to Firebase...' 
+              : `${vcs1FirebaseData.length + vcs2FirebaseData.length} live data points`
+            }
           </ThemedText>
         </ThemedView>
         
+        {/* Tab Navigation */}
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'VCS1' && styles.activeTab]}
+            onPress={() => setActiveTab('VCS1')}
+          >
+            <ThemedText style={[
+              styles.tabText,
+              activeTab === 'VCS1' ? styles.activeTabText : styles.inactiveTabText
+            ]}>
+              VCS1
+            </ThemedText>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'VCS2' && styles.activeTab]}
+            onPress={() => setActiveTab('VCS2')}
+          >
+            <ThemedText style={[
+              styles.tabText,
+              activeTab === 'VCS2' ? styles.activeTabText : styles.inactiveTabText
+            ]}>
+              VCS2
+            </ThemedText>
+          </TouchableOpacity>
+        </View>
+
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          {vibrationData.map((item) => (
-            <ThemedView key={item.id} style={styles.dataCard}>
-              <View style={styles.cardHeader}>
-                <View style={styles.sensorRow}>
-                  <Ionicons 
-                    name="hardware-chip-outline" 
-                    size={16} 
-                    color={Colors[colorScheme ?? 'light'].tabIconDefault}
-                    style={styles.sensorIcon}
-                  />
-                  <ThemedText style={styles.sensorText}>{item.location}</ThemedText>
-                </View>
-                <View style={[styles.magnitudeBadge, { backgroundColor: getMagnitudeColor(item.magnitude) + '20' }]}>
-                  <Ionicons 
-                    name={item.magnitude >= 3.0 ? 'warning' : item.magnitude >= 2.0 ? 'alert-circle' : 'checkmark-circle'} 
-                    size={12} 
-                    color={getMagnitudeColor(item.magnitude)}
-                    style={styles.magnitudeIcon}
-                  />
-                  <ThemedText style={[styles.magnitudeText, { color: getMagnitudeColor(item.magnitude) }]}>
-                    {getMagnitudeLevel(item.magnitude)}
-                  </ThemedText>
-                </View>
-              </View>
-              
-              <View style={styles.metricsContainer}>
-                <View style={styles.metricItem}>
-                  <View style={styles.metricHeader}>
-                    <Ionicons 
-                      name="trending-up" 
-                      size={14} 
-                      color={getMagnitudeColor(item.magnitude)}
-                      style={styles.metricIcon}
-                    />
-                    <ThemedText style={styles.metricLabel}>Magnitude</ThemedText>
-                  </View>
-                  <ThemedText style={[styles.metricValue, { color: getMagnitudeColor(item.magnitude) }]}>
-                    {item.magnitude}
-                  </ThemedText>
-                </View>
-                <View style={styles.metricItem}>
-                  <View style={styles.metricHeader}>
-                    <Ionicons 
-                      name="speedometer" 
-                      size={14} 
-                      color={Colors[colorScheme ?? 'light'].tabIconDefault}
-                      style={styles.metricIcon}
-                    />
-                    <ThemedText style={styles.metricLabel}>Frequency</ThemedText>
-                  </View>
-                  <ThemedText style={styles.metricValue}>{item.frequency}</ThemedText>
-                </View>
-              </View>
-              
-              <View style={styles.timestampRow}>
-                <Ionicons 
-                  name="time-outline" 
-                  size={14} 
-                  color={Colors[colorScheme ?? 'light'].tabIconDefault}
-                  style={styles.timeIcon}
-                />
-                <ThemedText style={styles.timestampText}>{item.timestamp}</ThemedText>
-              </View>
-            </ThemedView>
-          ))}
-          
-          <ThemedView style={styles.chartPlaceholder}>
+          {/* Chart Section */}
+          <ThemedView style={styles.chartContainer}>
             <View style={styles.chartHeader}>
               <Ionicons 
-                name="bar-chart" 
+                name="analytics" 
+                size={24} 
+                color={Colors[colorScheme ?? 'light'].tint}
+                style={styles.chartIcon}
+              />
+              <ThemedText style={styles.chartTitle}>
+                {activeTab} Vibration Data
+                {stats.lastUpdate !== 'No data' && (
+                  <ThemedText style={styles.lastUpdate}> • Last: {stats.lastUpdate}</ThemedText>
+                )}
+              </ThemedText>
+            </View>
+            
+            <View style={styles.chartWrapper}>
+              {isLoading ? (
+                <View style={styles.loadingContainer}>
+                  <Ionicons 
+                    name="pulse-outline" 
+                    size={40} 
+                    color={Colors[colorScheme ?? 'light'].tabIconDefault}
+                  />
+                  <ThemedText style={styles.loadingText}>Loading Firebase data...</ThemedText>
+                </View>
+              ) : (
+                <LineChart
+                  data={getCurrentData()}
+                  width={width - 40}
+                  height={220}
+                  chartConfig={chartConfig}
+                  bezier
+                  style={{
+                    borderRadius: 16,
+                  }}
+                />
+              )}
+            </View>
+          </ThemedView>
+
+          {/* Statistics */}
+          <ThemedView style={styles.statsContainer}>
+            <View style={styles.chartHeader}>
+              <Ionicons 
+                name="stats-chart" 
                 size={20} 
                 color={Colors[colorScheme ?? 'light'].tint}
                 style={styles.chartIcon}
               />
-              <ThemedText style={styles.chartTitle}>Vibration Chart</ThemedText>
+              <ThemedText style={[styles.chartTitle, { fontSize: 18 }]}>Statistics</ThemedText>
             </View>
-            <View style={[styles.chartArea, { backgroundColor: Colors[colorScheme ?? 'light'].tabIconDefault + '10' }]}>
-              <Ionicons 
-                name="pulse-outline" 
-                size={40} 
-                color={Colors[colorScheme ?? 'light'].tabIconDefault}
-                style={styles.chartPlaceholderIcon}
-              />
-              <ThemedText style={styles.chartPlaceholderText}>
-                Real-time vibration waveform will be displayed here
-              </ThemedText>
+            
+            <View style={styles.statsGrid}>
+              <ThemedView style={styles.statCard}>
+                <View style={styles.statHeader}>
+                  <Ionicons 
+                    name="radio-button-on" 
+                    size={16} 
+                    color={activeTab === 'VCS1' ? '#ff4444' : '#4485f4'}
+                    style={styles.statIcon}
+                  />
+                  <ThemedText style={styles.statLabel}>Current</ThemedText>
+                  <Ionicons 
+                    name={stats.trend === 'up' ? 'trending-up' : stats.trend === 'down' ? 'trending-down' : 'remove'}
+                    size={16} 
+                    color={stats.trend === 'up' ? '#44ff44' : stats.trend === 'down' ? '#ff4444' : Colors[colorScheme ?? 'light'].tabIconDefault}
+                    style={styles.trendIcon}
+                  />
+                </View>
+                <ThemedText style={styles.statValue}>{stats.current}</ThemedText>
+              </ThemedView>
+
+              <ThemedView style={styles.statCard}>
+                <View style={styles.statHeader}>
+                  <Ionicons 
+                    name="arrow-up" 
+                    size={16} 
+                    color="#ff4444"
+                    style={styles.statIcon}
+                  />
+                  <ThemedText style={styles.statLabel}>Maximum</ThemedText>
+                </View>
+                <ThemedText style={[styles.statValue, { color: '#ff4444' }]}>{stats.max}</ThemedText>
+              </ThemedView>
+
+              <ThemedView style={styles.statCard}>
+                <View style={styles.statHeader}>
+                  <Ionicons 
+                    name="arrow-down" 
+                    size={16} 
+                    color="#44ff44"
+                    style={styles.statIcon}
+                  />
+                  <ThemedText style={styles.statLabel}>Minimum</ThemedText>
+                </View>
+                <ThemedText style={[styles.statValue, { color: '#44ff44' }]}>{stats.min}</ThemedText>
+              </ThemedView>
+
+              <ThemedView style={styles.statCard}>
+                <View style={styles.statHeader}>
+                  <Ionicons 
+                    name="analytics" 
+                    size={16} 
+                    color={Colors[colorScheme ?? 'light'].tabIconDefault}
+                    style={styles.statIcon}
+                  />
+                  <ThemedText style={styles.statLabel}>Average</ThemedText>
+                </View>
+                <ThemedText style={styles.statValue}>{stats.avg}</ThemedText>
+              </ThemedView>
             </View>
           </ThemedView>
         </ScrollView>
