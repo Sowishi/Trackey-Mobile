@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
     activeTabText: {
-      color: 'white',
+      color: 'black',
     },
     inactiveTabText: {
       color: Colors[colorScheme ?? 'light'].tabIconDefault,
