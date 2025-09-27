@@ -5,9 +5,9 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useEffect, useState } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
-import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
+import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { WebView } from 'react-native-webview';
 
 export default function MapScreen() {
   const colorScheme = useColorScheme();
@@ -104,12 +104,51 @@ export default function MapScreen() {
     },
   });
 
-  const currentRegion = location ? {
-    latitude: location.coords.latitude,
-    longitude: location.coords.longitude,
-    latitudeDelta: 0.0922,
-    longitudeDelta: 0.0421,
-  } : defaultRegion;
+  const currentLocation = location ? {
+    lat: location.coords.latitude,
+    lng: location.coords.longitude,
+  } : {
+    lat: defaultRegion.latitude,
+    lng: defaultRegion.longitude,
+  };
+
+  const mapHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            * { margin: 0; padding: 0; }
+            html, body { height: 100%; }
+            #map { height: 100%; width: 100%; }
+        </style>
+    </head>
+    <body>
+        <div id="map"></div>
+        <script>
+            function initMap() {
+                const map = new google.maps.Map(document.getElementById("map"), {
+                    zoom: 12,
+                    center: { lat: ${currentLocation.lat}, lng: ${currentLocation.lng} },
+                    mapTypeControl: true,
+                    streetViewControl: true,
+                    fullscreenControl: false,
+                });
+                
+                // Add a marker at the center
+                new google.maps.Marker({
+                    position: { lat: ${currentLocation.lat}, lng: ${currentLocation.lng} },
+                    map: map,
+                    title: "Current Location",
+                });
+            }
+        </script>
+        <script async defer
+            src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBtlOXvz1Cr11cC4ZhLhXc4U0hQ00D6V50&callback=initMap">
+        </script>
+    </body>
+    </html>
+  `;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -132,27 +171,24 @@ export default function MapScreen() {
         
         {/* Full-screen map */}
         <View style={styles.mapContainer}>
-          {!mapReady && (
-            <View style={styles.loadingContainer}>
-              <Ionicons 
-                name="map-outline" 
-                size={60} 
-                color={Colors[colorScheme ?? 'light'].tabIconDefault}
-              />
-              <ThemedText style={styles.loadingText}>
-                Loading map...
-              </ThemedText>
-            </View>
-          )}
-          
-          <MapView
+          <WebView
             style={styles.map}
-            provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-            initialRegion={currentRegion}
-            showsUserLocation={true}
-            showsMyLocationButton={true}
-            showsCompass={true}
-            showsScale={true}
+            source={{ html: mapHtml }}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            startInLoadingState={true}
+            renderLoading={() => (
+              <View style={styles.loadingContainer}>
+                <Ionicons 
+                  name="map-outline" 
+                  size={60} 
+                  color={Colors[colorScheme ?? 'light'].tabIconDefault}
+                />
+                <ThemedText style={styles.loadingText}>
+                  Loading map...
+                </ThemedText>
+              </View>
+            )}
           />
         </View>
       </View>
