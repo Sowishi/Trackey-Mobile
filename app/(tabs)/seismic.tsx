@@ -22,6 +22,7 @@ export default function SeismicVibrationScreen() {
   const [vcs1FirebaseData, setVcs1FirebaseData] = useState<SeismicData[]>([]);
   const [vcs2FirebaseData, setVcs2FirebaseData] = useState<SeismicData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState(new Date());
 
   useEffect(() => {
     // Set up Firebase realtime database listeners
@@ -81,6 +82,52 @@ export default function SeismicVibrationScreen() {
     return `${hours}:${minutes}`;
   };
 
+  // Check if two dates are on the same day
+  const isSameDay = (date1: Date, date2: Date) => {
+    return date1.getFullYear() === date2.getFullYear() &&
+           date1.getMonth() === date2.getMonth() &&
+           date1.getDate() === date2.getDate();
+  };
+
+  // Filter data by selected date
+  const filterDataByDate = (data: SeismicData[]) => {
+    return data.filter(item => {
+      const itemDate = new Date(item.timestamp);
+      return isSameDay(itemDate, selectedDate);
+    });
+  };
+
+  // Navigate to previous day
+  const goToPreviousDay = () => {
+    const previousDay = new Date(selectedDate);
+    previousDay.setDate(selectedDate.getDate() - 1);
+    setSelectedDate(previousDay);
+  };
+
+  // Navigate to next day
+  const goToNextDay = () => {
+    const nextDay = new Date(selectedDate);
+    nextDay.setDate(selectedDate.getDate() + 1);
+    if (nextDay <= new Date()) { // Don't allow future dates
+      setSelectedDate(nextDay);
+    }
+  };
+
+  // Go to today
+  const goToToday = () => {
+    setSelectedDate(new Date());
+  };
+
+  // Format date for display
+  const formatDisplayDate = (date: Date) => {
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
   // Prepare chart data from Firebase data
   const getChartData = (data: SeismicData[]) => {
     if (data.length === 0) {
@@ -110,9 +157,11 @@ export default function SeismicVibrationScreen() {
     };
   };
 
-  // Get current data based on active tab
-  const vcs1Data = getChartData(vcs1FirebaseData);
-  const vcs2Data = getChartData(vcs2FirebaseData);
+  // Get current data based on active tab with date filtering
+  const filteredVcs1Data = filterDataByDate(vcs1FirebaseData);
+  const filteredVcs2Data = filterDataByDate(vcs2FirebaseData);
+  const vcs1Data = getChartData(filteredVcs1Data);
+  const vcs2Data = getChartData(filteredVcs2Data);
 
   const chartConfig = {
     backgroundColor: Colors[colorScheme ?? 'light'].background,
@@ -145,7 +194,7 @@ export default function SeismicVibrationScreen() {
   };
 
   const getCurrentStats = () => {
-    const firebaseData = activeTab === 'VCS1' ? vcs1FirebaseData : vcs2FirebaseData;
+    const firebaseData = activeTab === 'VCS1' ? filteredVcs1Data : filteredVcs2Data;
     
     if (firebaseData.length === 0) {
       return {
@@ -180,6 +229,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: Colors[colorScheme ?? 'light'].background,
+    paddingBottom: 50,
   },
   container: {
     flex: 1,
@@ -297,8 +347,47 @@ const styles = StyleSheet.create({
     },
     loadingText: {
       marginTop: 12,
-    opacity: 0.6,
-  },
+      opacity: 0.6,
+    },
+    datePickerContainer: {
+      marginBottom: 16,
+    },
+    dateNavigationContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    dateNavButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
+      backgroundColor: Colors[colorScheme ?? 'light'].tabIconDefault + '20',
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].tabIconDefault + '30',
+    },
+    dateDisplayButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: Colors[colorScheme ?? 'light'].tint + '15',
+      borderRadius: 12,
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].tint + '30',
+      flex: 1,
+      marginHorizontal: 12,
+      justifyContent: 'center',
+    },
+    dateIcon: {
+      marginRight: 8,
+    },
+    dateText: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].tint,
+    },
 });
 
   return (
@@ -317,10 +406,53 @@ const styles = StyleSheet.create({
           <ThemedText style={styles.subtitle}>
             {isLoading 
               ? 'Connecting to Firebase...' 
-              : `${vcs1FirebaseData.length + vcs2FirebaseData.length} live data points`
+              : `${filteredVcs1Data.length + filteredVcs2Data.length} data points for selected date`
             }
           </ThemedText>
         </ThemedView>
+        
+        {/* Date Picker */}
+        <View style={styles.datePickerContainer}>
+          <View style={styles.dateNavigationContainer}>
+            <TouchableOpacity 
+              style={styles.dateNavButton}
+              onPress={goToPreviousDay}
+            >
+              <Ionicons 
+                name="chevron-back" 
+                size={20} 
+                color={Colors[colorScheme ?? 'light'].tint}
+              />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.dateDisplayButton}
+              onPress={goToToday}
+            >
+              <Ionicons 
+                name="calendar" 
+                size={18} 
+                color={Colors[colorScheme ?? 'light'].tint}
+                style={styles.dateIcon}
+              />
+              <ThemedText style={styles.dateText}>
+                {formatDisplayDate(selectedDate)}
+              </ThemedText>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.dateNavButton, { opacity: new Date(selectedDate.getTime() + 24 * 60 * 60 * 1000) > new Date() ? 0.3 : 1 }]}
+              onPress={goToNextDay}
+              disabled={new Date(selectedDate.getTime() + 24 * 60 * 60 * 1000) > new Date()}
+            >
+              <Ionicons 
+                name="chevron-forward" 
+                size={20} 
+                color={Colors[colorScheme ?? 'light'].tint}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
         
         {/* Tab Navigation */}
         <View style={styles.tabContainer}>
