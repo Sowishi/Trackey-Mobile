@@ -8,12 +8,14 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
+import { database, off, onValue, ref } from '../../firebase';
 
 export default function MapScreen() {
   const colorScheme = useColorScheme();
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(true);
+  const [firebaseCoordinates, setFirebaseCoordinates] = useState<{lat: number, lon: number} | null>(null);
 
   // Default location (San Francisco)
   const defaultRegion = {
@@ -24,6 +26,7 @@ export default function MapScreen() {
   };
 
   useEffect(() => {
+    // Get user location
     (async () => {
       try {
         let { status } = await Location.requestForegroundPermissionsAsync();
@@ -39,6 +42,43 @@ export default function MapScreen() {
         console.log('Location error:', error);
       }
     })();
+
+    // Set up Firebase realtime database listeners
+    const latRef = ref(database, 'BNHS-Struxis/location_1/coordinates/lat');
+    const lonRef = ref(database, 'BNHS-Struxis/location_1/coordinates/lon');
+
+    let latValue: number | null = null;
+    let lonValue: number | null = null;
+
+    const updateCoordinates = () => {
+      if (latValue !== null && lonValue !== null) {
+        setFirebaseCoordinates({ lat: latValue, lon: lonValue });
+      }
+    };
+
+    const latListener = onValue(latRef, (snapshot: any) => {
+      const data = snapshot.val();
+      if (data !== null) {
+        latValue = data;
+        updateCoordinates();
+        console.log('Firebase lat updated:', data);
+      }
+    });
+
+    const lonListener = onValue(lonRef, (snapshot: any) => {
+      const data = snapshot.val();
+      if (data !== null) {
+        lonValue = data;
+        updateCoordinates();
+        console.log('Firebase lon updated:', data);
+      }
+    });
+
+    // Cleanup listeners on unmount
+    return () => {
+      off(latRef, 'value', latListener);
+      off(lonRef, 'value', lonListener);
+    };
   }, []);
 
   const styles = StyleSheet.create({
@@ -112,6 +152,12 @@ export default function MapScreen() {
     lng: defaultRegion.longitude,
   };
 
+  // Use Firebase coordinates as map center if available, otherwise use current location
+  const mapCenter = firebaseCoordinates ? {
+    lat: firebaseCoordinates.lat,
+    lng: firebaseCoordinates.lon,
+  } : currentLocation;
+
   const mapHtml = `
     <!DOCTYPE html>
     <html>
@@ -128,19 +174,42 @@ export default function MapScreen() {
         <script>
             function initMap() {
                 const map = new google.maps.Map(document.getElementById("map"), {
-                    zoom: 12,
-                    center: { lat: ${currentLocation.lat}, lng: ${currentLocation.lng} },
+                    zoom: 14,
+                    center: { lat: ${mapCenter.lat}, lng: ${mapCenter.lng} },
                     mapTypeControl: true,
                     streetViewControl: true,
                     fullscreenControl: false,
                 });
                 
-                // Add a marker at the center
+                ${firebaseCoordinates ? `
+                // Add Firebase location marker (Monitoring Station)
+                new google.maps.Marker({
+                    position: { lat: ${firebaseCoordinates.lat}, lng: ${firebaseCoordinates.lon} },
+                    map: map,
+                    title: "BNHS Struxis Monitoring Station",
+                    icon: {
+                        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23FF4444" width="32" height="32"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>'),
+                        scaledSize: new google.maps.Size(32, 32),
+                        anchor: new google.maps.Point(16, 32)
+                    }
+                });
+                ` : ''}
+                
+                ${location ? `
+                // Add user location marker (if different from Firebase location)
+                ${firebaseCoordinates && Math.abs(firebaseCoordinates.lat - currentLocation.lat) > 0.001 && Math.abs(firebaseCoordinates.lon - currentLocation.lng) > 0.001 ? `
                 new google.maps.Marker({
                     position: { lat: ${currentLocation.lat}, lng: ${currentLocation.lng} },
                     map: map,
-                    title: "Current Location",
+                    title: "Your Location",
+                    icon: {
+                        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%234285F4" width="24" height="24"><circle cx="12" cy="12" r="8"/></svg>'),
+                        scaledSize: new google.maps.Size(24, 24),
+                        anchor: new google.maps.Point(12, 12)
+                    }
                 });
+                ` : ''}
+                ` : ''}
             }
         </script>
         <script async defer
@@ -165,7 +234,10 @@ export default function MapScreen() {
             <ThemedText type="title" style={{ fontSize: 20 }}>Struxis Map</ThemedText>
           </View>
           <ThemedText style={styles.subtitle}>
-            Structural monitoring locations
+            {firebaseCoordinates 
+              ? `Live monitoring: ${firebaseCoordinates.lat.toFixed(6)}, ${firebaseCoordinates.lon.toFixed(6)}`
+              : 'Connecting to monitoring station...'
+            }
           </ThemedText>
         </ThemedView>
         
