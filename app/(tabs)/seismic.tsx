@@ -68,8 +68,17 @@ export default function SeismicVibrationScreen() {
     return date.toLocaleTimeString('en-US', { 
       hour: '2-digit', 
       minute: '2-digit',
+      second: '2-digit',
       hour12: false 
     });
+  };
+
+  // Format timestamp for shorter chart labels
+  const formatChartLabel = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
   };
 
   // Prepare chart data from Firebase data
@@ -86,11 +95,11 @@ export default function SeismicVibrationScreen() {
       };
     }
 
-    // Take last 10 data points for better chart readability
-    const recentData = data.slice(-10);
+    // Take last 8 data points for better chart readability with bigger size
+    const recentData = data.slice(-8);
     
     return {
-      labels: recentData.map(item => formatTimestamp(item.timestamp)),
+      labels: recentData.map(item => formatChartLabel(item.timestamp)),
       datasets: [{
         data: recentData.map(item => item.value),
         color: (opacity = 1) => activeTab === 'VCS1' 
@@ -119,6 +128,15 @@ export default function SeismicVibrationScreen() {
       r: '6',
       strokeWidth: '2',
       stroke: Colors[colorScheme ?? 'light'].background,
+    },
+    propsForLabels: {
+      fontSize: 12,
+    },
+    propsForVerticalLabels: {
+      fontSize: 10,
+    },
+    propsForHorizontalLabels: {
+      fontSize: 10,
     },
   };
 
@@ -212,7 +230,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
     chartContainer: {
-      marginBottom: 20,
+      marginBottom: 24,
   },
   chartHeader: {
     flexDirection: 'row',
@@ -231,7 +249,7 @@ const styles = StyleSheet.create({
       overflow: 'hidden',
     },
     statsContainer: {
-      marginTop: 20,
+      marginTop: 16,
     },
     statsGrid: {
       flexDirection: 'row',
@@ -271,7 +289,7 @@ const styles = StyleSheet.create({
       fontWeight: 'normal',
     },
     loadingContainer: {
-      height: 220,
+      height: 300,
       justifyContent: 'center',
       alignItems: 'center',
       backgroundColor: Colors[colorScheme ?? 'light'].tabIconDefault + '10',
@@ -279,8 +297,8 @@ const styles = StyleSheet.create({
     },
     loadingText: {
       marginTop: 12,
-      opacity: 0.6,
-    },
+    opacity: 0.6,
+  },
 });
 
   return (
@@ -362,7 +380,7 @@ const styles = StyleSheet.create({
                 <LineChart
                   data={getCurrentData()}
                   width={width - 40}
-                  height={220}
+                  height={300}
                   chartConfig={chartConfig}
                   bezier
                   style={{
