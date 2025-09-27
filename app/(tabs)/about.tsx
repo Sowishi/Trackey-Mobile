@@ -3,6 +3,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { Alert, Linking, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -13,6 +14,7 @@ export default function AboutScreen() {
     safeArea: {
       flex: 1,
       backgroundColor: Colors[colorScheme ?? 'light'].background,
+      paddingBottom: 50,
     },
     container: {
       flex: 1,
@@ -106,9 +108,13 @@ export default function AboutScreen() {
           text: 'Logout',
           style: 'destructive',
           onPress: () => {
-            // In a real app, you'd clear authentication state here
-            // For now, we'll just show an alert
-            Alert.alert('Logged out', 'You have been logged out successfully.');
+            // Navigate back to login screen
+            router.replace('/login');
+            
+            // Show success message after navigation
+            setTimeout(() => {
+              Alert.alert('Logged out', 'You have been logged out successfully.');
+            }, 100);
           },
         },
       ]
@@ -136,7 +142,7 @@ export default function AboutScreen() {
               <ThemedText type="title">About Struxis</ThemedText>
             </View>
             <ThemedText style={styles.subtitle}>
-              Structural monitoring and analysis platform
+              Advanced structural health monitoring with real-time Firebase integration
             </ThemedText>
           </ThemedView>
 
@@ -152,8 +158,10 @@ export default function AboutScreen() {
             </View>
             <ThemedText style={styles.infoText}>
               Version: 1.0.0{'\n'}
-              Build: 2024.01.15{'\n'}
-              Platform: React Native with Expo
+              Build: 2024.09.27{'\n'}
+              Platform: React Native with Expo SDK 54{'\n'}
+              Database: Firebase Realtime Database{'\n'}
+              Maps: Google Maps API Integration
             </ThemedText>
           </ThemedView>
 
@@ -168,11 +176,36 @@ export default function AboutScreen() {
               <ThemedText style={styles.sectionTitle}>Features</ThemedText>
             </View>
             <ThemedText style={styles.featureText}>
-              • Real-time structural monitoring{'\n'}
-              • Overload collection and analysis{'\n'}
-              • Seismic vibration detection{'\n'}
-              • Interactive mapping interface{'\n'}
-              • Data visualization and reporting
+              • Real-time Firebase data synchronization{'\n'}
+              • Interactive Google Maps integration{'\n'}
+              • Seismic vibration monitoring (VCS1 & VCS2){'\n'}
+              • Live chart visualization with date filtering{'\n'}
+              • Overload collection analysis{'\n'}
+              • GPS coordinate tracking{'\n'}
+              • Professional dark/light theme support{'\n'}
+              • Cross-platform compatibility (iOS, Android, Web)
+            </ThemedText>
+          </ThemedView>
+
+          <ThemedView style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Ionicons 
+                name="settings" 
+                size={20} 
+                color={Colors[colorScheme ?? 'light'].tint}
+                style={styles.sectionIcon}
+              />
+              <ThemedText style={styles.sectionTitle}>Technical Specifications</ThemedText>
+            </View>
+            <ThemedText style={styles.infoText}>
+              • Firebase Paths:{'\n'}
+                - Map Coordinates: /BNHS-Struxis/location_1/coordinates/{'\n'}
+                - VCS1 Data: /BNHS-Struxis/seismic/vcs1/values{'\n'}
+                - VCS2 Data: /BNHS-Struxis/seismic/vcs2/values{'\n'}
+              • Chart Library: react-native-chart-kit{'\n'}
+              • Maps: Google Maps JavaScript API{'\n'}
+              • Real-time Updates: Firebase Realtime Database{'\n'}
+              • UI Framework: React Native with Expo Router
             </ThemedText>
           </ThemedView>
 
@@ -188,17 +221,24 @@ export default function AboutScreen() {
             </View>
             <TouchableOpacity 
               style={styles.linkButton}
-              onPress={() => openLink('mailto:support@struxis.com')}
+              onPress={() => openLink('mailto:support@bnhs-struxis.com')}
             >
               <Ionicons name="mail-outline" size={16} color="#007AFF" style={styles.linkIcon} />
-              <ThemedText style={styles.linkText}>support@struxis.com</ThemedText>
+              <ThemedText style={styles.linkText}>support@bnhs-struxis.com</ThemedText>
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.linkButton}
-              onPress={() => openLink('https://struxis.com')}
+              onPress={() => openLink('https://github.com/bnhs-struxis')}
             >
-              <Ionicons name="globe-outline" size={16} color="#007AFF" style={styles.linkIcon} />
-              <ThemedText style={styles.linkText}>www.struxis.com</ThemedText>
+              <Ionicons name="logo-github" size={16} color="#007AFF" style={styles.linkIcon} />
+              <ThemedText style={styles.linkText}>GitHub Repository</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.linkButton}
+              onPress={() => openLink('https://bnhs.edu.ph')}
+            >
+              <Ionicons name="school-outline" size={16} color="#007AFF" style={styles.linkIcon} />
+              <ThemedText style={styles.linkText}>BNHS Official Website</ThemedText>
             </TouchableOpacity>
           </ThemedView>
 
@@ -226,6 +266,26 @@ export default function AboutScreen() {
               <Ionicons name="document-outline" size={16} color="#007AFF" style={styles.linkIcon} />
               <ThemedText style={styles.linkText}>Terms of Service</ThemedText>
             </TouchableOpacity>
+          </ThemedView>
+
+          <ThemedView style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Ionicons 
+                name="people" 
+                size={20} 
+                color={Colors[colorScheme ?? 'light'].tint}
+                style={styles.sectionIcon}
+              />
+              <ThemedText style={styles.sectionTitle}>Credits</ThemedText>
+            </View>
+            <ThemedText style={styles.infoText}>
+              Developed for BNHS (Bataan National High School){'\n'}
+              Structural Health Monitoring Project{'\n\n'}
+              Built with React Native, Expo, and Firebase{'\n'}
+              Maps powered by Google Maps API{'\n'}
+              Charts by react-native-chart-kit{'\n\n'}
+              © 2024 BNHS Struxis Team
+            </ThemedText>
           </ThemedView>
 
           <ThemedView style={styles.section}>
