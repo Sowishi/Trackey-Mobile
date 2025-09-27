@@ -3,8 +3,8 @@ import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
-import { Dimensions, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Dimensions, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { database, off, onValue, ref } from '../../firebase';
@@ -23,8 +23,58 @@ export default function SeismicVibrationScreen() {
   const [vcs2FirebaseData, setVcs2FirebaseData] = useState<SeismicData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDataPoint, setSelectedDataPoint] = useState<SeismicData | null>(null);
+  const [showTooltip, setShowTooltip] = useState(false);
+  
+  // Animation refs
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const chartScaleAnim = useRef(new Animated.Value(0.8)).current;
+  const tabSwitchAnim = useRef(new Animated.Value(0)).current;
+  
+  // Chart interaction refs
+  const chartScale = useRef(new Animated.Value(1)).current;
+  const chartTranslateX = useRef(new Animated.Value(0)).current;
+  const chartTranslateY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    // Initial animations
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(chartScaleAnim, {
+        toValue: 1,
+        duration: 1200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Pulsing animation for live data indicator
+    const pulseAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.2,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulseAnimation.start();
+
     // Set up Firebase realtime database listeners
     const vcs1Ref = ref(database, 'BNHS-Struxis/seismic/vcs1/values');
     const vcs2Ref = ref(database, 'BNHS-Struxis/seismic/vcs2/values');
@@ -126,6 +176,70 @@ export default function SeismicVibrationScreen() {
       month: 'short',
       day: 'numeric',
     });
+  };
+
+  // Animated tab switching
+  const switchTab = (tab: 'VCS1' | 'VCS2') => {
+    if (tab === activeTab) return;
+    
+    Animated.sequence([
+      Animated.timing(tabSwitchAnim, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.timing(tabSwitchAnim, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    setActiveTab(tab);
+  };
+
+  // Chart interaction handlers
+  const onChartPress = (data: any) => {
+    const currentData = activeTab === 'VCS1' ? filteredVcs1Data : filteredVcs2Data;
+    if (data && data.index !== undefined && currentData[data.index]) {
+      setSelectedDataPoint(currentData[data.index]);
+      setShowTooltip(true);
+      
+      // Animate tooltip appearance
+      Animated.spring(chartScale, {
+        toValue: 1.05,
+        useNativeDriver: true,
+      }).start(() => {
+        Animated.spring(chartScale, {
+          toValue: 1,
+          useNativeDriver: true,
+        }).start();
+      });
+
+      // Hide tooltip after 3 seconds
+      setTimeout(() => {
+        setShowTooltip(false);
+        setSelectedDataPoint(null);
+      }, 3000);
+    }
+  };
+
+  // Reset chart transformations
+  const resetChart = () => {
+    Animated.parallel([
+      Animated.spring(chartScale, {
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+      Animated.spring(chartTranslateX, {
+        toValue: 0,
+        useNativeDriver: true,
+      }),
+      Animated.spring(chartTranslateY, {
+        toValue: 0,
+        useNativeDriver: true,
+      }),
+    ]).start();
   };
 
   // Prepare chart data from Firebase data
@@ -347,7 +461,67 @@ const styles = StyleSheet.create({
     },
     loadingText: {
       marginTop: 12,
-      opacity: 0.6,
+    opacity: 0.6,
+    },
+    liveIndicator: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginLeft: 12,
+    },
+    liveDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: '#FF4444',
+      marginRight: 6,
+    },
+    liveText: {
+      fontSize: 12,
+      color: '#FF4444',
+      fontWeight: '600',
+    },
+    tooltip: {
+      position: 'absolute',
+      backgroundColor: Colors[colorScheme ?? 'light'].tint,
+      padding: 12,
+      borderRadius: 8,
+      top: -60,
+      left: '50%',
+      transform: [{ translateX: -75 }],
+      minWidth: 150,
+      zIndex: 1000,
+    },
+    tooltipText: {
+      color: 'white',
+      fontSize: 12,
+      fontWeight: '600',
+    textAlign: 'center',
+  },
+    tooltipValue: {
+      color: 'white',
+      fontSize: 16,
+      fontWeight: 'bold',
+      textAlign: 'center',
+      marginTop: 4,
+    },
+    interactiveChartContainer: {
+      position: 'relative',
+      overflow: 'hidden',
+    },
+    chartGestureHandler: {
+      flex: 1,
+    },
+    resetButton: {
+      position: 'absolute',
+      top: 10,
+      right: 10,
+      backgroundColor: Colors[colorScheme ?? 'light'].tint + '20',
+      borderRadius: 20,
+      width: 40,
+      height: 40,
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 100,
     },
     datePickerContainer: {
       marginBottom: 16,
@@ -454,35 +628,72 @@ const styles = StyleSheet.create({
           </View>
         </View>
         
-        {/* Tab Navigation */}
-        <View style={styles.tabContainer}>
+        {/* Animated Tab Navigation */}
+        <Animated.View 
+          style={[
+            styles.tabContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }]
+            }
+          ]}
+        >
           <TouchableOpacity
             style={[styles.tab, activeTab === 'VCS1' && styles.activeTab]}
-            onPress={() => setActiveTab('VCS1')}
+            onPress={() => switchTab('VCS1')}
           >
-            <ThemedText style={[
-              styles.tabText,
-              activeTab === 'VCS1' ? styles.activeTabText : styles.inactiveTabText
-            ]}>
-              VCS1
-            </ThemedText>
+            <Animated.View style={{
+              transform: [{ 
+                scale: activeTab === 'VCS1' ? tabSwitchAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [1, 0.95]
+                }) : 1 
+              }]
+            }}>
+              <ThemedText style={[
+                styles.tabText,
+                activeTab === 'VCS1' ? styles.activeTabText : styles.inactiveTabText
+              ]}>
+                VCS1
+              </ThemedText>
+            </Animated.View>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tab, activeTab === 'VCS2' && styles.activeTab]}
-            onPress={() => setActiveTab('VCS2')}
+            onPress={() => switchTab('VCS2')}
           >
-            <ThemedText style={[
-              styles.tabText,
-              activeTab === 'VCS2' ? styles.activeTabText : styles.inactiveTabText
-            ]}>
-              VCS2
-            </ThemedText>
+            <Animated.View style={{
+              transform: [{ 
+                scale: activeTab === 'VCS2' ? tabSwitchAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [1, 0.95]
+                }) : 1 
+              }]
+            }}>
+              <ThemedText style={[
+                styles.tabText,
+                activeTab === 'VCS2' ? styles.activeTabText : styles.inactiveTabText
+              ]}>
+                VCS2
+              </ThemedText>
+            </Animated.View>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
 
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          {/* Chart Section */}
-          <ThemedView style={styles.chartContainer}>
+          {/* Animated Chart Section */}
+          <Animated.View 
+            style={[
+              styles.chartContainer,
+              {
+                opacity: fadeAnim,
+                transform: [
+                  { translateY: slideAnim },
+                  { scale: chartScaleAnim }
+                ]
+              }
+            ]}
+          >
             <View style={styles.chartHeader}>
               <Ionicons 
                 name="analytics" 
@@ -496,35 +707,112 @@ const styles = StyleSheet.create({
                   <ThemedText style={styles.lastUpdate}> • Last: {stats.lastUpdate}</ThemedText>
                 )}
               </ThemedText>
+              
+              {/* Live Data Indicator */}
+              {!isLoading && stats.lastUpdate !== 'No data' && (
+                <Animated.View 
+                  style={[
+                    styles.liveIndicator,
+                    { transform: [{ scale: pulseAnim }] }
+                  ]}
+                >
+                  <View style={styles.liveDot} />
+                  <ThemedText style={styles.liveText}>LIVE</ThemedText>
+                </Animated.View>
+              )}
             </View>
             
-            <View style={styles.chartWrapper}>
+            <View style={[styles.chartWrapper, styles.interactiveChartContainer]}>
               {isLoading ? (
                 <View style={styles.loadingContainer}>
-                  <Ionicons 
-                    name="pulse-outline" 
-                    size={40} 
-                    color={Colors[colorScheme ?? 'light'].tabIconDefault}
-                  />
+                  <Animated.View style={{ transform: [{ rotate: pulseAnim.interpolate({
+                    inputRange: [1, 1.2],
+                    outputRange: ['0deg', '360deg']
+                  }) }] }}>
+                    <Ionicons 
+                      name="pulse-outline" 
+                      size={40} 
+                      color={Colors[colorScheme ?? 'light'].tabIconDefault}
+                    />
+                  </Animated.View>
                   <ThemedText style={styles.loadingText}>Loading Firebase data...</ThemedText>
                 </View>
               ) : (
-                <LineChart
-                  data={getCurrentData()}
-                  width={width - 40}
-                  height={300}
-                  chartConfig={chartConfig}
-                  bezier
-                  style={{
-                    borderRadius: 16,
-                  }}
-                />
+                <>
+                  <TouchableOpacity 
+                    style={styles.resetButton}
+                    onPress={resetChart}
+                  >
+                    <Ionicons 
+                      name="refresh-outline" 
+                      size={20} 
+                      color={Colors[colorScheme ?? 'light'].tint}
+                    />
+                  </TouchableOpacity>
+                  
+                  <Animated.View 
+                    style={{
+                      transform: [
+                        { scale: chartScale },
+                        { translateX: chartTranslateX },
+                        { translateY: chartTranslateY }
+                      ]
+                    }}
+                  >
+                    <LineChart
+                      data={getCurrentData()}
+                      width={width - 40}
+                      height={300}
+                      chartConfig={chartConfig}
+                      bezier
+                      onDataPointClick={onChartPress}
+                      withDots={true}
+                      withShadow={true}
+                      withInnerLines={true}
+                      withOuterLines={true}
+                      style={{
+                        borderRadius: 16,
+                      }}
+                    />
+                  </Animated.View>
+                  
+                  {/* Interactive Tooltip */}
+                  {showTooltip && selectedDataPoint && (
+                    <Animated.View 
+                      style={[
+                        styles.tooltip,
+                        {
+                          opacity: fadeAnim,
+                          transform: [{ scale: chartScale }]
+                        }
+                      ]}
+                    >
+                      <ThemedText style={styles.tooltipText}>
+                        {formatTimestamp(selectedDataPoint.timestamp)}
+                      </ThemedText>
+                      <ThemedText style={styles.tooltipValue}>
+                        {selectedDataPoint.value.toFixed(2)} Hz
+                      </ThemedText>
+                    </Animated.View>
+                  )}
+                </>
               )}
             </View>
-          </ThemedView>
+          </Animated.View>
 
-          {/* Statistics */}
-          <ThemedView style={styles.statsContainer}>
+          {/* Animated Statistics */}
+          <Animated.View 
+            style={[
+              styles.statsContainer,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim.interpolate({
+                  inputRange: [0, 50],
+                  outputRange: [0, 25]
+                }) }]
+              }
+            ]}
+          >
             <View style={styles.chartHeader}>
               <Ionicons 
                 name="stats-chart" 
@@ -535,7 +823,12 @@ const styles = StyleSheet.create({
               <ThemedText style={[styles.chartTitle, { fontSize: 18 }]}>Statistics</ThemedText>
             </View>
             
-            <View style={styles.statsGrid}>
+            <Animated.View 
+              style={[
+                styles.statsGrid,
+                { transform: [{ scale: chartScaleAnim }] }
+              ]}
+            >
               <ThemedView style={styles.statCard}>
                 <View style={styles.statHeader}>
                   <Ionicons 
@@ -593,8 +886,8 @@ const styles = StyleSheet.create({
                 </View>
                 <ThemedText style={styles.statValue}>{stats.avg}</ThemedText>
               </ThemedView>
-            </View>
-          </ThemedView>
+            </Animated.View>
+          </Animated.View>
         </ScrollView>
       </ThemedView>
     </SafeAreaView>

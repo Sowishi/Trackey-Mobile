@@ -1,5 +1,4 @@
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
@@ -222,24 +221,7 @@ export default function MapScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        {/* Header overlay */}
-        <ThemedView style={styles.header}>
-          <View style={styles.titleRow}>
-            <Ionicons 
-              name="map" 
-              size={24} 
-              color={Colors[colorScheme ?? 'light'].tint} 
-              style={styles.headerIcon}
-            />
-            <ThemedText type="title" style={{ fontSize: 20 }}>Struxis Map</ThemedText>
-          </View>
-          <ThemedText style={styles.subtitle}>
-            {firebaseCoordinates 
-              ? `Live monitoring: ${firebaseCoordinates.lat.toFixed(6)}, ${firebaseCoordinates.lon.toFixed(6)}`
-              : 'Connecting to monitoring station...'
-            }
-          </ThemedText>
-        </ThemedView>
+       
         
         {/* Full-screen map */}
         <View style={styles.mapContainer}>
