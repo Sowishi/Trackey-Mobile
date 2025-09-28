@@ -237,15 +237,15 @@ export default function MonitorScreen() {
       alignItems: 'center',
       width: '100%',
       marginBottom: 120,
-      gap: 60,
+      gap: 40,
     },
     energySource: {
       alignItems: 'center',
       justifyContent: 'center',
-      width: 60,
-      height: 60,
-      borderRadius: 30,
-      borderWidth: 2,
+      width: 80,
+      height: 80,
+      borderRadius: 100,
+      borderWidth: 3,
       backgroundColor: Colors[colorScheme ?? 'light'].background,
       elevation: 6,
       shadowColor: '#000',
@@ -254,7 +254,6 @@ export default function MonitorScreen() {
       shadowRadius: 8,
     },
     energyIcon: {
-      marginBottom: 8,
     },
     energyName: {
       fontSize: 10,
