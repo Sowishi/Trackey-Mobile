@@ -85,6 +85,7 @@ export default function MonitorScreen() {
   const progressAnim = useRef(new Animated.Value(0)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
   const energyBallAnim = useRef(new Animated.Value(0)).current;
+  const housePulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     // Initial animations
@@ -150,6 +151,23 @@ export default function MonitorScreen() {
     );
     energyBallAnimation.start();
 
+    // House pulsing animation
+    const housePulseAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(housePulseAnim, {
+          toValue: 1.1,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(housePulseAnim, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    housePulseAnimation.start();
+
     // Simulate loading
     setTimeout(() => {
       setIsLoading(false);
@@ -193,6 +211,7 @@ export default function MonitorScreen() {
       pulseAnimation.stop();
       glowAnimation.stop();
       energyBallAnimation.stop();
+      housePulseAnimation.stop();
     };
   }, []);
 
@@ -687,6 +706,7 @@ export default function MonitorScreen() {
                 styles.houseContainer,
               {
                 opacity: fadeAnim,
+                transform: [{ scale: housePulseAnim }],
               }
             ]}
           >
