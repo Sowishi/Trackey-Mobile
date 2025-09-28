@@ -15,8 +15,8 @@ export default function AboutScreen() {
   const [appInfo] = useState({
     version: '1.0.0',
     buildDate: '2024.09.28',
-    developer: 'Project Watch Team',
-    description: 'Advanced monitoring and weather analytics platform'
+    developer: 'Basud National High School',
+    description: 'Educational renewable energy monitoring system developed by students'
   });
   
   // Animation refs
@@ -249,7 +249,7 @@ export default function AboutScreen() {
   const handleLogout = () => {
     Alert.alert(
       'Logout',
-      'Are you sure you want to logout from Project Watch?',
+      'Are you sure you want to logout from BNHS Watch?',
       [
         {
           text: 'Cancel',
@@ -264,7 +264,7 @@ export default function AboutScreen() {
             
             // Show success message after navigation
             setTimeout(() => {
-              Alert.alert('Logged out', 'You have been logged out successfully from Project Watch.');
+              Alert.alert('Logged out', 'You have been logged out successfully from BNHS Watch.');
             }, 100);
           },
         },
@@ -279,12 +279,12 @@ export default function AboutScreen() {
   };
 
   const features = [
-    { icon: 'cloud', text: 'Real-time weather monitoring and analytics' },
-    { icon: 'desktop', text: 'System performance monitoring' },
-    { icon: 'analytics', text: 'Advanced data visualization' },
-    { icon: 'notifications', text: 'Smart alert system' },
-    { icon: 'refresh', text: 'Live data updates' },
-    { icon: 'shield-checkmark', text: 'Secure and reliable monitoring' },
+    { icon: 'sunny', text: 'Real-time solar energy monitoring' },
+    { icon: 'leaf', text: 'Wind turbine power tracking' },
+    { icon: 'water', text: 'Gutter turbine energy measurement' },
+    { icon: 'analytics', text: 'Educational data visualization' },
+    { icon: 'refresh', text: 'Live Firebase data integration' },
+    { icon: 'school', text: 'Student-developed monitoring system' },
   ];
 
   return (
@@ -306,10 +306,10 @@ export default function AboutScreen() {
               color={Colors[colorScheme ?? 'light'].tint} 
               style={styles.headerIcon}
             />
-            <ThemedText type="title">About Project Watch</ThemedText>
+            <ThemedText type="title">About BNHS Watch</ThemedText>
           </View>
           <ThemedText style={styles.subtitle}>
-            Information and settings for Project Watch
+            Renewable Energy Monitoring System by Basud National High School
           </ThemedText>
         </Animated.View>
         
@@ -336,8 +336,8 @@ export default function AboutScreen() {
                 color={Colors[colorScheme ?? 'light'].tint}
               />
             </Animated.View>
-            <ThemedText style={styles.appName}>Project Watch</ThemedText>
-            <ThemedText style={styles.appTagline}>Monitor • Weather • Analytics</ThemedText>
+            <ThemedText style={styles.appName}>BNHS Watch</ThemedText>
+            <ThemedText style={styles.appTagline}>Renewable Energy • Monitoring • Education</ThemedText>
             <ThemedText style={styles.appDescription}>
               {appInfo.description}
             </ThemedText>
@@ -455,37 +455,37 @@ export default function AboutScreen() {
               
               <TouchableOpacity 
                 style={styles.linkButton}
-                onPress={() => openLink('mailto:support@projectwatch.com')}
+                onPress={() => openLink('mailto:bnhs.renewable@gmail.com')}
               >
                 <Ionicons name="mail" size={18} color={Colors[colorScheme ?? 'light'].tint} style={styles.linkIcon} />
-                <ThemedText style={styles.linkText}>Contact Support</ThemedText>
+                <ThemedText style={styles.linkText}>Contact School</ThemedText>
                 <Ionicons name="chevron-forward" size={16} color={Colors[colorScheme ?? 'light'].tabIconDefault} style={styles.linkArrow} />
               </TouchableOpacity>
 
               <TouchableOpacity 
                 style={styles.linkButton}
-                onPress={() => openLink('https://projectwatch.com/docs')}
+                onPress={() => Alert.alert('School Project', 'This renewable energy monitoring system was developed as an educational project by students at Basud National High School to demonstrate real-time energy monitoring and sustainable technology.')}
               >
                 <Ionicons name="document-text" size={18} color={Colors[colorScheme ?? 'light'].tint} style={styles.linkIcon} />
-                <ThemedText style={styles.linkText}>Documentation</ThemedText>
+                <ThemedText style={styles.linkText}>About This Project</ThemedText>
                 <Ionicons name="chevron-forward" size={16} color={Colors[colorScheme ?? 'light'].tabIconDefault} style={styles.linkArrow} />
               </TouchableOpacity>
 
               <TouchableOpacity 
                 style={styles.linkButton}
-                onPress={() => openLink('https://github.com/projectwatch')}
+                onPress={() => Alert.alert('Basud National High School', 'Located in the Philippines, BNHS is committed to providing quality education and fostering innovation in science and technology among students.')}
               >
-                <Ionicons name="logo-github" size={18} color={Colors[colorScheme ?? 'light'].tint} style={styles.linkIcon} />
-                <ThemedText style={styles.linkText}>GitHub Repository</ThemedText>
+                <Ionicons name="school" size={18} color={Colors[colorScheme ?? 'light'].tint} style={styles.linkIcon} />
+                <ThemedText style={styles.linkText}>About Our School</ThemedText>
                 <Ionicons name="chevron-forward" size={16} color={Colors[colorScheme ?? 'light'].tabIconDefault} style={styles.linkArrow} />
               </TouchableOpacity>
 
               <TouchableOpacity 
                 style={styles.linkButton}
-                onPress={() => Alert.alert('Privacy Policy', 'Your privacy is important to us. Project Watch collects minimal data necessary for monitoring functionality and does not share personal information with third parties.')}
+                onPress={() => Alert.alert('Educational Use', 'This application is developed for educational purposes by Basud National High School students. Data collected is used solely for learning and demonstration of renewable energy monitoring systems.')}
               >
                 <Ionicons name="shield-outline" size={18} color={Colors[colorScheme ?? 'light'].tint} style={styles.linkIcon} />
-                <ThemedText style={styles.linkText}>Privacy Policy</ThemedText>
+                <ThemedText style={styles.linkText}>Educational Use Policy</ThemedText>
                 <Ionicons name="chevron-forward" size={16} color={Colors[colorScheme ?? 'light'].tabIconDefault} style={styles.linkArrow} />
               </TouchableOpacity>
             </View>
@@ -506,12 +506,12 @@ export default function AboutScreen() {
           >
             <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
               <Ionicons name="log-out-outline" size={20} color="white" style={styles.logoutIcon} />
-              <ThemedText style={styles.logoutButtonText}>Logout from Project Watch</ThemedText>
+              <ThemedText style={styles.logoutButtonText}>Logout from BNHS Watch</ThemedText>
             </TouchableOpacity>
           </Animated.View>
 
           <ThemedText style={styles.copyright}>
-            © 2024 Project Watch Team. All rights reserved.
+            © 2024 Basud National High School. Educational Project.
           </ThemedText>
         </ScrollView>
       </ThemedView>

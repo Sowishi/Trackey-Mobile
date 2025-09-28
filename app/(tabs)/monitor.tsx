@@ -451,8 +451,8 @@ export default function MonitorScreen() {
     energySource: {
       alignItems: 'center',
       justifyContent: 'center',
-      width: 80,
-      height: 80,
+      width: 70,
+      height: 70,
       borderRadius: 40,
       borderWidth: 3,
       backgroundColor: Colors[colorScheme ?? 'light'].background,
