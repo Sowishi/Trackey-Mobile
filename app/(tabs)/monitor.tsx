@@ -503,26 +503,175 @@ export default function MonitorScreen() {
       bottom: 0,
       zIndex: -1,
     },
-    totalOutputCard: {
-      backgroundColor: '#2A2A2A',
-      borderRadius: 20,
-      padding: 20,
-      marginBottom: 20,
-      borderWidth: 2,
-      borderColor: Colors[colorScheme ?? 'light'].tint + '40',
-      alignItems: 'center',
-    },
-    totalOutputValue: {
-      fontSize: 36,
-      fontWeight: 'bold',
-      color: Colors[colorScheme ?? 'light'].tint,
-      marginBottom: 8,
-    },
-    totalOutputLabel: {
-      fontSize: 16,
-      fontWeight: '600',
-      opacity: 0.8,
-    },
+     // Statistics Section Styles
+     statisticsContainer: {
+       paddingHorizontal: 20,
+       paddingTop: 30,
+       paddingBottom: 20,
+     },
+     totalOutputCard: {
+       backgroundColor: Colors[colorScheme ?? 'light'].background,
+       borderRadius: 16,
+       padding: 20,
+       marginBottom: 20,
+       borderWidth: 2,
+       borderColor: '#FFD700' + '40',
+       elevation: 4,
+       shadowColor: '#000',
+       shadowOffset: { width: 0, height: 2 },
+       shadowOpacity: 0.1,
+       shadowRadius: 8,
+     },
+     totalOutputHeader: {
+       flexDirection: 'row',
+       alignItems: 'center',
+       marginBottom: 10,
+     },
+     totalOutputValue: {
+       fontSize: 32,
+       fontWeight: 'bold',
+       color: '#FFD700',
+       marginBottom: 5,
+       textAlign: 'center',
+     },
+     totalOutputLabel: {
+       fontSize: 16,
+       fontWeight: '600',
+       marginLeft: 8,
+       color: Colors[colorScheme ?? 'light'].text,
+     },
+     lastUpdateText: {
+       fontSize: 12,
+       opacity: 0.6,
+       textAlign: 'center',
+       marginTop: 5,
+     },
+     sectionTitle: {
+       fontSize: 18,
+       fontWeight: 'bold',
+       marginBottom: 15,
+       color: Colors[colorScheme ?? 'light'].text,
+     },
+     energySourcesGrid: {
+       marginBottom: 25,
+     },
+     sourceCard: {
+       backgroundColor: Colors[colorScheme ?? 'light'].background,
+       borderRadius: 12,
+       padding: 15,
+       marginBottom: 12,
+       borderLeftWidth: 4,
+       elevation: 2,
+       shadowColor: '#000',
+       shadowOffset: { width: 0, height: 1 },
+       shadowOpacity: 0.1,
+       shadowRadius: 4,
+     },
+     sourceHeader: {
+       flexDirection: 'row',
+       alignItems: 'center',
+       marginBottom: 8,
+     },
+     sourceTitle: {
+       fontSize: 14,
+       fontWeight: '600',
+       marginLeft: 8,
+       color: Colors[colorScheme ?? 'light'].text,
+     },
+     sourceValue: {
+       fontSize: 20,
+       fontWeight: 'bold',
+       marginBottom: 4,
+     },
+     sourceSubtext: {
+       fontSize: 12,
+       opacity: 0.7,
+       marginBottom: 8,
+       color: Colors[colorScheme ?? 'light'].text,
+     },
+     contributionBar: {
+       height: 4,
+       backgroundColor: Colors[colorScheme ?? 'light'].tabIconDefault + '30',
+       borderRadius: 2,
+       overflow: 'hidden',
+     },
+     contributionFill: {
+       height: '100%',
+       borderRadius: 2,
+     },
+     metricsContainer: {
+       marginBottom: 25,
+     },
+     metricsGrid: {
+       flexDirection: 'row',
+       flexWrap: 'wrap',
+       justifyContent: 'space-between',
+     },
+     metricCard: {
+       backgroundColor: Colors[colorScheme ?? 'light'].background,
+       borderRadius: 12,
+       padding: 15,
+       width: '48%',
+       marginBottom: 12,
+       alignItems: 'center',
+       elevation: 2,
+       shadowColor: '#000',
+       shadowOffset: { width: 0, height: 1 },
+       shadowOpacity: 0.1,
+       shadowRadius: 4,
+     },
+     metricValue: {
+       fontSize: 16,
+       fontWeight: 'bold',
+       marginTop: 8,
+       marginBottom: 4,
+       color: Colors[colorScheme ?? 'light'].text,
+     },
+     metricLabel: {
+       fontSize: 12,
+       opacity: 0.7,
+       textAlign: 'center',
+       color: Colors[colorScheme ?? 'light'].text,
+     },
+     statusContainer: {
+       marginBottom: 20,
+     },
+     statusGrid: {
+       flexDirection: 'row',
+       justifyContent: 'space-between',
+       flexWrap: 'wrap',
+     },
+     statusItem: {
+       backgroundColor: Colors[colorScheme ?? 'light'].background,
+       borderRadius: 12,
+       padding: 15,
+       width: '32%',
+       alignItems: 'center',
+       elevation: 2,
+       shadowColor: '#000',
+       shadowOffset: { width: 0, height: 1 },
+       shadowOpacity: 0.1,
+       shadowRadius: 4,
+     },
+     statusIndicator: {
+       width: 12,
+       height: 12,
+       borderRadius: 6,
+       marginBottom: 8,
+     },
+     statusLabel: {
+       fontSize: 11,
+       opacity: 0.7,
+       textAlign: 'center',
+       marginBottom: 4,
+       color: Colors[colorScheme ?? 'light'].text,
+     },
+     statusValue: {
+       fontSize: 12,
+       fontWeight: '600',
+       textAlign: 'center',
+       color: Colors[colorScheme ?? 'light'].text,
+     },
     batterySection: {
       backgroundColor: '#2A2A2A',
       borderRadius: 16,
@@ -1022,27 +1171,130 @@ export default function MonitorScreen() {
               {renderEnergySource(energyData.gutter)}
                 </View>
 
-            {/* House Icon */}
-          <Animated.View 
-            style={[
-                styles.houseContainer,
-              {
-                opacity: fadeAnim,
-              }
-            ]}
-          >
-              <Ionicons 
-                name="home" 
-                size={40} 
-                color={Colors[colorScheme ?? 'light'].tint}
-              />
-            </Animated.View>
-            </View>
-            
-       
+             {/* House Icon */}
+           <Animated.View 
+             style={[
+                 styles.houseContainer,
+               {
+                 opacity: fadeAnim,
+                 transform: [{ scale: housePulseAnim }],
+               }
+             ]}
+           >
+               <Ionicons 
+                 name="home" 
+                 size={40} 
+                 color={Colors[colorScheme ?? 'light'].tint}
+               />
+             </Animated.View>
+             </View>
 
+           {/* Statistics Section */}
+           <Animated.View 
+             style={[
+               styles.statisticsContainer,
+               {
+                 opacity: fadeAnim,
+                 transform: [{ translateY: slideAnim }]
+               }
+             ]}
+           >
+             {/* Total Output Card */}
+             <View style={styles.totalOutputCard}>
+               <View style={styles.totalOutputHeader}>
+                 <Ionicons name="flash" size={24} color="#FFD700" />
+                 <ThemedText style={styles.totalOutputLabel}>Total Power Output</ThemedText>
+               </View>
+               <ThemedText style={styles.totalOutputValue}>
+                 {energyData.totalOutput.toFixed(1)} W
+               </ThemedText>
+               <ThemedText style={styles.lastUpdateText}>
+                 Last updated: {energyData.lastUpdate}
+               </ThemedText>
+             </View>
+
+             {/* Energy Sources Grid */}
+             <View style={styles.energySourcesGrid}>
+               <View style={[styles.sourceCard, { borderLeftColor: energyData.solar.color }]}>
+                 <View style={styles.sourceHeader}>
+                   <Ionicons name={energyData.solar.icon as any} size={20} color={energyData.solar.color} />
+                   <ThemedText style={styles.sourceTitle}>Solar</ThemedText>
+                 </View>
+                 <ThemedText style={[styles.sourceValue, { color: energyData.solar.color }]}>
+                   {energyData.solar.watts.toFixed(1)}W
+                 </ThemedText>
+                 <ThemedText style={styles.sourceSubtext}>
+                   {energyData.solar.amps.toFixed(1)}A • {energyData.solar.volts.toFixed(1)}V
+                 </ThemedText>
+                 <View style={styles.contributionBar}>
+                   <View 
+                     style={[
+                       styles.contributionFill, 
+                       { 
+                         backgroundColor: energyData.solar.color,
+                         width: `${energyData.totalOutput > 0 ? (energyData.solar.watts / energyData.totalOutput) * 100 : 0}%`
+                       }
+                     ]} 
+                   />
+                 </View>
+               </View>
+
+               <View style={[styles.sourceCard, { borderLeftColor: energyData.wind.color }]}>
+                 <View style={styles.sourceHeader}>
+                   <Ionicons name={energyData.wind.icon as any} size={20} color={energyData.wind.color} />
+                   <ThemedText style={styles.sourceTitle}>Wind</ThemedText>
+                 </View>
+                 <ThemedText style={[styles.sourceValue, { color: energyData.wind.color }]}>
+                   {energyData.wind.watts.toFixed(1)}W
+                 </ThemedText>
+                 <ThemedText style={styles.sourceSubtext}>
+                   {energyData.wind.amps.toFixed(1)}A • {energyData.wind.volts.toFixed(1)}V
+                 </ThemedText>
+                 <View style={styles.contributionBar}>
+                   <View 
+                     style={[
+                       styles.contributionFill, 
+                       { 
+                         backgroundColor: energyData.wind.color,
+                         width: `${energyData.totalOutput > 0 ? (energyData.wind.watts / energyData.totalOutput) * 100 : 0}%`
+                       }
+                     ]} 
+                   />
+                 </View>
+               </View>
+
+               <View style={[styles.sourceCard, { borderLeftColor: energyData.gutter.color }]}>
+                 <View style={styles.sourceHeader}>
+                   <Ionicons name={energyData.gutter.icon as any} size={20} color={energyData.gutter.color} />
+                   <ThemedText style={styles.sourceTitle}>Gutter</ThemedText>
+                 </View>
+                 <ThemedText style={[styles.sourceValue, { color: energyData.gutter.color }]}>
+                   {energyData.gutter.watts.toFixed(1)}W
+                 </ThemedText>
+                 <ThemedText style={styles.sourceSubtext}>
+                   {energyData.gutter.amps.toFixed(1)}A • {energyData.gutter.volts.toFixed(1)}V
+                 </ThemedText>
+                 <View style={styles.contributionBar}>
+                   <View 
+                     style={[
+                       styles.contributionFill, 
+                       { 
+                         backgroundColor: energyData.gutter.color,
+                         width: `${energyData.totalOutput > 0 ? (energyData.gutter.watts / energyData.totalOutput) * 100 : 0}%`
+                       }
+                     ]} 
+                   />
+                 </View>
+               </View>
+             </View>
+
+           
+           </Animated.View>
+             
         
-        </ScrollView>
+
+         
+         </ScrollView>
       </ThemedView>
 
       {/* Energy Source Detail Modal */}
