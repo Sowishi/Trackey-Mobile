@@ -5,10 +5,10 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Animated, Dimensions, Modal, PanResponder, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 interface WeatherData {
   temperature: number;
@@ -73,12 +73,14 @@ export default function WeatherScreen() {
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isModalVisible, setIsModalVisible] = useState(false);
   
   // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
+  const modalSlideAnim = useRef(new Animated.Value(height)).current;
 
   // Fetch weather data from OpenWeatherMap API
   const fetchWeatherData = async (lat: number, lon: number) => {
@@ -475,11 +477,99 @@ export default function WeatherScreen() {
       fontSize: 14,
       lineHeight: 18,
     },
+    // Modal styles
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'flex-end',
+    },
+    modalContent: {
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      paddingTop: 8,
+      maxHeight: height * 0.85,
+      minHeight: height * 0.6,
+    },
+    modalHandle: {
+      width: 40,
+      height: 4,
+      backgroundColor: Colors[colorScheme ?? 'light'].tabIconDefault + '40',
+      borderRadius: 2,
+      alignSelf: 'center',
+      marginBottom: 16,
+    },
+    modalScrollView: {
+      flex: 1,
+      paddingHorizontal: 20,
+    },
+    // FAB styles
+    fab: {
+      position: 'absolute',
+      bottom: 30,
+      right: 20,
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: Colors[colorScheme ?? 'light'].tint,
+      justifyContent: 'center',
+      alignItems: 'center',
+      elevation: 8,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+    },
+    fabIcon: {
+      marginLeft: 2, // Slight adjustment for visual balance
+    },
   });
 
   const refreshWeather = () => {
     loadWeatherData();
   };
+
+  const openModal = () => {
+    setIsModalVisible(true);
+    Animated.timing(modalSlideAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const closeModal = () => {
+    Animated.timing(modalSlideAnim, {
+      toValue: height,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setIsModalVisible(false);
+    });
+  };
+
+  // Pan responder for swipe down to close
+  const panResponder = PanResponder.create({
+    onMoveShouldSetPanResponder: (_, gestureState) => {
+      return gestureState.dy > 10 && Math.abs(gestureState.dx) < Math.abs(gestureState.dy);
+    },
+    onPanResponderMove: (_, gestureState) => {
+      if (gestureState.dy > 0) {
+        modalSlideAnim.setValue(gestureState.dy);
+      }
+    },
+    onPanResponderRelease: (_, gestureState) => {
+      if (gestureState.dy > height * 0.3) {
+        closeModal();
+      } else {
+        Animated.timing(modalSlideAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }).start();
+      }
+    },
+  });
 
   const getWeatherIcon = (main: string, iconCode: string) => {
     // Use OpenWeatherMap icon codes to determine appropriate Ionicon
@@ -604,6 +694,161 @@ export default function WeatherScreen() {
     }
 
     return recommendations.length > 0 ? recommendations : ["📊 Monitoring weather conditions for optimal energy prediction."];
+  };
+
+  // AI Predictor Modal Component
+  const renderAIPredictorModal = () => {
+    if (!weatherData) return null;
+
+    const powerData = calculatePowerOutput(weatherData);
+    const recommendations = getAIRecommendation(powerData, weatherData);
+
+    return (
+      <Modal
+        visible={isModalVisible}
+        transparent={true}
+        animationType="none"
+        onRequestClose={closeModal}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={closeModal}
+        >
+          <Animated.View 
+            style={[
+              styles.modalContent,
+              {
+                transform: [{ translateY: modalSlideAnim }]
+              }
+            ]}
+            {...panResponder.panHandlers}
+          >
+            <TouchableOpacity activeOpacity={1}>
+              <View style={styles.modalHandle} />
+              
+              <ScrollView 
+                style={styles.modalScrollView}
+                showsVerticalScrollIndicator={false}
+              >
+                <View style={styles.aiHeader}>
+                  <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                    <Ionicons 
+                      name="bulb" 
+                      size={28} 
+                      color={Colors[colorScheme ?? 'light'].tint}
+                      style={styles.aiIcon}
+                    />
+                  </Animated.View>
+                  <ThemedText style={styles.aiTitle}>AI Energy Predictor</ThemedText>
+                </View>
+                
+                <ThemedText style={styles.aiSubtitle}>
+                  Smart renewable energy output predictions based on current weather conditions
+                </ThemedText>
+
+                {/* Total Power Output */}
+                <View style={styles.totalPowerCard}>
+                  <ThemedText style={styles.totalPowerOutput}>
+                    {powerData.total}W
+                  </ThemedText>
+                  <ThemedText style={styles.totalPowerLabel}>
+                    Predicted Total Output
+                  </ThemedText>
+                </View>
+
+                {/* Individual Power Sources */}
+                <View style={styles.powerGrid}>
+                  <View style={styles.powerCard}>
+                    <Ionicons 
+                      name="sunny" 
+                      size={28} 
+                      color="#FFD700"
+                      style={styles.powerIcon}
+                    />
+                    <ThemedText style={[styles.powerOutput, { color: '#FFD700' }]}>
+                      {powerData.solar.output}W
+                    </ThemedText>
+                    <ThemedText style={styles.powerLabel}>Solar Panel (100W)</ThemedText>
+                    <ThemedText style={styles.powerEfficiency}>
+                      {powerData.solar.efficiency}% efficiency
+                    </ThemedText>
+                  </View>
+
+                  <View style={styles.powerCard}>
+                    <Ionicons 
+                      name="leaf" 
+                      size={28} 
+                      color="#4CAF50"
+                      style={styles.powerIcon}
+                    />
+                    <ThemedText style={[styles.powerOutput, { color: '#4CAF50' }]}>
+                      {powerData.wind.output}W
+                    </ThemedText>
+                    <ThemedText style={styles.powerLabel}>Wind Turbine (400W)</ThemedText>
+                    <ThemedText style={styles.powerEfficiency}>
+                      {powerData.wind.efficiency}% efficiency
+                    </ThemedText>
+                  </View>
+
+                  <View style={styles.powerCard}>
+                    <Ionicons 
+                      name="water" 
+                      size={28} 
+                      color="#2196F3"
+                      style={styles.powerIcon}
+                    />
+                    <ThemedText style={[styles.powerOutput, { color: '#2196F3' }]}>
+                      {powerData.gutter.output}W
+                    </ThemedText>
+                    <ThemedText style={styles.powerLabel}>Gutter Turbine (50W)</ThemedText>
+                    <ThemedText style={styles.powerEfficiency}>
+                      {powerData.gutter.efficiency}% efficiency
+                    </ThemedText>
+                  </View>
+
+                  <View style={styles.powerCard}>
+                    <Ionicons 
+                      name="flash" 
+                      size={28} 
+                      color={Colors[colorScheme ?? 'light'].tint}
+                      style={styles.powerIcon}
+                    />
+                    <ThemedText style={[styles.powerOutput, { color: Colors[colorScheme ?? 'light'].tint }]}>
+                      {Math.round((powerData.total / 550) * 100)}%
+                    </ThemedText>
+                    <ThemedText style={styles.powerLabel}>System Efficiency</ThemedText>
+                    <ThemedText style={styles.powerEfficiency}>
+                      of {550}W total capacity
+                    </ThemedText>
+                  </View>
+                </View>
+
+                {/* AI Recommendations */}
+                <View style={styles.recommendationsSection}>
+                  <ThemedText style={styles.recommendationTitle}>
+                    🤖 AI Recommendations
+                  </ThemedText>
+                  {recommendations.map((rec, index) => (
+                    <View key={index} style={styles.recommendation}>
+                      <ThemedText style={styles.recommendationText}>{rec}</ThemedText>
+                    </View>
+                  ))}
+                </View>
+
+                {/* Close button */}
+                <TouchableOpacity 
+                  style={[styles.refreshButton, { marginTop: 30, marginBottom: 20 }]}
+                  onPress={closeModal}
+                >
+                  <Ionicons name="close" size={20} color="white" />
+                </TouchableOpacity>
+              </ScrollView>
+            </TouchableOpacity>
+          </Animated.View>
+        </TouchableOpacity>
+      </Modal>
+    );
   };
 
   return (
@@ -817,133 +1062,6 @@ export default function WeatherScreen() {
                     <ThemedText style={styles.metricLabel}>Coordinates</ThemedText>
                   </View>
                 </View>
-
-                {/* AI Weather Predictor Section */}
-                <Animated.View 
-                  style={[
-                    styles.aiSection,
-                    {
-                      opacity: fadeAnim,
-                      transform: [{ translateY: slideAnim.interpolate({
-                        inputRange: [0, 50],
-                        outputRange: [0, 30]
-                      }) }]
-                    }
-                  ]}
-                >
-                  <View style={styles.aiHeader}>
-                    <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-                      <Ionicons 
-                        name="bulb" 
-                        size={24} 
-                        color={Colors[colorScheme ?? 'light'].tint}
-                        style={styles.aiIcon}
-                      />
-                    </Animated.View>
-                    <ThemedText style={styles.aiTitle}>AI Energy Predictor</ThemedText>
-                  </View>
-                  <ThemedText style={styles.aiSubtitle}>
-                    Smart renewable energy output predictions based on current weather conditions
-                  </ThemedText>
-
-                  {(() => {
-                    const powerData = calculatePowerOutput(weatherData);
-                    const recommendations = getAIRecommendation(powerData, weatherData);
-                    
-                    return (
-                      <>
-                        {/* Total Power Output */}
-                        <View style={styles.totalPowerCard}>
-                          <ThemedText style={styles.totalPowerOutput}>
-                            {powerData.total}W
-                          </ThemedText>
-                          <ThemedText style={styles.totalPowerLabel}>
-                            Predicted Total Output
-                          </ThemedText>
-                        </View>
-
-                        {/* Individual Power Sources */}
-                        <View style={styles.powerGrid}>
-                          <View style={styles.powerCard}>
-                            <Ionicons 
-                              name="sunny" 
-                              size={28} 
-                              color="#FFD700"
-                              style={styles.powerIcon}
-                            />
-                            <ThemedText style={[styles.powerOutput, { color: '#FFD700' }]}>
-                              {powerData.solar.output}W
-                            </ThemedText>
-                            <ThemedText style={styles.powerLabel}>Solar Panel (100W)</ThemedText>
-                            <ThemedText style={styles.powerEfficiency}>
-                              {powerData.solar.efficiency}% efficiency
-                            </ThemedText>
-                          </View>
-
-                          <View style={styles.powerCard}>
-                            <Ionicons 
-                              name="leaf" 
-                              size={28} 
-                              color="#4CAF50"
-                              style={styles.powerIcon}
-                            />
-                            <ThemedText style={[styles.powerOutput, { color: '#4CAF50' }]}>
-                              {powerData.wind.output}W
-                            </ThemedText>
-                            <ThemedText style={styles.powerLabel}>Wind Turbine (400W)</ThemedText>
-                            <ThemedText style={styles.powerEfficiency}>
-                              {powerData.wind.efficiency}% efficiency
-                            </ThemedText>
-                          </View>
-
-                          <View style={styles.powerCard}>
-                            <Ionicons 
-                              name="water" 
-                              size={28} 
-                              color="#2196F3"
-                              style={styles.powerIcon}
-                            />
-                            <ThemedText style={[styles.powerOutput, { color: '#2196F3' }]}>
-                              {powerData.gutter.output}W
-                            </ThemedText>
-                            <ThemedText style={styles.powerLabel}>Gutter Turbine (50W)</ThemedText>
-                            <ThemedText style={styles.powerEfficiency}>
-                              {powerData.gutter.efficiency}% efficiency
-                            </ThemedText>
-                          </View>
-
-                          <View style={styles.powerCard}>
-                            <Ionicons 
-                              name="flash" 
-                              size={28} 
-                              color={Colors[colorScheme ?? 'light'].tint}
-                              style={styles.powerIcon}
-                            />
-                            <ThemedText style={[styles.powerOutput, { color: Colors[colorScheme ?? 'light'].tint }]}>
-                              {Math.round((powerData.total / 550) * 100)}%
-                            </ThemedText>
-                            <ThemedText style={styles.powerLabel}>System Efficiency</ThemedText>
-                            <ThemedText style={styles.powerEfficiency}>
-                              of {550}W total capacity
-                            </ThemedText>
-                          </View>
-                        </View>
-
-                        {/* AI Recommendations */}
-                        <View style={styles.recommendationsSection}>
-                          <ThemedText style={styles.recommendationTitle}>
-                            🤖 AI Recommendations
-                          </ThemedText>
-                          {recommendations.map((rec, index) => (
-                            <View key={index} style={styles.recommendation}>
-                              <ThemedText style={styles.recommendationText}>{rec}</ThemedText>
-                            </View>
-                          ))}
-                        </View>
-                      </>
-                    );
-                  })()}
-                </Animated.View>
               </>
             ) : (
               <View style={styles.loadingContainer}>
@@ -956,9 +1074,26 @@ export default function WeatherScreen() {
               </View>
             )}
           </Animated.View>
-
-         
         </ScrollView>
+
+        {/* Floating Action Button */}
+        {weatherData && !isLoading && (
+          <TouchableOpacity 
+            style={styles.fab}
+            onPress={openModal}
+            activeOpacity={0.8}
+          >
+            <Ionicons 
+              name="bulb" 
+              size={24} 
+              color="white"
+              style={styles.fabIcon}
+            />
+          </TouchableOpacity>
+        )}
+
+        {/* AI Predictor Modal */}
+        {renderAIPredictorModal()}
       </ThemedView>
     </SafeAreaView>
   );
