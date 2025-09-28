@@ -4,46 +4,75 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Animated, Dimensions, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Circle, Line } from 'react-native-svg';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
-interface MonitorData {
-  cpuUsage: number;
-  memoryUsage: number;
-  diskUsage: number;
-  networkSpeed: number;
-  temperature: number;
-  uptime: string;
-  status: 'online' | 'warning' | 'offline';
-  lastUpdate: string;
+interface EnergySource {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  amps: number;
+  volts: number;
+  watts: number;
+  efficiency: number;
+  status: 'active' | 'inactive' | 'maintenance';
 }
 
-interface SystemAlert {
-  id: number;
-  type: 'info' | 'warning' | 'error';
-  message: string;
-  timestamp: string;
+interface EnergyMonitorData {
+  solar: EnergySource;
+  wind: EnergySource;
+  gutter: EnergySource;
+  totalOutput: number;
+  batteryLevel: number;
+  gridConnection: boolean;
+  lastUpdate: string;
 }
 
 export default function MonitorScreen() {
   const colorScheme = useColorScheme();
-  const [monitorData, setMonitorData] = useState<MonitorData>({
-    cpuUsage: 45,
-    memoryUsage: 62,
-    diskUsage: 78,
-    networkSpeed: 125,
-    temperature: 42,
-    uptime: '15d 8h 32m',
-    status: 'online',
+  const [energyData, setEnergyData] = useState<EnergyMonitorData>({
+    solar: {
+      id: 'solar',
+      name: 'Solar Panel',
+      icon: 'sunny',
+      color: '#FFD700',
+      amps: 8.5,
+      volts: 12.0,
+      watts: 102,
+      efficiency: 85,
+      status: 'active'
+    },
+    wind: {
+      id: 'wind',
+      name: 'Wind Turbine',
+      icon: 'leaf',
+      color: '#4CAF50',
+      amps: 15.2,
+      volts: 24.0,
+      watts: 365,
+      efficiency: 78,
+      status: 'active'
+    },
+    gutter: {
+      id: 'gutter',
+      name: 'Gutter Turbine',
+      icon: 'water',
+      color: '#2196F3',
+      amps: 2.1,
+      volts: 12.0,
+      watts: 25,
+      efficiency: 45,
+      status: 'active'
+    },
+    totalOutput: 492,
+    batteryLevel: 87,
+    gridConnection: true,
     lastUpdate: new Date().toLocaleTimeString()
   });
-  const [alerts, setAlerts] = useState<SystemAlert[]>([
-    { id: 1, type: 'info', message: 'System monitoring started', timestamp: '10:30 AM' },
-    { id: 2, type: 'warning', message: 'High disk usage detected', timestamp: '10:25 AM' },
-    { id: 3, type: 'info', message: 'Network connection stable', timestamp: '10:20 AM' },
-  ]);
   const [isLoading, setIsLoading] = useState(true);
   
   // Animation refs
@@ -94,17 +123,38 @@ export default function MonitorScreen() {
       setIsLoading(false);
     }, 2000);
 
-    // Simulate system updates every 5 seconds
+    // Simulate energy data updates every 3 seconds
     const interval = setInterval(() => {
-      setMonitorData(prev => ({
+      setEnergyData(prev => ({
         ...prev,
-        cpuUsage: Math.max(10, Math.min(95, prev.cpuUsage + (Math.random() - 0.5) * 20)),
-        memoryUsage: Math.max(20, Math.min(90, prev.memoryUsage + (Math.random() - 0.5) * 15)),
-        networkSpeed: Math.max(50, Math.min(500, prev.networkSpeed + (Math.random() - 0.5) * 100)),
-        temperature: Math.max(35, Math.min(65, prev.temperature + (Math.random() - 0.5) * 10)),
+        solar: {
+          ...prev.solar,
+          amps: Math.max(0, Math.min(15, prev.solar.amps + (Math.random() - 0.5) * 2)),
+          watts: Math.max(0, Math.min(120, prev.solar.watts + (Math.random() - 0.5) * 20)),
+          efficiency: Math.max(70, Math.min(95, prev.solar.efficiency + (Math.random() - 0.5) * 10))
+        },
+        wind: {
+          ...prev.wind,
+          amps: Math.max(0, Math.min(25, prev.wind.amps + (Math.random() - 0.5) * 5)),
+          watts: Math.max(0, Math.min(400, prev.wind.watts + (Math.random() - 0.5) * 50)),
+          efficiency: Math.max(60, Math.min(90, prev.wind.efficiency + (Math.random() - 0.5) * 15))
+        },
+        gutter: {
+          ...prev.gutter,
+          amps: Math.max(0, Math.min(5, prev.gutter.amps + (Math.random() - 0.5) * 1)),
+          watts: Math.max(0, Math.min(50, prev.gutter.watts + (Math.random() - 0.5) * 10)),
+          efficiency: Math.max(20, Math.min(70, prev.gutter.efficiency + (Math.random() - 0.5) * 20))
+        },
+        batteryLevel: Math.max(20, Math.min(100, prev.batteryLevel + (Math.random() - 0.5) * 5)),
         lastUpdate: new Date().toLocaleTimeString()
       }));
-    }, 5000);
+      
+      // Update total output
+      setEnergyData(prev => ({
+        ...prev,
+        totalOutput: prev.solar.watts + prev.wind.watts + prev.gutter.watts
+      }));
+    }, 3000);
 
     return () => {
       clearInterval(interval);
@@ -140,127 +190,124 @@ export default function MonitorScreen() {
     scrollView: {
       flex: 1,
     },
-    statusCard: {
+    // Energy Monitor Styles - Single Line Layout
+    energyContainer: {
+      flex: 1,
+      alignItems: 'center',
+      paddingVertical: 60,
+      paddingHorizontal: 20,
+    },
+    energySourcesRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      width: '100%',
+      paddingHorizontal: 40,
+      marginBottom: 120,
+    },
+    energySource: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      borderWidth: 2,
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      elevation: 6,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+    },
+    energyIcon: {
+      marginBottom: 8,
+    },
+    energyName: {
+      fontSize: 10,
+      fontWeight: '500',
+      textAlign: 'center',
+      opacity: 0.7,
+      position: 'absolute',
+      bottom: -25,
+      width: 60,
+    },
+    houseContainer: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      borderWidth: 2,
+      borderColor: Colors[colorScheme ?? 'light'].tint,
+      elevation: 8,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.15,
+      shadowRadius: 12,
+    },
+    svgContainer: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: -1,
+    },
+    totalOutputCard: {
       backgroundColor: '#2A2A2A',
       borderRadius: 20,
       padding: 20,
       marginBottom: 20,
-      borderWidth: 1,
-      borderColor: Colors[colorScheme ?? 'light'].tabIconDefault + '30',
-      elevation: 3,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.3,
-      shadowRadius: 8,
-    },
-    statusHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 20,
-    },
-    systemTitle: {
-      fontSize: 20,
-      fontWeight: '600',
-    },
-    statusIndicator: {
-      flexDirection: 'row',
+      borderWidth: 2,
+      borderColor: Colors[colorScheme ?? 'light'].tint + '40',
       alignItems: 'center',
     },
-    statusDot: {
-      width: 12,
-      height: 12,
-      borderRadius: 6,
-      marginRight: 8,
-    },
-    statusText: {
-      fontSize: 14,
-      fontWeight: '600',
-    },
-    metricsGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent: 'space-between',
-    },
-    metricCard: {
-      width: '48%',
-      backgroundColor: '#333333',
-      borderRadius: 16,
-      padding: 16,
-      marginBottom: 16,
-      borderWidth: 1,
-      borderColor: Colors[colorScheme ?? 'light'].tint + '20',
-    },
-    metricHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 12,
-    },
-    metricIcon: {
-      marginRight: 8,
-    },
-    metricLabel: {
-      fontSize: 14,
-      fontWeight: '500',
-      opacity: 0.8,
-    },
-    metricValue: {
-      fontSize: 28,
+    totalOutputValue: {
+      fontSize: 36,
       fontWeight: 'bold',
+      color: Colors[colorScheme ?? 'light'].tint,
       marginBottom: 8,
     },
-    progressBar: {
-      height: 6,
-      backgroundColor: Colors[colorScheme ?? 'light'].tabIconDefault + '30',
-      borderRadius: 3,
-      overflow: 'hidden',
-    },
-    progressFill: {
-      height: '100%',
-      borderRadius: 3,
-    },
-    progressText: {
-      fontSize: 12,
-      opacity: 0.7,
-      marginTop: 4,
-    },
-    alertsSection: {
-      marginTop: 10,
-    },
-    sectionTitle: {
-      fontSize: 18,
+    totalOutputLabel: {
+      fontSize: 16,
       fontWeight: '600',
-      marginBottom: 16,
-      flexDirection: 'row',
-      alignItems: 'center',
+      opacity: 0.8,
     },
-    sectionIcon: {
-      marginRight: 8,
-    },
-    alertCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
+    batterySection: {
       backgroundColor: '#2A2A2A',
-      borderRadius: 12,
+      borderRadius: 16,
       padding: 16,
-      marginBottom: 12,
+      marginBottom: 20,
       borderWidth: 1,
       borderColor: Colors[colorScheme ?? 'light'].tabIconDefault + '30',
     },
-    alertIcon: {
-      marginRight: 12,
+    batteryHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 12,
     },
-    alertContent: {
-      flex: 1,
+    batteryIcon: {
+      marginRight: 8,
     },
-    alertMessage: {
-      fontSize: 14,
-      fontWeight: '500',
-      marginBottom: 4,
+    batteryLabel: {
+      fontSize: 16,
+      fontWeight: '600',
     },
-    alertTime: {
-      fontSize: 12,
-      opacity: 0.6,
+    batteryLevel: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: '#4CAF50',
+      marginBottom: 8,
+    },
+    batteryBar: {
+      height: 8,
+      backgroundColor: Colors[colorScheme ?? 'light'].tabIconDefault + '30',
+      borderRadius: 4,
+      overflow: 'hidden',
+    },
+    batteryFill: {
+      height: '100%',
+      borderRadius: 4,
     },
     refreshButton: {
       backgroundColor: Colors[colorScheme ?? 'light'].tint,
@@ -290,43 +337,140 @@ export default function MonitorScreen() {
     },
   });
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'online': return '#4CAF50';
-      case 'warning': return '#FF9800';
-      case 'offline': return '#F44336';
-      default: return Colors[colorScheme ?? 'light'].tabIconDefault;
-    }
+  // Simplified Energy Source Component
+  const renderEnergySource = (source: EnergySource) => (
+    <Animated.View 
+      key={source.id}
+      style={[
+        styles.energySource,
+        {
+          borderColor: source.color,
+          opacity: fadeAnim,
+          transform: [{ scale: pulseAnim.interpolate({
+            inputRange: [1, 1.3],
+            outputRange: [1, 1.05]
+          }) }]
+        }
+      ]}
+    >
+      <Ionicons 
+        name={source.icon as any} 
+        size={28} 
+        color={source.color}
+        style={styles.energyIcon}
+      />
+      <ThemedText style={[styles.energyName, { color: Colors[colorScheme ?? 'light'].text }]}>
+        {source.name}
+      </ThemedText>
+    </Animated.View>
+  );
+
+  // SVG Connection Lines Component
+  const renderConnectionLines = () => {
+    // Calculate positions based on screen width
+    const solarX = width * 0.25;
+    const windX = width * 0.5;
+    const gutterX = width * 0.75;
+    const houseX = width * 0.5;
+    
+    const sourceY = 140; // Y position of energy sources
+    const houseY = 280; // Y position of house
+    
+    return (
+      <Svg height={height} width={width} style={styles.svgContainer}>
+        {/* Solar to House */}
+        <Line
+          x1={solarX}
+          y1={sourceY}
+          x2={houseX}
+          y2={houseY}
+          stroke={energyData.solar.color}
+          strokeWidth="2"
+          strokeOpacity="0.6"
+        />
+        
+        {/* Wind to House */}
+        <Line
+          x1={windX}
+          y1={sourceY}
+          x2={houseX}
+          y2={houseY}
+          stroke={energyData.wind.color}
+          strokeWidth="2"
+          strokeOpacity="0.6"
+        />
+        
+        {/* Gutter to House */}
+        <Line
+          x1={gutterX}
+          y1={sourceY}
+          x2={houseX}
+          y2={houseY}
+          stroke={energyData.gutter.color}
+          strokeWidth="2"
+          strokeOpacity="0.6"
+        />
+        
+        {/* Connection dots at energy sources */}
+        <Circle
+          cx={solarX}
+          cy={sourceY}
+          r="4"
+          fill={energyData.solar.color}
+        />
+        
+        <Circle
+          cx={windX}
+          cy={sourceY}
+          r="4"
+          fill={energyData.wind.color}
+        />
+        
+        <Circle
+          cx={gutterX}
+          cy={sourceY}
+          r="4"
+          fill={energyData.gutter.color}
+        />
+        
+        {/* Connection dot at house */}
+        <Circle
+          cx={houseX}
+          cy={houseY}
+          r="6"
+          fill={Colors[colorScheme ?? 'light'].tint}
+        />
+      </Svg>
+    );
   };
 
-  const getAlertColor = (type: string) => {
-    switch (type) {
-      case 'info': return '#2196F3';
-      case 'warning': return '#FF9800';
-      case 'error': return '#F44336';
-      default: return Colors[colorScheme ?? 'light'].tabIconDefault;
-    }
-  };
-
-  const getAlertIcon = (type: string) => {
-    switch (type) {
-      case 'info': return 'information-circle';
-      case 'warning': return 'warning';
-      case 'error': return 'alert-circle';
-      default: return 'information-circle';
-    }
+  const getBatteryColor = (level: number) => {
+    if (level > 60) return '#4CAF50';
+    if (level > 30) return '#FF9800';
+    return '#F44336';
   };
 
   const refreshData = () => {
     setIsLoading(true);
     setTimeout(() => {
-      setMonitorData(prev => ({
+      // Simulate new energy readings
+      setEnergyData(prev => ({
         ...prev,
-        cpuUsage: Math.max(10, Math.min(95, prev.cpuUsage + (Math.random() - 0.5) * 30)),
-        memoryUsage: Math.max(20, Math.min(90, prev.memoryUsage + (Math.random() - 0.5) * 25)),
-        diskUsage: Math.max(30, Math.min(95, prev.diskUsage + (Math.random() - 0.5) * 10)),
-        networkSpeed: Math.max(50, Math.min(500, prev.networkSpeed + (Math.random() - 0.5) * 150)),
-        temperature: Math.max(35, Math.min(65, prev.temperature + (Math.random() - 0.5) * 15)),
+        solar: {
+          ...prev.solar,
+          amps: Math.max(0, Math.min(15, 8.5 + (Math.random() - 0.5) * 4)),
+          watts: Math.max(0, Math.min(120, 102 + (Math.random() - 0.5) * 40)),
+        },
+        wind: {
+          ...prev.wind,
+          amps: Math.max(0, Math.min(25, 15.2 + (Math.random() - 0.5) * 8)),
+          watts: Math.max(0, Math.min(400, 365 + (Math.random() - 0.5) * 80)),
+        },
+        gutter: {
+          ...prev.gutter,
+          amps: Math.max(0, Math.min(5, 2.1 + (Math.random() - 0.5) * 2)),
+          watts: Math.max(0, Math.min(50, 25 + (Math.random() - 0.5) * 20)),
+        },
         lastUpdate: new Date().toLocaleTimeString()
       }));
       setIsLoading(false);
@@ -347,215 +491,56 @@ export default function MonitorScreen() {
         >
           <View style={styles.titleRow}>
             <Ionicons 
-              name="desktop" 
+              name="flash" 
               size={28} 
               color={Colors[colorScheme ?? 'light'].tint} 
               style={styles.headerIcon}
             />
-            <ThemedText type="title">System Monitor</ThemedText>
+            <ThemedText type="title">Energy Monitor</ThemedText>
           </View>
           <ThemedText style={styles.subtitle}>
-            Real-time system performance monitoring for Project Watch
+            Real-time renewable energy monitoring • Solar • Wind • Hydro
           </ThemedText>
         </Animated.View>
         
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          <Animated.View 
-            style={[
-              styles.statusCard,
-              {
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }]
-              }
-            ]}
-          >
-            <View style={styles.statusHeader}>
-              <ThemedText style={styles.systemTitle}>Project Watch Server</ThemedText>
-              <Animated.View 
-                style={[
-                  styles.statusIndicator,
-                  { transform: [{ scale: pulseAnim }] }
-                ]}
-              >
-                <View style={[styles.statusDot, { backgroundColor: getStatusColor(monitorData.status) }]} />
-                <ThemedText style={[styles.statusText, { color: getStatusColor(monitorData.status) }]}>
-                  {monitorData.status.toUpperCase()}
-                </ThemedText>
-              </Animated.View>
-            </View>
+        
 
-            {isLoading ? (
-              <View style={styles.loadingContainer}>
-                <Animated.View style={{
-                  transform: [{
-                    rotate: pulseAnim.interpolate({
-                      inputRange: [1, 1.3],
-                      outputRange: ['0deg', '360deg']
-                    })
-                  }]
-                }}>
-                  <Ionicons 
-                    name="refresh-outline" 
-                    size={40} 
-                    color={Colors[colorScheme ?? 'light'].tabIconDefault}
-                  />
-                </Animated.View>
-                <ThemedText style={styles.loadingText}>Loading system data...</ThemedText>
-              </View>
-            ) : (
-              <View style={styles.metricsGrid}>
-                <View style={styles.metricCard}>
-                  <View style={styles.metricHeader}>
-                    <Ionicons 
-                      name="hardware-chip" 
-                      size={20} 
-                      color={Colors[colorScheme ?? 'light'].tint}
-                      style={styles.metricIcon}
-                    />
-                    <ThemedText style={styles.metricLabel}>CPU Usage</ThemedText>
-                  </View>
-                  <ThemedText style={styles.metricValue}>{Math.round(monitorData.cpuUsage)}%</ThemedText>
-                  <View style={styles.progressBar}>
-                    <Animated.View 
-                      style={[
-                        styles.progressFill, 
-                        { 
-                          width: progressAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: ['0%', `${monitorData.cpuUsage}%`]
-                          }),
-                          backgroundColor: monitorData.cpuUsage > 80 ? '#F44336' : monitorData.cpuUsage > 60 ? '#FF9800' : '#4CAF50'
-                        }
-                      ]} 
-                    />
-                  </View>
-                  <ThemedText style={styles.progressText}>
-                    {monitorData.cpuUsage > 80 ? 'High' : monitorData.cpuUsage > 60 ? 'Medium' : 'Normal'}
-                  </ThemedText>
-                </View>
-
-                <View style={styles.metricCard}>
-                  <View style={styles.metricHeader}>
-                    <Ionicons 
-                      name="library" 
-                      size={20} 
-                      color={Colors[colorScheme ?? 'light'].tint}
-                      style={styles.metricIcon}
-                    />
-                    <ThemedText style={styles.metricLabel}>Memory</ThemedText>
-                  </View>
-                  <ThemedText style={styles.metricValue}>{Math.round(monitorData.memoryUsage)}%</ThemedText>
-                  <View style={styles.progressBar}>
-                    <Animated.View 
-                      style={[
-                        styles.progressFill, 
-                        { 
-                          width: progressAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: ['0%', `${monitorData.memoryUsage}%`]
-                          }),
-                          backgroundColor: monitorData.memoryUsage > 85 ? '#F44336' : monitorData.memoryUsage > 70 ? '#FF9800' : '#4CAF50'
-                        }
-                      ]} 
-                    />
-                  </View>
-                  <ThemedText style={styles.progressText}>
-                    {monitorData.memoryUsage > 85 ? 'High' : monitorData.memoryUsage > 70 ? 'Medium' : 'Normal'}
-                  </ThemedText>
-                </View>
-
-                <View style={styles.metricCard}>
-                  <View style={styles.metricHeader}>
-                    <Ionicons 
-                      name="server" 
-                      size={20} 
-                      color={Colors[colorScheme ?? 'light'].tint}
-                      style={styles.metricIcon}
-                    />
-                    <ThemedText style={styles.metricLabel}>Disk Usage</ThemedText>
-                  </View>
-                  <ThemedText style={styles.metricValue}>{Math.round(monitorData.diskUsage)}%</ThemedText>
-                  <View style={styles.progressBar}>
-                    <Animated.View 
-                      style={[
-                        styles.progressFill, 
-                        { 
-                          width: progressAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: ['0%', `${monitorData.diskUsage}%`]
-                          }),
-                          backgroundColor: monitorData.diskUsage > 90 ? '#F44336' : monitorData.diskUsage > 75 ? '#FF9800' : '#4CAF50'
-                        }
-                      ]} 
-                    />
-                  </View>
-                  <ThemedText style={styles.progressText}>
-                    {monitorData.diskUsage > 90 ? 'Critical' : monitorData.diskUsage > 75 ? 'Warning' : 'Normal'}
-                  </ThemedText>
-                </View>
-
-                <View style={styles.metricCard}>
-                  <View style={styles.metricHeader}>
-                    <Ionicons 
-                      name="speedometer" 
-                      size={20} 
-                      color={Colors[colorScheme ?? 'light'].tint}
-                      style={styles.metricIcon}
-                    />
-                    <ThemedText style={styles.metricLabel}>Network</ThemedText>
-                  </View>
-                  <ThemedText style={styles.metricValue}>{Math.round(monitorData.networkSpeed)}</ThemedText>
-                  <ThemedText style={styles.progressText}>Mbps</ThemedText>
-                </View>
-              </View>
-            )}
-          </Animated.View>
-
-          <Animated.View 
-            style={[
-              styles.alertsSection,
-              {
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim.interpolate({
-                  inputRange: [0, 50],
-                  outputRange: [0, 25]
-                }) }]
-              }
-            ]}
-          >
-            <View style={styles.sectionTitle}>
-              <Ionicons 
-                name="notifications" 
-                size={20} 
-                color={Colors[colorScheme ?? 'light'].tint}
-                style={styles.sectionIcon}
-              />
-              <ThemedText style={{ fontSize: 18, fontWeight: '600' }}>System Alerts</ThemedText>
+          {/* Energy Sources Layout */}
+          <View style={styles.energyContainer}>
+            {/* Connection Lines */}
+            {renderConnectionLines()}
+            
+            {/* All Energy Sources in One Row */}
+            <View style={styles.energySourcesRow}>
+              {renderEnergySource(energyData.solar)}
+              {renderEnergySource(energyData.wind)}
+              {renderEnergySource(energyData.gutter)}
             </View>
             
-            {alerts.map((alert) => (
-              <View key={alert.id} style={styles.alertCard}>
-                <Ionicons 
-                  name={getAlertIcon(alert.type)} 
-                  size={24} 
-                  color={getAlertColor(alert.type)}
-                  style={styles.alertIcon}
-                />
-                <View style={styles.alertContent}>
-                  <ThemedText style={styles.alertMessage}>{alert.message}</ThemedText>
-                  <ThemedText style={styles.alertTime}>{alert.timestamp}</ThemedText>
-                </View>
-              </View>
-            ))}
-          </Animated.View>
+            {/* House Icon */}
+            <Animated.View 
+              style={[
+                styles.houseContainer,
+                {
+                  transform: [{ scale: pulseAnim.interpolate({
+                    inputRange: [1, 1.3],
+                    outputRange: [1, 1.1]
+                  }) }]
+                }
+              ]}
+            >
+              <Ionicons 
+                name="home" 
+                size={40} 
+                color={Colors[colorScheme ?? 'light'].tint}
+              />
+            </Animated.View>
+          </View>
 
-          <TouchableOpacity style={styles.refreshButton} onPress={refreshData}>
-            <Ionicons 
-              name="refresh" 
-              size={28} 
-              color="white"
-            />
-          </TouchableOpacity>
+       
+
+        
         </ScrollView>
       </ThemedView>
     </SafeAreaView>
