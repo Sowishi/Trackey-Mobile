@@ -6,7 +6,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Dimensions, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Circle, Path } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient, Path, Stop } from 'react-native-svg';
+
+const AnimatedPath = Animated.createAnimatedComponent(Path);
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 const { width, height } = Dimensions.get('window');
 
@@ -80,6 +83,8 @@ export default function MonitorScreen() {
   const slideAnim = useRef(new Animated.Value(50)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
+  const energyBallAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // Initial animations
@@ -117,6 +122,33 @@ export default function MonitorScreen() {
       ])
     );
     pulseAnimation.start();
+
+    // Glowing animation for energy flow
+    const glowAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: false,
+        }),
+        Animated.timing(glowAnim, {
+          toValue: 0,
+          duration: 2000,
+          useNativeDriver: false,
+        }),
+      ])
+    );
+    glowAnimation.start();
+
+    // Energy ball animation traveling along the lines
+    const energyBallAnimation = Animated.loop(
+      Animated.timing(energyBallAnim, {
+        toValue: 1,
+        duration: 3000,
+        useNativeDriver: false,
+      })
+    );
+    energyBallAnimation.start();
 
     // Simulate loading
     setTimeout(() => {
@@ -159,6 +191,8 @@ export default function MonitorScreen() {
     return () => {
       clearInterval(interval);
       pulseAnimation.stop();
+      glowAnimation.stop();
+      energyBallAnimation.stop();
     };
   }, []);
 
@@ -339,7 +373,7 @@ export default function MonitorScreen() {
     },
   });
 
-  // Simplified Energy Source Component
+  // Simplified Energy Source Component (no animation)
   const renderEnergySource = (source: EnergySource) => (
     <Animated.View 
       key={source.id}
@@ -348,10 +382,6 @@ export default function MonitorScreen() {
         {
           borderColor: source.color,
           opacity: fadeAnim,
-          transform: [{ scale: pulseAnim.interpolate({
-            inputRange: [1, 1.3],
-            outputRange: [1, 1.05]
-          }) }]
         }
       ]}
     >
@@ -394,33 +424,90 @@ export default function MonitorScreen() {
       return `M ${startX} ${startY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${endX} ${endY}`;
     };
 
+    // Calculate energy ball position along curve
+    const getEnergyBallPosition = (startX: number, startY: number, endX: number, endY: number, t: number) => {
+      const midY = startY + (endY - startY) * .5;
+      const controlX1 = startX + (endX - startX) * 0.2;
+      const controlY1 = midY;
+      const controlX2 = endX + (startX - endX) * 0.2;
+      const controlY2 = midY;
+      
+      // Cubic Bezier curve calculation
+      const x = Math.pow(1 - t, 3) * startX + 
+                3 * Math.pow(1 - t, 2) * t * controlX1 + 
+                3 * (1 - t) * Math.pow(t, 2) * controlX2 + 
+                Math.pow(t, 3) * endX;
+      
+      const y = Math.pow(1 - t, 3) * startY + 
+                3 * Math.pow(1 - t, 2) * t * controlY1 + 
+                3 * (1 - t) * Math.pow(t, 2) * controlY2 + 
+                Math.pow(t, 3) * endY;
+      
+      return { x, y };
+    };
+
     return (
       <Svg height={height} width={width} style={styles.svgContainer}>
-        {/* Curved Solar to House */}
+        <Defs>
+          {/* Glowing gradient definition */}
+          <LinearGradient id="glowGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <Stop offset="0%" stopColor="#FF8C00" stopOpacity="0.3" />
+            <Stop offset="50%" stopColor="#FFD700" stopOpacity="1" />
+            <Stop offset="100%" stopColor="#FF8C00" stopOpacity="0.3" />
+          </LinearGradient>
+        </Defs>
+        
+        {/* Base curved lines (always visible) */}
         <Path
           d={createCurvedPath(solarX, sourceY, houseX, houseY)}
           stroke="#FF8C00"
-          strokeWidth="4"
+          strokeWidth="2"
           fill="none"
-          strokeOpacity="0.8"
+          strokeOpacity="0.4"
         />
         
-        {/* Curved Wind to House */}
         <Path
           d={createCurvedPath(windX, sourceY, houseX, houseY)}
           stroke="#FF8C00"
-          strokeWidth="4"
+          strokeWidth="2"
           fill="none"
-          strokeOpacity="0.8"
+          strokeOpacity="0.4"
         />
         
-        {/* Curved Gutter to House */}
         <Path
           d={createCurvedPath(gutterX, sourceY, houseX, houseY)}
           stroke="#FF8C00"
-          strokeWidth="4"
+          strokeWidth="2"
           fill="none"
-          strokeOpacity="0.8"
+          strokeOpacity="0.4"
+        />
+        
+        {/* Glowing animated lines */}
+        <AnimatedPath
+          d={createCurvedPath(solarX, sourceY, houseX, houseY)}
+          stroke="url(#glowGradient)"
+          strokeWidth="6"
+          fill="none"
+          strokeOpacity={glowAnim}
+          strokeLinecap="round"
+        />
+        
+        <AnimatedPath
+          d={createCurvedPath(windX, sourceY, houseX, houseY)}
+          stroke="url(#glowGradient)"
+          strokeWidth="6"
+          fill="none"
+          strokeOpacity={glowAnim}
+          strokeLinecap="round"
+        />
+        
+        <AnimatedPath
+          d={createCurvedPath(gutterX, sourceY, houseX, houseY)}
+          stroke="url(#glowGradient)"
+          strokeWidth="6"
+          fill="none"
+          strokeOpacity={glowAnim}
+          strokeLinecap="round"
         />
         
         {/* Connection dots at energy sources */}
@@ -445,12 +532,108 @@ export default function MonitorScreen() {
           fill={energyData.gutter.color}
         />
         
-        {/* Connection dot at house - positioned exactly at house center */}
+        {/* Glowing connection dot at house */}
+        <AnimatedCircle
+          cx={houseX}
+          cy={houseY}
+          r="8"
+          fill="#FF8C00"
+          fillOpacity={glowAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0.3, 1]
+          })}
+        />
+        
+        {/* Inner house connection dot */}
         <Circle
           cx={houseX}
           cy={houseY}
+          r="4"
+          fill="#FFD700"
+        />
+
+        {/* Energy balls traveling along the lines */}
+        <AnimatedCircle
+          cx={energyBallAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [solarX, houseX]
+          })}
+          cy={energyBallAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [sourceY, houseY]
+          })}
           r="6"
-          fill="#FF8C00"
+          fill="#FFD700"
+          fillOpacity="0.9"
+        />
+        <AnimatedCircle
+          cx={energyBallAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [solarX, houseX]
+          })}
+          cy={energyBallAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [sourceY, houseY]
+          })}
+          r="3"
+          fill="#FFFFFF"
+          fillOpacity="0.8"
+        />
+        
+        {/* Wind energy ball */}
+        <AnimatedCircle
+          cx={energyBallAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [windX, houseX]
+          })}
+          cy={energyBallAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [sourceY, houseY]
+          })}
+          r="6"
+          fill="#FFD700"
+          fillOpacity="0.9"
+        />
+        <AnimatedCircle
+          cx={energyBallAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [windX, houseX]
+          })}
+          cy={energyBallAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [sourceY, houseY]
+          })}
+          r="3"
+          fill="#FFFFFF"
+          fillOpacity="0.8"
+        />
+        
+        {/* Gutter energy ball */}
+        <AnimatedCircle
+          cx={energyBallAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [gutterX, houseX]
+          })}
+          cy={energyBallAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [sourceY, houseY]
+          })}
+          r="6"
+          fill="#FFD700"
+          fillOpacity="0.9"
+        />
+        <AnimatedCircle
+          cx={energyBallAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [gutterX, houseX]
+          })}
+          cy={energyBallAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [sourceY, houseY]
+          })}
+          r="3"
+          fill="#FFFFFF"
+          fillOpacity="0.8"
         />
       </Svg>
     );
@@ -497,28 +680,25 @@ export default function MonitorScreen() {
               {renderEnergySource(energyData.solar)}
               {renderEnergySource(energyData.wind)}
               {renderEnergySource(energyData.gutter)}
-            </View>
-            
+                </View>
+
             {/* House Icon */}
-            <Animated.View 
-              style={[
+          <Animated.View 
+            style={[
                 styles.houseContainer,
-                {
-                  transform: [{ scale: pulseAnim.interpolate({
-                    inputRange: [1, 1.3],
-                    outputRange: [1, 1.1]
-                  }) }]
-                }
-              ]}
-            >
+              {
+                opacity: fadeAnim,
+              }
+            ]}
+          >
               <Ionicons 
                 name="home" 
                 size={40} 
                 color={Colors[colorScheme ?? 'light'].tint}
               />
             </Animated.View>
-          </View>
-
+            </View>
+            
        
 
         
