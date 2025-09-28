@@ -1,6 +1,7 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
+import { database, off, onValue, ref } from '@/firebase';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
@@ -45,9 +46,9 @@ export default function MonitorScreen() {
       name: 'Solar Panel',
       icon: 'sunny',
       color: '#FFD700',
-      amps: 8.5,
-      volts: 12.0,
-      watts: 102,
+      amps: 0,
+      volts: 0,
+      watts: 0,
       efficiency: 85,
       status: 'active'
     },
@@ -56,9 +57,9 @@ export default function MonitorScreen() {
       name: 'Wind Turbine',
       icon: 'leaf',
       color: '#4CAF50',
-      amps: 15.2,
-      volts: 24.0,
-      watts: 365,
+      amps: 0,
+      volts: 0,
+      watts: 0,
       efficiency: 78,
       status: 'active'
     },
@@ -67,13 +68,13 @@ export default function MonitorScreen() {
       name: 'Gutter Turbine',
       icon: 'water',
       color: '#2196F3',
-      amps: 2.1,
-      volts: 12.0,
-      watts: 25,
+      amps: 0,
+      volts: 0,
+      watts: 0,
       efficiency: 45,
       status: 'active'
     },
-    totalOutput: 492,
+    totalOutput: 0,
     batteryLevel: 87,
     gridConnection: true,
     lastUpdate: new Date().toLocaleTimeString()
@@ -171,46 +172,170 @@ export default function MonitorScreen() {
     );
     housePulseAnimation.start();
 
+    // Firebase Real-time Database Listeners
+    const setupFirebaseListeners = () => {
+      // Gutter data listeners
+      const gutterAmpsRef = ref(database, '/BNHS-Watch/renewable/gutter/amps');
+      const gutterVoltRef = ref(database, '/BNHS-Watch/renewable/gutter/volt');
+      const gutterWattRef = ref(database, '/BNHS-Watch/renewable/gutter/watt');
+
+      // Wind data listeners
+      const windAmpsRef = ref(database, '/BNHS-Watch/renewable/wind/amps');
+      const windVoltRef = ref(database, '/BNHS-Watch/renewable/wind/volt');
+      const windWattRef = ref(database, '/BNHS-Watch/renewable/wind/watt');
+
+      // Solar data listeners
+      const solarAmpsRef = ref(database, '/BNHS-Watch/renewable/solar/amps');
+      const solarVoltRef = ref(database, '/BNHS-Watch/renewable/solar/volt');
+      const solarWattRef = ref(database, '/BNHS-Watch/renewable/solar/watt');
+
+      // Gutter listeners
+      onValue(gutterAmpsRef, (snapshot) => {
+        const value = snapshot.val();
+        if (value !== null) {
+          setEnergyData(prev => ({
+            ...prev,
+            gutter: { ...prev.gutter, amps: parseFloat(value) || 0 },
+            lastUpdate: new Date().toLocaleTimeString()
+          }));
+        }
+      });
+
+      onValue(gutterVoltRef, (snapshot) => {
+        const value = snapshot.val();
+        if (value !== null) {
+          setEnergyData(prev => ({
+            ...prev,
+            gutter: { ...prev.gutter, volts: parseFloat(value) || 0 },
+            lastUpdate: new Date().toLocaleTimeString()
+          }));
+        }
+      });
+
+      onValue(gutterWattRef, (snapshot) => {
+        const value = snapshot.val();
+        if (value !== null) {
+          setEnergyData(prev => ({
+            ...prev,
+            gutter: { ...prev.gutter, watts: parseFloat(value) || 0 },
+            lastUpdate: new Date().toLocaleTimeString()
+          }));
+        }
+      });
+
+      // Wind listeners
+      onValue(windAmpsRef, (snapshot) => {
+        const value = snapshot.val();
+        if (value !== null) {
+          setEnergyData(prev => ({
+            ...prev,
+            wind: { ...prev.wind, amps: parseFloat(value) || 0 },
+            lastUpdate: new Date().toLocaleTimeString()
+          }));
+        }
+      });
+
+      onValue(windVoltRef, (snapshot) => {
+        const value = snapshot.val();
+        if (value !== null) {
+          setEnergyData(prev => ({
+            ...prev,
+            wind: { ...prev.wind, volts: parseFloat(value) || 0 },
+            lastUpdate: new Date().toLocaleTimeString()
+          }));
+        }
+      });
+
+      onValue(windWattRef, (snapshot) => {
+        const value = snapshot.val();
+        if (value !== null) {
+          setEnergyData(prev => ({
+            ...prev,
+            wind: { ...prev.wind, watts: parseFloat(value) || 0 },
+            lastUpdate: new Date().toLocaleTimeString()
+          }));
+        }
+      });
+
+      // Solar listeners
+      onValue(solarAmpsRef, (snapshot) => {
+        const value = snapshot.val();
+        if (value !== null) {
+          setEnergyData(prev => ({
+            ...prev,
+            solar: { ...prev.solar, amps: parseFloat(value) || 0 },
+            lastUpdate: new Date().toLocaleTimeString()
+          }));
+        }
+      });
+
+      onValue(solarVoltRef, (snapshot) => {
+        const value = snapshot.val();
+        if (value !== null) {
+          setEnergyData(prev => ({
+            ...prev,
+            solar: { ...prev.solar, volts: parseFloat(value) || 0 },
+            lastUpdate: new Date().toLocaleTimeString()
+          }));
+        }
+      });
+
+      onValue(solarWattRef, (snapshot) => {
+        const value = snapshot.val();
+        if (value !== null) {
+          setEnergyData(prev => ({
+            ...prev,
+            solar: { ...prev.solar, watts: parseFloat(value) || 0 },
+            lastUpdate: new Date().toLocaleTimeString()
+          }));
+        }
+      });
+
+      return {
+        gutterAmpsRef,
+        gutterVoltRef,
+        gutterWattRef,
+        windAmpsRef,
+        windVoltRef,
+        windWattRef,
+        solarAmpsRef,
+        solarVoltRef,
+        solarWattRef
+      };
+    };
+
+    const firebaseRefs = setupFirebaseListeners();
+
+    // Calculate total output whenever individual values change
+    const calculateTotalOutput = () => {
+      setEnergyData(prev => ({
+        ...prev,
+        totalOutput: prev.solar.watts + prev.wind.watts + prev.gutter.watts
+      }));
+    };
+
+    // Update total output every second
+    const totalOutputInterval = setInterval(calculateTotalOutput, 1000);
+
     // Simulate loading
     setTimeout(() => {
       setIsLoading(false);
     }, 2000);
 
-    // Simulate energy data updates every 3 seconds
-    const interval = setInterval(() => {
-      setEnergyData(prev => ({
-        ...prev,
-        solar: {
-          ...prev.solar,
-          amps: Math.max(0, Math.min(15, prev.solar.amps + (Math.random() - 0.5) * 2)),
-          watts: Math.max(0, Math.min(120, prev.solar.watts + (Math.random() - 0.5) * 20)),
-          efficiency: Math.max(70, Math.min(95, prev.solar.efficiency + (Math.random() - 0.5) * 10))
-        },
-        wind: {
-          ...prev.wind,
-          amps: Math.max(0, Math.min(25, prev.wind.amps + (Math.random() - 0.5) * 5)),
-          watts: Math.max(0, Math.min(400, prev.wind.watts + (Math.random() - 0.5) * 50)),
-          efficiency: Math.max(60, Math.min(90, prev.wind.efficiency + (Math.random() - 0.5) * 15))
-        },
-        gutter: {
-          ...prev.gutter,
-          amps: Math.max(0, Math.min(5, prev.gutter.amps + (Math.random() - 0.5) * 1)),
-          watts: Math.max(0, Math.min(50, prev.gutter.watts + (Math.random() - 0.5) * 10)),
-          efficiency: Math.max(20, Math.min(70, prev.gutter.efficiency + (Math.random() - 0.5) * 20))
-        },
-        batteryLevel: Math.max(20, Math.min(100, prev.batteryLevel + (Math.random() - 0.5) * 5)),
-        lastUpdate: new Date().toLocaleTimeString()
-      }));
-      
-      // Update total output
-      setEnergyData(prev => ({
-        ...prev,
-        totalOutput: prev.solar.watts + prev.wind.watts + prev.gutter.watts
-      }));
-    }, 3000);
-
     return () => {
-      clearInterval(interval);
+      // Clean up Firebase listeners
+      off(firebaseRefs.gutterAmpsRef);
+      off(firebaseRefs.gutterVoltRef);
+      off(firebaseRefs.gutterWattRef);
+      off(firebaseRefs.windAmpsRef);
+      off(firebaseRefs.windVoltRef);
+      off(firebaseRefs.windWattRef);
+      off(firebaseRefs.solarAmpsRef);
+      off(firebaseRefs.solarVoltRef);
+      off(firebaseRefs.solarWattRef);
+      
+      // Clean up intervals and animations
+      clearInterval(totalOutputInterval);
       pulseAnimation.stop();
       glowAnimation.stop();
       energyBallAnimation.stop();
@@ -903,7 +1028,6 @@ export default function MonitorScreen() {
                 styles.houseContainer,
               {
                 opacity: fadeAnim,
-                transform: [{ scale: housePulseAnim }],
               }
             ]}
           >
