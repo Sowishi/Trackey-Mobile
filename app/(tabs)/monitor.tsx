@@ -4,7 +4,7 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, ScrollView, StyleSheet, View } from 'react-native';
+import { Animated, Dimensions, Modal, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 
@@ -37,6 +37,8 @@ interface EnergyMonitorData {
 
 export default function MonitorScreen() {
   const colorScheme = useColorScheme();
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedEnergySource, setSelectedEnergySource] = useState<EnergySource | null>(null);
   const [energyData, setEnergyData] = useState<EnergyMonitorData>({
     solar: {
       id: 'solar',
@@ -215,6 +217,36 @@ export default function MonitorScreen() {
     };
   }, []);
 
+  // Handle energy source click
+  const handleEnergySourcePress = (source: EnergySource) => {
+    setSelectedEnergySource(source);
+    setModalVisible(true);
+  };
+
+  // Close modal
+  const closeModal = () => {
+    setModalVisible(false);
+    setSelectedEnergySource(null);
+  };
+
+  // Get additional statistics for energy source
+  const getAdditionalStats = (source: EnergySource) => {
+    const power = source.watts;
+    const dailyProduction = (power * 8).toFixed(1); // Assuming 8 hours of production
+    const monthlyProduction = (parseFloat(dailyProduction) * 30).toFixed(1);
+    const carbonOffset = (power * 0.0005 * 24).toFixed(2); // kg CO2 per day
+    const costSavings = (power * 0.12 * 24 / 1000).toFixed(2); // $ per day at $0.12/kWh
+    
+    return {
+      dailyProduction,
+      monthlyProduction,
+      carbonOffset,
+      costSavings,
+      powerFactor: (source.efficiency / 100).toFixed(2),
+      temperature: `${Math.floor(Math.random() * 20) + 25}°C`,
+    };
+  };
+
   const styles = StyleSheet.create({
     safeArea: {
       flex: 1,
@@ -389,30 +421,133 @@ export default function MonitorScreen() {
       marginTop: 12,
       opacity: 0.7,
     },
+    // Modal Styles
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'flex-end',
+    },
+    modalContainer: {
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      padding: 20,
+      maxHeight: '70%',
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 20,
+      paddingBottom: 15,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors[colorScheme ?? 'light'].tabIconDefault + '30',
+    },
+    modalTitle: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    modalTitleText: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      marginLeft: 10,
+      color: Colors[colorScheme ?? 'light'].text,
+    },
+    closeButton: {
+      padding: 5,
+    },
+    statsContainer: {
+      marginBottom: 20,
+    },
+    statsRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 15,
+    },
+    statItem: {
+      flex: 1,
+      alignItems: 'center',
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      borderRadius: 12,
+      padding: 15,
+      marginHorizontal: 5,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].tabIconDefault + '30',
+    },
+    statValue: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      marginBottom: 5,
+    },
+    statLabel: {
+      fontSize: 12,
+      opacity: 0.7,
+      textAlign: 'center',
+    },
+    additionalStats: {
+      marginTop: 10,
+    },
+    additionalStatItem: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 15,
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      borderRadius: 8,
+      marginBottom: 8,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].tabIconDefault + '20',
+    },
+    additionalStatLabel: {
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    additionalStatValue: {
+      fontSize: 14,
+      fontWeight: 'bold',
+    },
+    statusBadge: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 15,
+      alignSelf: 'flex-start',
+      marginTop: 10,
+    },
+    statusText: {
+      fontSize: 12,
+      fontWeight: '600',
+      textTransform: 'uppercase',
+    },
   });
 
-  // Simplified Energy Source Component (no animation)
+  // Clickable Energy Source Component
   const renderEnergySource = (source: EnergySource) => (
-    <Animated.View 
+    <TouchableOpacity
       key={source.id}
-      style={[
-        styles.energySource,
-        {
-          borderColor: source.color,
-          opacity: fadeAnim,
-        }
-      ]}
+      onPress={() => handleEnergySourcePress(source)}
+      activeOpacity={0.8}
     >
-      <Ionicons 
-        name={source.icon as any} 
-        size={24} 
-        color={source.color}
-        style={styles.energyIcon}
-      />
-      <ThemedText style={[styles.energyName, { color: Colors[colorScheme ?? 'light'].text }]}>
-        {source.name}
-      </ThemedText>
-    </Animated.View>
+      <Animated.View 
+        style={[
+          styles.energySource,
+          {
+            borderColor: source.color,
+            opacity: fadeAnim,
+          }
+        ]}
+      >
+        <Ionicons 
+          name={source.icon as any} 
+          size={24} 
+          color={source.color}
+          style={styles.energyIcon}
+        />
+        <ThemedText style={[styles.energyName, { color: Colors[colorScheme ?? 'light'].text }]}>
+          {source.name}
+        </ThemedText>
+      </Animated.View>
+    </TouchableOpacity>
   );
 
   // SVG Connection Lines Component
@@ -723,6 +858,168 @@ export default function MonitorScreen() {
         
         </ScrollView>
       </ThemedView>
+
+      {/* Energy Source Detail Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={closeModal}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={closeModal}
+        >
+          <TouchableOpacity 
+            style={styles.modalContainer}
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+          >
+            {selectedEnergySource && (
+              <>
+                {/* Modal Header */}
+                <View style={styles.modalHeader}>
+                  <View style={styles.modalTitle}>
+                    <Ionicons 
+                      name={selectedEnergySource.icon as any} 
+                      size={24} 
+                      color={selectedEnergySource.color}
+                    />
+                    <ThemedText style={styles.modalTitleText}>
+                      {selectedEnergySource.name}
+                    </ThemedText>
+                  </View>
+                  <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
+                    <Ionicons 
+                      name="close" 
+                      size={24} 
+                      color={Colors[colorScheme ?? 'light'].text}
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Main Stats */}
+                <View style={styles.statsContainer}>
+                  <View style={styles.statsRow}>
+                    <View style={styles.statItem}>
+                      <ThemedText style={[styles.statValue, { color: selectedEnergySource.color }]}>
+                        {selectedEnergySource.amps.toFixed(1)}
+                      </ThemedText>
+                      <ThemedText style={[styles.statLabel, { color: Colors[colorScheme ?? 'light'].text }]}>
+                        Amps
+                      </ThemedText>
+                    </View>
+                    <View style={styles.statItem}>
+                      <ThemedText style={[styles.statValue, { color: selectedEnergySource.color }]}>
+                        {selectedEnergySource.volts.toFixed(1)}
+                      </ThemedText>
+                      <ThemedText style={[styles.statLabel, { color: Colors[colorScheme ?? 'light'].text }]}>
+                        Volts
+                      </ThemedText>
+                    </View>
+                    <View style={styles.statItem}>
+                      <ThemedText style={[styles.statValue, { color: selectedEnergySource.color }]}>
+                        {selectedEnergySource.watts}
+                      </ThemedText>
+                      <ThemedText style={[styles.statLabel, { color: Colors[colorScheme ?? 'light'].text }]}>
+                        Watts
+                      </ThemedText>
+                    </View>
+                  </View>
+
+                  {/* Status Badge */}
+                  <View style={[
+                    styles.statusBadge, 
+                    { 
+                      backgroundColor: selectedEnergySource.status === 'active' 
+                        ? '#4CAF50' 
+                        : selectedEnergySource.status === 'maintenance' 
+                        ? '#FF9800' 
+                        : '#F44336'
+                    }
+                  ]}>
+                    <ThemedText style={[styles.statusText, { color: 'white' }]}>
+                      {selectedEnergySource.status}
+                    </ThemedText>
+                  </View>
+                </View>
+
+                {/* Additional Statistics */}
+                <View style={styles.additionalStats}>
+                  <ThemedText style={[
+                    styles.modalTitleText, 
+                    { fontSize: 16, marginBottom: 15, color: Colors[colorScheme ?? 'light'].text }
+                  ]}>
+                    Performance Statistics
+                  </ThemedText>
+                  
+                  {(() => {
+                    const stats = getAdditionalStats(selectedEnergySource);
+                    return (
+                      <>
+                        <View style={styles.additionalStatItem}>
+                          <ThemedText style={[styles.additionalStatLabel, { color: Colors[colorScheme ?? 'light'].text }]}>
+                            Efficiency
+                          </ThemedText>
+                          <ThemedText style={[styles.additionalStatValue, { color: selectedEnergySource.color }]}>
+                            {selectedEnergySource.efficiency}%
+                          </ThemedText>
+                        </View>
+                        
+                        <View style={styles.additionalStatItem}>
+                          <ThemedText style={[styles.additionalStatLabel, { color: Colors[colorScheme ?? 'light'].text }]}>
+                            Daily Production
+                          </ThemedText>
+                          <ThemedText style={[styles.additionalStatValue, { color: selectedEnergySource.color }]}>
+                            {stats.dailyProduction} Wh
+                          </ThemedText>
+                        </View>
+                        
+                        <View style={styles.additionalStatItem}>
+                          <ThemedText style={[styles.additionalStatLabel, { color: Colors[colorScheme ?? 'light'].text }]}>
+                            Monthly Production
+                          </ThemedText>
+                          <ThemedText style={[styles.additionalStatValue, { color: selectedEnergySource.color }]}>
+                            {stats.monthlyProduction} Wh
+                          </ThemedText>
+                        </View>
+                        
+                        <View style={styles.additionalStatItem}>
+                          <ThemedText style={[styles.additionalStatLabel, { color: Colors[colorScheme ?? 'light'].text }]}>
+                            Carbon Offset
+                          </ThemedText>
+                          <ThemedText style={[styles.additionalStatValue, { color: '#4CAF50' }]}>
+                            {stats.carbonOffset} kg CO₂/day
+                          </ThemedText>
+                        </View>
+                        
+                        <View style={styles.additionalStatItem}>
+                          <ThemedText style={[styles.additionalStatLabel, { color: Colors[colorScheme ?? 'light'].text }]}>
+                            Cost Savings
+                          </ThemedText>
+                          <ThemedText style={[styles.additionalStatValue, { color: '#4CAF50' }]}>
+                            ${stats.costSavings}/day
+                          </ThemedText>
+                        </View>
+                        
+                        <View style={styles.additionalStatItem}>
+                          <ThemedText style={[styles.additionalStatLabel, { color: Colors[colorScheme ?? 'light'].text }]}>
+                            Operating Temperature
+                          </ThemedText>
+                          <ThemedText style={[styles.additionalStatValue, { color: Colors[colorScheme ?? 'light'].text }]}>
+                            {stats.temperature}
+                          </ThemedText>
+                        </View>
+                      </>
+                    );
+                  })()}
+                </View>
+              </>
+            )}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
