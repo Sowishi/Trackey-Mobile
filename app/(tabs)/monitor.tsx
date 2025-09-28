@@ -88,6 +88,7 @@ export default function MonitorScreen() {
   const glowAnim = useRef(new Animated.Value(0)).current;
   const energyBallAnim = useRef(new Animated.Value(0)).current;
   const housePulseAnim = useRef(new Animated.Value(1)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     // Initial animations
@@ -217,10 +218,42 @@ export default function MonitorScreen() {
     };
   }, []);
 
-  // Handle energy source click
+  // Handle energy source click with animation
   const handleEnergySourcePress = (source: EnergySource) => {
+    // Scale animation for visual feedback
+    Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 0.95,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
     setSelectedEnergySource(source);
     setModalVisible(true);
+  };
+
+  // Handle press in animation
+  const handlePressIn = () => {
+    Animated.timing(scaleAnim, {
+      toValue: 0.95,
+      duration: 100,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  // Handle press out animation
+  const handlePressOut = () => {
+    Animated.timing(scaleAnim, {
+      toValue: 1,
+      duration: 100,
+      useNativeDriver: true,
+    }).start();
   };
 
   // Close modal
@@ -295,14 +328,20 @@ export default function MonitorScreen() {
       justifyContent: 'center',
       width: 80,
       height: 80,
-      borderRadius: 100,
+      borderRadius: 40,
       borderWidth: 3,
       backgroundColor: Colors[colorScheme ?? 'light'].background,
-      elevation: 6,
+      elevation: 8,
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.15,
+      shadowRadius: 12,
+    },
+    energySourcePressed: {
+      elevation: 4,
+      shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.1,
-      shadowRadius: 8,
+      shadowRadius: 6,
     },
     energyIcon: {
     },
@@ -521,12 +560,17 @@ export default function MonitorScreen() {
     },
   });
 
-  // Clickable Energy Source Component
+  // Enhanced Clickable Energy Source Component
   const renderEnergySource = (source: EnergySource) => (
     <TouchableOpacity
       key={source.id}
       onPress={() => handleEnergySourcePress(source)}
-      activeOpacity={0.8}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      activeOpacity={0.9}
+      style={{
+        transform: [{ scale: scaleAnim }],
+      }}
     >
       <Animated.View 
         style={[
@@ -534,18 +578,36 @@ export default function MonitorScreen() {
           {
             borderColor: source.color,
             opacity: fadeAnim,
+            shadowColor: source.color,
           }
         ]}
       >
         <Ionicons 
           name={source.icon as any} 
-          size={24} 
+          size={28} 
           color={source.color}
           style={styles.energyIcon}
         />
         <ThemedText style={[styles.energyName, { color: Colors[colorScheme ?? 'light'].text }]}>
           {source.name}
         </ThemedText>
+        
+        {/* Subtle glow effect indicator */}
+        <Animated.View
+          style={{
+            position: 'absolute',
+            width: 84,
+            height: 84,
+            borderRadius: 42,
+            borderWidth: 2,
+            borderColor: source.color,
+            opacity: pulseAnim.interpolate({
+              inputRange: [1, 1.3],
+              outputRange: [0.3, 0.6],
+            }),
+            transform: [{ scale: pulseAnim }],
+          }}
+        />
       </Animated.View>
     </TouchableOpacity>
   );
