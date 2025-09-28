@@ -372,6 +372,109 @@ export default function WeatherScreen() {
       marginTop: 12,
       opacity: 0.7,
     },
+    aiSection: {
+      marginTop: 20,
+      backgroundColor: '#2A2A2A',
+      borderRadius: 20,
+      padding: 20,
+      borderWidth: 2,
+      borderColor: Colors[colorScheme ?? 'light'].tint + '40',
+    },
+    aiHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    aiIcon: {
+      marginRight: 12,
+    },
+    aiTitle: {
+      fontSize: 20,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].tint,
+    },
+    aiSubtitle: {
+      fontSize: 14,
+      opacity: 0.8,
+      marginBottom: 20,
+    },
+    powerGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'space-between',
+      marginBottom: 20,
+    },
+    powerCard: {
+      width: '48%',
+      backgroundColor: '#333333',
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 12,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].tint + '30',
+    },
+    powerIcon: {
+      marginBottom: 8,
+    },
+    powerOutput: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      marginBottom: 4,
+    },
+    powerLabel: {
+      fontSize: 12,
+      opacity: 0.7,
+      textAlign: 'center',
+      marginBottom: 4,
+    },
+    powerEfficiency: {
+      fontSize: 10,
+      opacity: 0.6,
+      textAlign: 'center',
+    },
+    totalPowerCard: {
+      width: '100%',
+      backgroundColor: Colors[colorScheme ?? 'light'].tint + '20',
+      borderRadius: 12,
+      padding: 20,
+      marginBottom: 20,
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: Colors[colorScheme ?? 'light'].tint + '60',
+    },
+    totalPowerOutput: {
+      fontSize: 32,
+      fontWeight: 'bold',
+      color: Colors[colorScheme ?? 'light'].tint,
+      marginBottom: 8,
+    },
+    totalPowerLabel: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].tint,
+    },
+    recommendationsSection: {
+      marginTop: 16,
+    },
+    recommendationTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      marginBottom: 12,
+      color: Colors[colorScheme ?? 'light'].tint,
+    },
+    recommendation: {
+      backgroundColor: '#444444',
+      borderRadius: 8,
+      padding: 12,
+      marginBottom: 8,
+      borderLeftWidth: 3,
+      borderLeftColor: Colors[colorScheme ?? 'light'].tint,
+    },
+    recommendationText: {
+      fontSize: 14,
+      lineHeight: 18,
+    },
   });
 
   const refreshWeather = () => {
@@ -413,6 +516,94 @@ export default function WeatherScreen() {
     if (chance >= 40) return 'Medium';
     if (chance >= 20) return 'Low';
     return 'Very Low';
+  };
+
+  // AI Weather Predictor - Calculate power output for renewable energy systems
+  const calculatePowerOutput = (weatherData: WeatherData) => {
+    // Solar Panel (100W) - Based on weather condition, cloud cover, and time
+    let solarEfficiency = 0.8; // Base efficiency
+    const condition = weatherData.condition.toLowerCase();
+    
+    if (condition.includes('clear') || condition.includes('sunny')) {
+      solarEfficiency = 0.95;
+    } else if (condition.includes('partly') || condition.includes('few clouds')) {
+      solarEfficiency = 0.75;
+    } else if (condition.includes('cloud') || condition.includes('overcast')) {
+      solarEfficiency = 0.45;
+    } else if (condition.includes('rain') || condition.includes('storm')) {
+      solarEfficiency = 0.15;
+    } else if (condition.includes('snow') || condition.includes('fog')) {
+      solarEfficiency = 0.25;
+    }
+
+    // Adjust for rain chance
+    solarEfficiency *= (1 - (weatherData.chanceOfRain / 200)); // Reduce by rain chance
+    
+    const solarOutput = Math.round(100 * solarEfficiency);
+
+    // Wind Turbine (400W) - Based on wind speed (cut-in: 3m/s, rated: 12m/s, cut-out: 25m/s)
+    const windSpeedMs = weatherData.windSpeed / 3.6; // Convert km/h to m/s
+    let windOutput = 0;
+    
+    if (windSpeedMs >= 3 && windSpeedMs <= 25) {
+      if (windSpeedMs <= 12) {
+        // Power curve approximation: P = 0.5 * ρ * A * V³ * Cp (simplified)
+        windOutput = Math.round(400 * Math.min(1, (windSpeedMs - 3) / 9));
+      } else {
+        windOutput = 400; // Rated power
+      }
+    }
+
+    // Gutter Motor Turbine (50W) - Based on rain and wind
+    let gutterOutput = 0;
+    if (weatherData.chanceOfRain > 30) {
+      // Rain provides water flow
+      const rainFactor = Math.min(1, weatherData.chanceOfRain / 70);
+      gutterOutput += Math.round(35 * rainFactor);
+    }
+    if (windSpeedMs > 2) {
+      // Wind assists the turbine
+      const windFactor = Math.min(1, windSpeedMs / 10);
+      gutterOutput += Math.round(15 * windFactor);
+    }
+    gutterOutput = Math.min(50, gutterOutput); // Cap at rated power
+
+    const totalOutput = solarOutput + windOutput + gutterOutput;
+
+    return {
+      solar: { output: solarOutput, efficiency: Math.round(solarEfficiency * 100) },
+      wind: { output: windOutput, efficiency: Math.round((windOutput / 400) * 100) },
+      gutter: { output: gutterOutput, efficiency: Math.round((gutterOutput / 50) * 100) },
+      total: totalOutput,
+    };
+  };
+
+  const getAIRecommendation = (powerData: any, weatherData: WeatherData) => {
+    const recommendations = [];
+    
+    if (powerData.solar.efficiency > 80) {
+      recommendations.push("☀️ Excellent solar conditions! Peak energy generation expected.");
+    } else if (powerData.solar.efficiency < 30) {
+      recommendations.push("⛅ Poor solar conditions. Consider battery backup.");
+    }
+
+    if (powerData.wind.output > 300) {
+      recommendations.push("💨 Strong winds detected! Wind turbine at high efficiency.");
+    } else if (powerData.wind.output < 50) {
+      recommendations.push("🌬️ Low wind speeds. Wind generation minimal.");
+    }
+
+    if (weatherData.chanceOfRain > 60) {
+      recommendations.push("🌧️ High rain probability! Gutter turbine will be active.");
+    }
+
+    if (powerData.total > 400) {
+      recommendations.push("⚡ High total output predicted! Excellent renewable energy conditions.");
+    } else if (powerData.total < 100) {
+      recommendations.push("🔋 Low output expected. Consider energy conservation measures.");
+    }
+
+    return recommendations.length > 0 ? recommendations : ["📊 Monitoring weather conditions for optimal energy prediction."];
   };
 
   return (
@@ -626,6 +817,133 @@ export default function WeatherScreen() {
                     <ThemedText style={styles.metricLabel}>Coordinates</ThemedText>
                   </View>
                 </View>
+
+                {/* AI Weather Predictor Section */}
+                <Animated.View 
+                  style={[
+                    styles.aiSection,
+                    {
+                      opacity: fadeAnim,
+                      transform: [{ translateY: slideAnim.interpolate({
+                        inputRange: [0, 50],
+                        outputRange: [0, 30]
+                      }) }]
+                    }
+                  ]}
+                >
+                  <View style={styles.aiHeader}>
+                    <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                      <Ionicons 
+                        name="bulb" 
+                        size={24} 
+                        color={Colors[colorScheme ?? 'light'].tint}
+                        style={styles.aiIcon}
+                      />
+                    </Animated.View>
+                    <ThemedText style={styles.aiTitle}>AI Energy Predictor</ThemedText>
+                  </View>
+                  <ThemedText style={styles.aiSubtitle}>
+                    Smart renewable energy output predictions based on current weather conditions
+                  </ThemedText>
+
+                  {(() => {
+                    const powerData = calculatePowerOutput(weatherData);
+                    const recommendations = getAIRecommendation(powerData, weatherData);
+                    
+                    return (
+                      <>
+                        {/* Total Power Output */}
+                        <View style={styles.totalPowerCard}>
+                          <ThemedText style={styles.totalPowerOutput}>
+                            {powerData.total}W
+                          </ThemedText>
+                          <ThemedText style={styles.totalPowerLabel}>
+                            Predicted Total Output
+                          </ThemedText>
+                        </View>
+
+                        {/* Individual Power Sources */}
+                        <View style={styles.powerGrid}>
+                          <View style={styles.powerCard}>
+                            <Ionicons 
+                              name="sunny" 
+                              size={28} 
+                              color="#FFD700"
+                              style={styles.powerIcon}
+                            />
+                            <ThemedText style={[styles.powerOutput, { color: '#FFD700' }]}>
+                              {powerData.solar.output}W
+                            </ThemedText>
+                            <ThemedText style={styles.powerLabel}>Solar Panel (100W)</ThemedText>
+                            <ThemedText style={styles.powerEfficiency}>
+                              {powerData.solar.efficiency}% efficiency
+                            </ThemedText>
+                          </View>
+
+                          <View style={styles.powerCard}>
+                            <Ionicons 
+                              name="leaf" 
+                              size={28} 
+                              color="#4CAF50"
+                              style={styles.powerIcon}
+                            />
+                            <ThemedText style={[styles.powerOutput, { color: '#4CAF50' }]}>
+                              {powerData.wind.output}W
+                            </ThemedText>
+                            <ThemedText style={styles.powerLabel}>Wind Turbine (400W)</ThemedText>
+                            <ThemedText style={styles.powerEfficiency}>
+                              {powerData.wind.efficiency}% efficiency
+                            </ThemedText>
+                          </View>
+
+                          <View style={styles.powerCard}>
+                            <Ionicons 
+                              name="water" 
+                              size={28} 
+                              color="#2196F3"
+                              style={styles.powerIcon}
+                            />
+                            <ThemedText style={[styles.powerOutput, { color: '#2196F3' }]}>
+                              {powerData.gutter.output}W
+                            </ThemedText>
+                            <ThemedText style={styles.powerLabel}>Gutter Turbine (50W)</ThemedText>
+                            <ThemedText style={styles.powerEfficiency}>
+                              {powerData.gutter.efficiency}% efficiency
+                            </ThemedText>
+                          </View>
+
+                          <View style={styles.powerCard}>
+                            <Ionicons 
+                              name="flash" 
+                              size={28} 
+                              color={Colors[colorScheme ?? 'light'].tint}
+                              style={styles.powerIcon}
+                            />
+                            <ThemedText style={[styles.powerOutput, { color: Colors[colorScheme ?? 'light'].tint }]}>
+                              {Math.round((powerData.total / 550) * 100)}%
+                            </ThemedText>
+                            <ThemedText style={styles.powerLabel}>System Efficiency</ThemedText>
+                            <ThemedText style={styles.powerEfficiency}>
+                              of {550}W total capacity
+                            </ThemedText>
+                          </View>
+                        </View>
+
+                        {/* AI Recommendations */}
+                        <View style={styles.recommendationsSection}>
+                          <ThemedText style={styles.recommendationTitle}>
+                            🤖 AI Recommendations
+                          </ThemedText>
+                          {recommendations.map((rec, index) => (
+                            <View key={index} style={styles.recommendation}>
+                              <ThemedText style={styles.recommendationText}>{rec}</ThemedText>
+                            </View>
+                          ))}
+                        </View>
+                      </>
+                    );
+                  })()}
+                </Animated.View>
               </>
             ) : (
               <View style={styles.loadingContainer}>
