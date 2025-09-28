@@ -481,7 +481,6 @@ export default function WeatherScreen() {
     modalOverlay: {
       flex: 1,
       backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      justifyContent: 'flex-end',
     },
     modalContent: {
       backgroundColor: Colors[colorScheme ?? 'light'].background,
@@ -490,6 +489,10 @@ export default function WeatherScreen() {
       paddingTop: 8,
       maxHeight: height * 0.85,
       minHeight: height * 0.6,
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
     },
     modalHandle: {
       width: 40,
@@ -710,11 +713,12 @@ export default function WeatherScreen() {
         animationType="none"
         onRequestClose={closeModal}
       >
-        <TouchableOpacity 
-          style={styles.modalOverlay} 
-          activeOpacity={1} 
-          onPress={closeModal}
-        >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity 
+            style={{ flex: 1 }}
+            activeOpacity={1} 
+            onPress={closeModal}
+          />
           <Animated.View 
             style={[
               styles.modalContent,
@@ -724,13 +728,12 @@ export default function WeatherScreen() {
             ]}
             {...panResponder.panHandlers}
           >
-            <TouchableOpacity activeOpacity={1}>
-              <View style={styles.modalHandle} />
-              
-              <ScrollView 
-                style={styles.modalScrollView}
-                showsVerticalScrollIndicator={false}
-              >
+            <View style={styles.modalHandle} />
+            
+            <ScrollView 
+              style={styles.modalScrollView}
+              showsVerticalScrollIndicator={false}
+            >
                 <View style={styles.aiHeader}>
                   <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
                     <Ionicons 
@@ -740,10 +743,10 @@ export default function WeatherScreen() {
                       style={styles.aiIcon}
                     />
                   </Animated.View>
-                  <ThemedText style={styles.aiTitle}>AI Energy Predictor</ThemedText>
+                  <ThemedText style={[styles.aiTitle, { color: Colors[colorScheme ?? 'light'].text }]}>AI Energy Predictor</ThemedText>
                 </View>
                 
-                <ThemedText style={styles.aiSubtitle}>
+                <ThemedText style={[styles.aiSubtitle, { color: Colors[colorScheme ?? 'light'].text }]}>
                   Smart renewable energy output predictions based on current weather conditions
                 </ThemedText>
 
@@ -769,8 +772,8 @@ export default function WeatherScreen() {
                     <ThemedText style={[styles.powerOutput, { color: '#FFD700' }]}>
                       {powerData.solar.output}W
                     </ThemedText>
-                    <ThemedText style={styles.powerLabel}>Solar Panel (100W)</ThemedText>
-                    <ThemedText style={styles.powerEfficiency}>
+                    <ThemedText style={[styles.powerLabel, { color: Colors[colorScheme ?? 'light'].text }]}>Solar Panel (100W)</ThemedText>
+                    <ThemedText style={[styles.powerEfficiency, { color: Colors[colorScheme ?? 'light'].text }]}>
                       {powerData.solar.efficiency}% efficiency
                     </ThemedText>
                   </View>
@@ -785,8 +788,8 @@ export default function WeatherScreen() {
                     <ThemedText style={[styles.powerOutput, { color: '#4CAF50' }]}>
                       {powerData.wind.output}W
                     </ThemedText>
-                    <ThemedText style={styles.powerLabel}>Wind Turbine (400W)</ThemedText>
-                    <ThemedText style={styles.powerEfficiency}>
+                    <ThemedText style={[styles.powerLabel, { color: Colors[colorScheme ?? 'light'].text }]}>Wind Turbine (400W)</ThemedText>
+                    <ThemedText style={[styles.powerEfficiency, { color: Colors[colorScheme ?? 'light'].text }]}>
                       {powerData.wind.efficiency}% efficiency
                     </ThemedText>
                   </View>
@@ -801,8 +804,8 @@ export default function WeatherScreen() {
                     <ThemedText style={[styles.powerOutput, { color: '#2196F3' }]}>
                       {powerData.gutter.output}W
                     </ThemedText>
-                    <ThemedText style={styles.powerLabel}>Gutter Turbine (50W)</ThemedText>
-                    <ThemedText style={styles.powerEfficiency}>
+                    <ThemedText style={[styles.powerLabel, { color: Colors[colorScheme ?? 'light'].text }]}>Gutter Turbine (50W)</ThemedText>
+                    <ThemedText style={[styles.powerEfficiency, { color: Colors[colorScheme ?? 'light'].text }]}>
                       {powerData.gutter.efficiency}% efficiency
                     </ThemedText>
                   </View>
@@ -817,8 +820,8 @@ export default function WeatherScreen() {
                     <ThemedText style={[styles.powerOutput, { color: Colors[colorScheme ?? 'light'].tint }]}>
                       {Math.round((powerData.total / 550) * 100)}%
                     </ThemedText>
-                    <ThemedText style={styles.powerLabel}>System Efficiency</ThemedText>
-                    <ThemedText style={styles.powerEfficiency}>
+                    <ThemedText style={[styles.powerLabel, { color: Colors[colorScheme ?? 'light'].text }]}>System Efficiency</ThemedText>
+                    <ThemedText style={[styles.powerEfficiency, { color: Colors[colorScheme ?? 'light'].text }]}>
                       of {550}W total capacity
                     </ThemedText>
                   </View>
@@ -826,27 +829,26 @@ export default function WeatherScreen() {
 
                 {/* AI Recommendations */}
                 <View style={styles.recommendationsSection}>
-                  <ThemedText style={styles.recommendationTitle}>
+                  <ThemedText style={[styles.recommendationTitle, { color: Colors[colorScheme ?? 'light'].tint }]}>
                     🤖 AI Recommendations
                   </ThemedText>
                   {recommendations.map((rec, index) => (
                     <View key={index} style={styles.recommendation}>
-                      <ThemedText style={styles.recommendationText}>{rec}</ThemedText>
+                      <ThemedText style={[styles.recommendationText, { color: Colors[colorScheme ?? 'light'].text }]}>{rec}</ThemedText>
                     </View>
                   ))}
                 </View>
 
                 {/* Close button */}
-                <TouchableOpacity 
-                  style={[styles.refreshButton, { marginTop: 30, marginBottom: 20 }]}
-                  onPress={closeModal}
-                >
-                  <Ionicons name="close" size={20} color="white" />
-                </TouchableOpacity>
-              </ScrollView>
-            </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.refreshButton, { marginTop: 30, marginBottom: 20 }]}
+                onPress={closeModal}
+              >
+                <Ionicons name="close" size={20} color="white" />
+              </TouchableOpacity>
+            </ScrollView>
           </Animated.View>
-        </TouchableOpacity>
+        </View>
       </Modal>
     );
   };
@@ -1076,9 +1078,7 @@ export default function WeatherScreen() {
           </Animated.View>
         </ScrollView>
 
-        {/* Floating Action Button */}
-        {weatherData && !isLoading && (
-          <TouchableOpacity 
+        <TouchableOpacity 
             style={styles.fab}
             onPress={openModal}
             activeOpacity={0.8}
@@ -1090,7 +1090,6 @@ export default function WeatherScreen() {
               style={styles.fabIcon}
             />
           </TouchableOpacity>
-        )}
 
         {/* AI Predictor Modal */}
         {renderAIPredictorModal()}
