@@ -33,52 +33,26 @@ export default function TabLayout() {
         },
       }}>
       <Tabs.Screen
-        name="index"
+        name="weather"
         options={{
-          title: 'Map',
+          title: 'Weather',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               size={focused ? 32 : 28} 
-              name={focused ? "map" : "map-outline"} 
+              name={focused ? "cloud" : "cloud-outline"} 
               color={color} 
             />
           ),
         }}
       />
       <Tabs.Screen
-        name="overload"
+        name="monitor"
         options={{
-          title: 'Overload Collection',
+          title: 'Monitor',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               size={focused ? 32 : 28} 
-              name={focused ? "albums" : "albums-outline"} 
-              color={color} 
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="seismic"
-        options={{
-          title: 'Seismic Vibration',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              size={focused ? 32 : 28} 
-              name={focused ? "pulse" : "pulse-outline"} 
-              color={color} 
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="about"
-        options={{
-          title: 'About',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              size={focused ? 32 : 28} 
-              name={focused ? "information-circle" : "information-circle-outline"} 
+              name={focused ? "desktop" : "desktop-outline"} 
               color={color} 
             />
           ),

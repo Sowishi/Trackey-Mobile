@@ -4,14 +4,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -36,10 +36,10 @@ export default function LoginScreen() {
 
     // For demo purposes, accept any email/password combination
     // In a real app, you'd authenticate with your backend
-    Alert.alert('Success', 'Login successful!', [
+    Alert.alert('Welcome to Project Watch!', 'Login successful!', [
       {
         text: 'OK',
-        onPress: () => router.replace('/(tabs)'),
+        onPress: () => router.replace('/(tabs)/weather'),
       },
     ]);
   };
@@ -144,13 +144,13 @@ export default function LoginScreen() {
         <View style={styles.content}>
           <View style={styles.header}>
             <Ionicons 
-              name="shield-checkmark" 
+              name="eye" 
               size={60} 
               color={Colors[colorScheme ?? 'light'].tint} 
               style={styles.logo}
             />
-            <Text style={styles.title}>Welcome to Struxis</Text>
-            <Text style={styles.subtitle}>Sign in to continue</Text>
+            <Text style={styles.title}>Project Watch</Text>
+            <Text style={styles.subtitle}>Monitor • Weather • Analytics</Text>
           </View>
 
           <View style={styles.form}>
