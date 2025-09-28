@@ -67,6 +67,10 @@ interface OpenWeatherForecastResponse {
 
 const API_KEY = 'd9c9e08dfa990d4a79b3b87a5b783bf3';
 const BASE_URL = 'https://api.openweathermap.org/data/2.5';
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
+const DEFAULT_LOCATION = { lat: 14.5995, lon: 120.9842 }; // Manila, Philippines
+const MAX_RETRY_ATTEMPTS = 3;
+const RETRY_DELAY = 1000; // 1 second
 
 export default function WeatherScreen() {
   const colorScheme = useColorScheme();
@@ -74,6 +78,9 @@ export default function WeatherScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [cachedLocation, setCachedLocation] = useState<{ lat: number; lon: number } | null>(null);
+  const [lastFetchTime, setLastFetchTime] = useState<number>(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -82,92 +89,152 @@ export default function WeatherScreen() {
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const modalSlideAnim = useRef(new Animated.Value(height)).current;
 
-  // Fetch weather data from OpenWeatherMap API
-  const fetchWeatherData = async (lat: number, lon: number) => {
+  // Utility function for retry logic with exponential backoff
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+  // Optimized weather data fetching with parallel API calls and retry logic
+  const fetchWeatherData = async (lat: number, lon: number, forceRefresh = false, retryCount = 0) => {
     try {
+      // Check if we need to fetch new data (cache check)
+      const now = Date.now();
+      if (!forceRefresh && weatherData && (now - lastFetchTime) < CACHE_DURATION) {
+        console.log('Using cached weather data');
+        return;
+      }
+
       setError(null);
       
-      // Fetch current weather
-      const weatherResponse = await fetch(
-        `${BASE_URL}/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric`
-      );
+      // Parallel API calls for better performance with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
-      if (!weatherResponse.ok) {
-        throw new Error(`Weather API error: ${weatherResponse.status}`);
+      try {
+        const [weatherResponse, forecastResponse] = await Promise.all([
+          fetch(`${BASE_URL}/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric`, {
+            signal: controller.signal
+          }),
+          fetch(`${BASE_URL}/forecast?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric&cnt=8`, {
+            signal: controller.signal
+          })
+        ]);
+        
+        clearTimeout(timeoutId);
+        
+        // Check both responses
+        if (!weatherResponse.ok) {
+          throw new Error(`Weather API error: ${weatherResponse.status} ${weatherResponse.statusText}`);
+        }
+        if (!forecastResponse.ok) {
+          throw new Error(`Forecast API error: ${forecastResponse.status} ${forecastResponse.statusText}`);
+        }
+        
+        // Parallel JSON parsing
+        const [weatherJson, forecastJson]: [OpenWeatherResponse, OpenWeatherForecastResponse] = await Promise.all([
+          weatherResponse.json(),
+          forecastResponse.json()
+        ]);
+        
+        // Validate response data
+        if (!weatherJson.main || !weatherJson.weather || !weatherJson.weather[0]) {
+          throw new Error('Invalid weather data received');
+        }
+        
+        // Calculate chance of rain from next 24 hours
+        const chanceOfRain = forecastJson.list?.length > 0 
+          ? Math.max(...forecastJson.list.map(item => item.pop)) * 100 
+          : 0;
+        
+        // Process weather data
+        const newWeatherData: WeatherData = {
+          temperature: Math.round(weatherJson.main.temp),
+          humidity: weatherJson.main.humidity,
+          windSpeed: Math.round((weatherJson.wind?.speed || 0) * 3.6), // Convert m/s to km/h
+          pressure: weatherJson.main.pressure,
+          condition: weatherJson.weather[0].description
+            .split(' ')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' '),
+          icon: getWeatherIcon(weatherJson.weather[0].main, weatherJson.weather[0].icon),
+          location: weatherJson.name || 'Unknown Location',
+          lastUpdate: new Date().toLocaleTimeString(),
+          feelsLike: Math.round(weatherJson.main.feels_like),
+          chanceOfRain: Math.round(chanceOfRain),
+          visibility: Math.round((weatherJson.visibility || 10000) / 1000), // Convert to km
+          uvIndex: 0, // Would need UV API for this
+          coordinates: {
+            lat: weatherJson.coord?.lat || lat,
+            lon: weatherJson.coord?.lon || lon,
+          },
+        };
+        
+        setWeatherData(newWeatherData);
+        setLastFetchTime(now);
+        setIsLoading(false);
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        throw fetchError;
       }
-      
-      const weatherJson: OpenWeatherResponse = await weatherResponse.json();
-      
-      // Fetch forecast for chance of rain
-      const forecastResponse = await fetch(
-        `${BASE_URL}/forecast?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric&cnt=8`
-      );
-      
-      if (!forecastResponse.ok) {
-        throw new Error(`Forecast API error: ${forecastResponse.status}`);
-      }
-      
-      const forecastJson: OpenWeatherForecastResponse = await forecastResponse.json();
-      
-      // Calculate chance of rain from next 24 hours
-      const chanceOfRain = Math.max(...forecastJson.list.map(item => item.pop)) * 100;
-      
-      const weatherData: WeatherData = {
-        temperature: Math.round(weatherJson.main.temp),
-        humidity: weatherJson.main.humidity,
-        windSpeed: Math.round(weatherJson.wind.speed * 3.6), // Convert m/s to km/h
-        pressure: weatherJson.main.pressure,
-        condition: weatherJson.weather[0].description
-          .split(' ')
-          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(' '),
-        icon: getWeatherIcon(weatherJson.weather[0].main, weatherJson.weather[0].icon),
-        location: weatherJson.name,
-        lastUpdate: new Date().toLocaleTimeString(),
-        feelsLike: Math.round(weatherJson.main.feels_like),
-        chanceOfRain: Math.round(chanceOfRain),
-        visibility: Math.round(weatherJson.visibility / 1000), // Convert to km
-        uvIndex: 0, // Would need UV API for this
-        coordinates: {
-          lat: weatherJson.coord.lat,
-          lon: weatherJson.coord.lon,
-        },
-      };
-      
-      setWeatherData(weatherData);
-      setIsLoading(false);
     } catch (error) {
-      console.error('Error fetching weather data:', error);
-      setError(error instanceof Error ? error.message : 'Failed to fetch weather data');
+      console.error(`Error fetching weather data (attempt ${retryCount + 1}):`, error);
+      
+      // Retry logic with exponential backoff
+      if (retryCount < MAX_RETRY_ATTEMPTS) {
+        const backoffDelay = RETRY_DELAY * Math.pow(2, retryCount);
+        console.log(`Retrying in ${backoffDelay}ms...`);
+        await delay(backoffDelay);
+        return fetchWeatherData(lat, lon, forceRefresh, retryCount + 1);
+      }
+      
+      // Final failure
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch weather data';
+      setError(`${errorMessage} (after ${MAX_RETRY_ATTEMPTS} attempts)`);
       setIsLoading(false);
     }
   };
 
-  // Get user location and fetch weather
-  const loadWeatherData = async () => {
+  // Optimized location and weather data loading
+  const loadWeatherData = async (forceRefresh = false) => {
     try {
       setIsLoading(true);
       setError(null);
       
-      // Request location permission
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        // Fallback to a default location (Manila, Philippines)
-        await fetchWeatherData(14.5995, 120.9842);
-        return;
-      }
-
-      // Get current location
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
+      let coordinates = cachedLocation;
       
-      await fetchWeatherData(location.coords.latitude, location.coords.longitude);
+      // Only get location if we don't have cached coordinates or force refresh
+      if (!coordinates || forceRefresh) {
+        try {
+          // Request location permission
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status !== 'granted') {
+            coordinates = DEFAULT_LOCATION;
+            setCachedLocation(coordinates);
+          } else {
+            // Get current location with optimized settings
+            const location = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+              timeInterval: 10000, // 10 seconds timeout
+              distanceInterval: 100, // 100 meters minimum distance
+            });
+            
+            coordinates = {
+              lat: location.coords.latitude,
+              lon: location.coords.longitude,
+            };
+            setCachedLocation(coordinates);
+          }
+        } catch (locationError) {
+          console.log('Location error, using default:', locationError);
+          coordinates = DEFAULT_LOCATION;
+          setCachedLocation(coordinates);
+        }
+      }
+      
+      await fetchWeatherData(coordinates.lat, coordinates.lon, forceRefresh);
     } catch (error) {
-      console.error('Error getting location:', error);
-      setError('Failed to get location. Using default location.');
-      // Fallback to Manila, Philippines
-      await fetchWeatherData(14.5995, 120.9842);
+      console.error('Error loading weather data:', error);
+      setError('Failed to load weather data. Using default location.');
+      // Final fallback
+      await fetchWeatherData(DEFAULT_LOCATION.lat, DEFAULT_LOCATION.lon, forceRefresh);
     }
   };
 
@@ -217,15 +284,23 @@ export default function WeatherScreen() {
     // Load weather data on component mount
     loadWeatherData();
 
-    // Update weather data every 10 minutes
+    // Update weather data every 10 minutes (only if app is active)
     const interval = setInterval(() => {
-      loadWeatherData();
+      // Only auto-refresh if we have cached data and it's been more than 5 minutes
+      const now = Date.now();
+      if (weatherData && (now - lastFetchTime) >= CACHE_DURATION) {
+        loadWeatherData();
+      }
     }, 600000); // 10 minutes
 
     return () => {
       clearInterval(interval);
       pulseAnimation.stop();
       rotateAnimation.stop();
+      // Clear refresh timeout on unmount
+      if (refreshWeatherRef.current) {
+        clearTimeout(refreshWeatherRef.current);
+      }
     };
   }, []);
 
@@ -528,8 +603,29 @@ export default function WeatherScreen() {
     },
   });
 
+  // Debounced refresh function to prevent multiple rapid calls
+  const refreshWeatherRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
   const refreshWeather = () => {
-    loadWeatherData();
+    if (isRefreshing) {
+      console.log('Refresh already in progress, skipping...');
+      return;
+    }
+
+    // Clear existing timeout
+    if (refreshWeatherRef.current) {
+      clearTimeout(refreshWeatherRef.current);
+    }
+
+    // Debounce the refresh call
+    refreshWeatherRef.current = setTimeout(async () => {
+      setIsRefreshing(true);
+      try {
+        await loadWeatherData(true); // Force refresh
+      } finally {
+        setIsRefreshing(false);
+      }
+    }, 300); // 300ms debounce
   };
 
   const openModal = () => {
@@ -1040,29 +1136,9 @@ export default function WeatherScreen() {
                     <ThemedText style={styles.metricLabel}>Feels Like</ThemedText>
                   </View>
 
-                  <View style={styles.weatherMetric}>
-                    <Ionicons 
-                      name="eye" 
-                      size={24} 
-                      color={Colors[colorScheme ?? 'light'].tint}
-                      style={styles.metricIcon}
-                    />
-                    <ThemedText style={styles.metricValue}>{weatherData.visibility} km</ThemedText>
-                    <ThemedText style={styles.metricLabel}>Visibility</ThemedText>
-                  </View>
+               
 
-                  <View style={styles.weatherMetric}>
-                    <Ionicons 
-                      name="location" 
-                      size={24} 
-                      color={Colors[colorScheme ?? 'light'].tint}
-                      style={styles.metricIcon}
-                    />
-                    <ThemedText style={styles.metricValue}>
-                      {weatherData.coordinates.lat.toFixed(2)}, {weatherData.coordinates.lon.toFixed(2)}
-                    </ThemedText>
-                    <ThemedText style={styles.metricLabel}>Coordinates</ThemedText>
-                  </View>
+                 
                 </View>
               </>
             ) : (
