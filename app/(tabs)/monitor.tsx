@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Dimensions, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Circle, Line } from 'react-native-svg';
+import Svg, { Circle, Path } from 'react-native-svg';
 
 const { width, height } = Dimensions.get('window');
 
@@ -199,17 +199,18 @@ export default function MonitorScreen() {
     },
     energySourcesRow: {
       flexDirection: 'row',
-      justifyContent: 'space-around',
+      justifyContent: 'center',
+      alignItems: 'center',
       width: '100%',
-      paddingHorizontal: 40,
       marginBottom: 120,
+      gap: 60,
     },
     energySource: {
       alignItems: 'center',
       justifyContent: 'center',
-      width: 80,
-      height: 80,
-      borderRadius: 40,
+      width: 60,
+      height: 60,
+      borderRadius: 30,
       borderWidth: 2,
       backgroundColor: Colors[colorScheme ?? 'light'].background,
       elevation: 6,
@@ -244,6 +245,7 @@ export default function MonitorScreen() {
       shadowOffset: { width: 0, height: 6 },
       shadowOpacity: 0.15,
       shadowRadius: 12,
+      marginTop: 100,
     },
     svgContainer: {
       position: 'absolute',
@@ -355,7 +357,7 @@ export default function MonitorScreen() {
     >
       <Ionicons 
         name={source.icon as any} 
-        size={28} 
+        size={24} 
         color={source.color}
         style={styles.energyIcon}
       />
@@ -367,48 +369,58 @@ export default function MonitorScreen() {
 
   // SVG Connection Lines Component
   const renderConnectionLines = () => {
-    // Calculate positions based on screen width
-    const solarX = width * 0.25;
-    const windX = width * 0.5;
-    const gutterX = width * 0.75;
-    const houseX = width * 0.5;
+    // Calculate exact positions to match the actual element centers
+    const centerX = width * 0.45;
+    const gap = 120;
     
-    const sourceY = 140; // Y position of energy sources
-    const houseY = 280; // Y position of house
+    // Energy source positions (accounting for circle centers)
+    const solarX = centerX - gap;
+    const windX = centerX;
+    const gutterX = centerX + gap;
+    const sourceY = 120; // Adjusted to match actual circle center position
     
+    // House position (accounting for house container center + margin top)
+    const houseX = width * 0.45;
+    const houseY = 380; // Adjusted to match actual house center position
+    
+    // Create curved path for each connection
+    const createCurvedPath = (startX: number, startY: number, endX: number, endY: number) => {
+      const midY = startY + (endY - startY) * .5;
+      const controlX1 = startX + (endX - startX) * 0.2;
+      const controlY1 = midY;
+      const controlX2 = endX + (startX - endX) * 0.2;
+      const controlY2 = midY;
+      
+      return `M ${startX} ${startY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${endX} ${endY}`;
+    };
+
     return (
       <Svg height={height} width={width} style={styles.svgContainer}>
-        {/* Solar to House */}
-        <Line
-          x1={solarX}
-          y1={sourceY}
-          x2={houseX}
-          y2={houseY}
-          stroke={energyData.solar.color}
-          strokeWidth="2"
-          strokeOpacity="0.6"
+        {/* Curved Solar to House */}
+        <Path
+          d={createCurvedPath(solarX, sourceY, houseX, houseY)}
+          stroke="#FF8C00"
+          strokeWidth="4"
+          fill="none"
+          strokeOpacity="0.8"
         />
         
-        {/* Wind to House */}
-        <Line
-          x1={windX}
-          y1={sourceY}
-          x2={houseX}
-          y2={houseY}
-          stroke={energyData.wind.color}
-          strokeWidth="2"
-          strokeOpacity="0.6"
+        {/* Curved Wind to House */}
+        <Path
+          d={createCurvedPath(windX, sourceY, houseX, houseY)}
+          stroke="#FF8C00"
+          strokeWidth="4"
+          fill="none"
+          strokeOpacity="0.8"
         />
         
-        {/* Gutter to House */}
-        <Line
-          x1={gutterX}
-          y1={sourceY}
-          x2={houseX}
-          y2={houseY}
-          stroke={energyData.gutter.color}
-          strokeWidth="2"
-          strokeOpacity="0.6"
+        {/* Curved Gutter to House */}
+        <Path
+          d={createCurvedPath(gutterX, sourceY, houseX, houseY)}
+          stroke="#FF8C00"
+          strokeWidth="4"
+          fill="none"
+          strokeOpacity="0.8"
         />
         
         {/* Connection dots at energy sources */}
@@ -433,49 +445,18 @@ export default function MonitorScreen() {
           fill={energyData.gutter.color}
         />
         
-        {/* Connection dot at house */}
+        {/* Connection dot at house - positioned exactly at house center */}
         <Circle
           cx={houseX}
           cy={houseY}
           r="6"
-          fill={Colors[colorScheme ?? 'light'].tint}
+          fill="#FF8C00"
         />
       </Svg>
     );
   };
 
-  const getBatteryColor = (level: number) => {
-    if (level > 60) return '#4CAF50';
-    if (level > 30) return '#FF9800';
-    return '#F44336';
-  };
 
-  const refreshData = () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      // Simulate new energy readings
-      setEnergyData(prev => ({
-        ...prev,
-        solar: {
-          ...prev.solar,
-          amps: Math.max(0, Math.min(15, 8.5 + (Math.random() - 0.5) * 4)),
-          watts: Math.max(0, Math.min(120, 102 + (Math.random() - 0.5) * 40)),
-        },
-        wind: {
-          ...prev.wind,
-          amps: Math.max(0, Math.min(25, 15.2 + (Math.random() - 0.5) * 8)),
-          watts: Math.max(0, Math.min(400, 365 + (Math.random() - 0.5) * 80)),
-        },
-        gutter: {
-          ...prev.gutter,
-          amps: Math.max(0, Math.min(5, 2.1 + (Math.random() - 0.5) * 2)),
-          watts: Math.max(0, Math.min(50, 25 + (Math.random() - 0.5) * 20)),
-        },
-        lastUpdate: new Date().toLocaleTimeString()
-      }));
-      setIsLoading(false);
-    }, 1500);
-  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
