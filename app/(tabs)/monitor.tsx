@@ -90,6 +90,9 @@ export default function MonitorScreen() {
   const energyBallAnim = useRef(new Animated.Value(0)).current;
   const housePulseAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const statsCardAnim = useRef(new Animated.Value(0)).current;
+  const statsProgressAnim = useRef(new Animated.Value(0)).current;
+  const countUpAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // Initial animations
@@ -317,9 +320,29 @@ export default function MonitorScreen() {
     // Update total output every second
     const totalOutputInterval = setInterval(calculateTotalOutput, 1000);
 
+    // Statistics animations
+    const statsAnimation = Animated.stagger(200, [
+      Animated.timing(statsCardAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(statsProgressAnim, {
+        toValue: 1,
+        duration: 1500,
+        useNativeDriver: false,
+      }),
+      Animated.timing(countUpAnim, {
+        toValue: 1,
+        duration: 2000,
+        useNativeDriver: false,
+      }),
+    ]);
+
     // Simulate loading
     setTimeout(() => {
       setIsLoading(false);
+      statsAnimation.start();
     }, 2000);
 
     return () => {
@@ -512,39 +535,56 @@ export default function MonitorScreen() {
      totalOutputCard: {
        backgroundColor: Colors[colorScheme ?? 'light'].background,
        borderRadius: 16,
-       padding: 20,
-       marginBottom: 20,
+       padding: 32,
+       marginBottom: 32,
        borderWidth: 2,
-       borderColor: '#FFD700' + '40',
+       borderColor: '#F97316',
        elevation: 4,
-       shadowColor: '#000',
+       shadowColor: '#F97316',
        shadowOffset: { width: 0, height: 2 },
        shadowOpacity: 0.1,
        shadowRadius: 8,
+       overflow: 'hidden',
      },
      totalOutputHeader: {
-       flexDirection: 'row',
        alignItems: 'center',
-       marginBottom: 10,
+       marginBottom: 20,
      },
      totalOutputValue: {
-       fontSize: 32,
-       fontWeight: 'bold',
-       color: '#FFD700',
-       marginBottom: 5,
+       fontSize: 48,
+       fontWeight: '300',
+       color: '#F97316',
+       marginBottom: 4,
        textAlign: 'center',
+       letterSpacing: 2,
      },
      totalOutputLabel: {
-       fontSize: 16,
-       fontWeight: '600',
-       marginLeft: 8,
+       fontSize: 14,
+       fontWeight: '500',
        color: Colors[colorScheme ?? 'light'].text,
+       textAlign: 'center',
+       opacity: 0.8,
+       textTransform: 'uppercase',
+       letterSpacing: 1,
+       marginBottom: 16,
      },
      lastUpdateText: {
-       fontSize: 12,
-       opacity: 0.6,
+       fontSize: 11,
+       opacity: 0.5,
        textAlign: 'center',
-       marginTop: 5,
+       color: Colors[colorScheme ?? 'light'].text,
+     },
+     totalOutputGlow: {
+       position: 'absolute',
+       top: 0,
+       left: 0,
+       right: 0,
+       bottom: 0,
+       backgroundColor: 'rgba(249, 115, 22, 0.03)',
+       borderRadius: 16,
+     },
+     totalOutputIcon: {
+       marginBottom: 12,
      },
      sectionTitle: {
        fontSize: 18,
@@ -553,51 +593,76 @@ export default function MonitorScreen() {
        color: Colors[colorScheme ?? 'light'].text,
      },
      energySourcesGrid: {
-       marginBottom: 25,
+       marginBottom: 32,
+       gap: 16,
      },
      sourceCard: {
        backgroundColor: Colors[colorScheme ?? 'light'].background,
-       borderRadius: 12,
-       padding: 15,
-       marginBottom: 12,
-       borderLeftWidth: 4,
-       elevation: 2,
+       borderRadius: 20,
+       padding: 20,
+       marginBottom: 16,
+       borderLeftWidth: 6,
+       elevation: 6,
        shadowColor: '#000',
-       shadowOffset: { width: 0, height: 1 },
-       shadowOpacity: 0.1,
-       shadowRadius: 4,
+       shadowOffset: { width: 0, height: 3 },
+       shadowOpacity: 0.15,
+       shadowRadius: 8,
+       overflow: 'hidden',
+     },
+     sourceCardGlow: {
+       position: 'absolute',
+       top: 0,
+       left: 0,
+       right: 0,
+       bottom: 0,
+       opacity: 0.1,
+       borderRadius: 20,
      },
      sourceHeader: {
        flexDirection: 'row',
        alignItems: 'center',
-       marginBottom: 8,
+       justifyContent: 'space-between',
+       marginBottom: 12,
+     },
+     sourceHeaderLeft: {
+       flexDirection: 'row',
+       alignItems: 'center',
      },
      sourceTitle: {
-       fontSize: 14,
-       fontWeight: '600',
-       marginLeft: 8,
+       fontSize: 16,
+       fontWeight: '700',
+       marginLeft: 10,
        color: Colors[colorScheme ?? 'light'].text,
      },
      sourceValue: {
-       fontSize: 20,
+       fontSize: 28,
        fontWeight: 'bold',
-       marginBottom: 4,
+       marginBottom: 8,
+       letterSpacing: 0.5,
      },
      sourceSubtext: {
-       fontSize: 12,
-       opacity: 0.7,
-       marginBottom: 8,
+       fontSize: 14,
+       opacity: 0.8,
+       marginBottom: 16,
        color: Colors[colorScheme ?? 'light'].text,
+       fontWeight: '500',
      },
      contributionBar: {
-       height: 4,
-       backgroundColor: Colors[colorScheme ?? 'light'].tabIconDefault + '30',
-       borderRadius: 2,
+       height: 8,
+       backgroundColor: Colors[colorScheme ?? 'light'].tabIconDefault + '20',
+       borderRadius: 4,
        overflow: 'hidden',
+       marginBottom: 8,
      },
      contributionFill: {
        height: '100%',
-       borderRadius: 2,
+       borderRadius: 4,
+     },
+     contributionPercentage: {
+       fontSize: 12,
+       fontWeight: '600',
+       textAlign: 'right',
+       opacity: 0.7,
      },
      metricsContainer: {
        marginBottom: 25,
@@ -1200,95 +1265,262 @@ export default function MonitorScreen() {
              ]}
            >
              {/* Total Output Card */}
-             <View style={styles.totalOutputCard}>
+             <Animated.View 
+               style={[
+                 styles.totalOutputCard,
+                 {
+                   transform: [{ scale: statsCardAnim }],
+                   opacity: statsCardAnim,
+                 }
+               ]}
+             >
+               <Animated.View 
+                 style={[
+                   styles.totalOutputGlow,
+                   {
+                     opacity: pulseAnim.interpolate({
+                       inputRange: [1, 1.3],
+                       outputRange: [0.02, 0.06],
+                     }),
+                     transform: [{ scale: pulseAnim }],
+                   }
+                 ]}
+               />
                <View style={styles.totalOutputHeader}>
-                 <Ionicons name="flash" size={24} color="#FFD700" />
-                 <ThemedText style={styles.totalOutputLabel}>Total Power Output</ThemedText>
+                 <Ionicons 
+                   name="flash-outline" 
+                   size={32} 
+                   color="#F97316" 
+                   style={styles.totalOutputIcon}
+                 />
+                 <ThemedText style={styles.totalOutputLabel}>
+                   Total Power Output
+                 </ThemedText>
+                 <Animated.Text 
+                   style={[
+                     styles.totalOutputValue,
+                     {
+                       opacity: countUpAnim,
+                       transform: [{ 
+                         translateY: countUpAnim.interpolate({
+                           inputRange: [0, 1],
+                           outputRange: [20, 0],
+                         })
+                       }],
+                     }
+                   ]}
+                 >
+                   {energyData.totalOutput.toFixed(1)}
+                 </Animated.Text>
+                 <ThemedText style={[styles.totalOutputValue, { fontSize: 20, fontWeight: '400', opacity: 0.7 }]}>
+                   WATTS
+                 </ThemedText>
+                 <ThemedText style={styles.lastUpdateText}>
+                   {energyData.lastUpdate}
+                 </ThemedText>
                </View>
-               <ThemedText style={styles.totalOutputValue}>
-                 {energyData.totalOutput.toFixed(1)} W
-               </ThemedText>
-               <ThemedText style={styles.lastUpdateText}>
-                 Last updated: {energyData.lastUpdate}
-               </ThemedText>
-             </View>
+             </Animated.View>
 
              {/* Energy Sources Grid */}
              <View style={styles.energySourcesGrid}>
-               <View style={[styles.sourceCard, { borderLeftColor: energyData.solar.color }]}>
+               {/* Solar Card */}
+               <Animated.View 
+                 style={[
+                   styles.sourceCard, 
+                   { 
+                     borderLeftColor: energyData.solar.color,
+                     transform: [{ 
+                       translateX: statsCardAnim.interpolate({
+                         inputRange: [0, 1],
+                         outputRange: [-100, 0],
+                       })
+                     }],
+                     opacity: statsCardAnim,
+                   }
+                 ]}
+               >
+                 <Animated.View 
+                   style={[
+                     styles.sourceCardGlow,
+                     { backgroundColor: energyData.solar.color }
+                   ]}
+                 />
                  <View style={styles.sourceHeader}>
-                   <Ionicons name={energyData.solar.icon as any} size={20} color={energyData.solar.color} />
-                   <ThemedText style={styles.sourceTitle}>Solar</ThemedText>
+                   <View style={styles.sourceHeaderLeft}>
+                     <Ionicons name={energyData.solar.icon as any} size={24} color={energyData.solar.color} />
+                     <ThemedText style={styles.sourceTitle}>Solar Panel</ThemedText>
+                   </View>
+                   <View style={[styles.statusBadge, { backgroundColor: energyData.solar.color + '20' }]}>
+                     <ThemedText style={[styles.statusText, { color: energyData.solar.color }]}>
+                       {energyData.solar.status}
+                     </ThemedText>
+                   </View>
                  </View>
-                 <ThemedText style={[styles.sourceValue, { color: energyData.solar.color }]}>
+                 <Animated.Text 
+                   style={[
+                     styles.sourceValue, 
+                     { 
+                       color: energyData.solar.color,
+                       opacity: countUpAnim,
+                     }
+                   ]}
+                 >
                    {energyData.solar.watts.toFixed(1)}W
-                 </ThemedText>
+                 </Animated.Text>
                  <ThemedText style={styles.sourceSubtext}>
                    {energyData.solar.amps.toFixed(1)}A • {energyData.solar.volts.toFixed(1)}V
                  </ThemedText>
                  <View style={styles.contributionBar}>
-                   <View 
+                   <Animated.View 
                      style={[
                        styles.contributionFill, 
                        { 
                          backgroundColor: energyData.solar.color,
-                         width: `${energyData.totalOutput > 0 ? (energyData.solar.watts / energyData.totalOutput) * 100 : 0}%`
+                         width: statsProgressAnim.interpolate({
+                           inputRange: [0, 1],
+                           outputRange: ['0%', `${energyData.totalOutput > 0 ? (energyData.solar.watts / energyData.totalOutput) * 100 : 0}%`]
+                         })
                        }
                      ]} 
                    />
                  </View>
-               </View>
-
-               <View style={[styles.sourceCard, { borderLeftColor: energyData.wind.color }]}>
-                 <View style={styles.sourceHeader}>
-                   <Ionicons name={energyData.wind.icon as any} size={20} color={energyData.wind.color} />
-                   <ThemedText style={styles.sourceTitle}>Wind</ThemedText>
-                 </View>
-                 <ThemedText style={[styles.sourceValue, { color: energyData.wind.color }]}>
-                   {energyData.wind.watts.toFixed(1)}W
+                 <ThemedText style={styles.contributionPercentage}>
+                   {energyData.totalOutput > 0 ? ((energyData.solar.watts / energyData.totalOutput) * 100).toFixed(1) : 0}% contribution
                  </ThemedText>
+               </Animated.View>
+
+               {/* Wind Card */}
+               <Animated.View 
+                 style={[
+                   styles.sourceCard, 
+                   { 
+                     borderLeftColor: energyData.wind.color,
+                     transform: [{ 
+                       translateX: statsCardAnim.interpolate({
+                         inputRange: [0, 1],
+                         outputRange: [100, 0],
+                       })
+                     }],
+                     opacity: statsCardAnim,
+                   }
+                 ]}
+               >
+                 <Animated.View 
+                   style={[
+                     styles.sourceCardGlow,
+                     { backgroundColor: energyData.wind.color }
+                   ]}
+                 />
+                 <View style={styles.sourceHeader}>
+                   <View style={styles.sourceHeaderLeft}>
+                     <Ionicons name={energyData.wind.icon as any} size={24} color={energyData.wind.color} />
+                     <ThemedText style={styles.sourceTitle}>Wind Turbine</ThemedText>
+                   </View>
+                   <View style={[styles.statusBadge, { backgroundColor: energyData.wind.color + '20' }]}>
+                     <ThemedText style={[styles.statusText, { color: energyData.wind.color }]}>
+                       {energyData.wind.status}
+                     </ThemedText>
+                   </View>
+                 </View>
+                 <Animated.Text 
+                   style={[
+                     styles.sourceValue, 
+                     { 
+                       color: energyData.wind.color,
+                       opacity: countUpAnim,
+                     }
+                   ]}
+                 >
+                   {energyData.wind.watts.toFixed(1)}W
+                 </Animated.Text>
                  <ThemedText style={styles.sourceSubtext}>
                    {energyData.wind.amps.toFixed(1)}A • {energyData.wind.volts.toFixed(1)}V
                  </ThemedText>
                  <View style={styles.contributionBar}>
-                   <View 
+                   <Animated.View 
                      style={[
                        styles.contributionFill, 
                        { 
                          backgroundColor: energyData.wind.color,
-                         width: `${energyData.totalOutput > 0 ? (energyData.wind.watts / energyData.totalOutput) * 100 : 0}%`
+                         width: statsProgressAnim.interpolate({
+                           inputRange: [0, 1],
+                           outputRange: ['0%', `${energyData.totalOutput > 0 ? (energyData.wind.watts / energyData.totalOutput) * 100 : 0}%`]
+                         })
                        }
                      ]} 
                    />
                  </View>
-               </View>
-
-               <View style={[styles.sourceCard, { borderLeftColor: energyData.gutter.color }]}>
-                 <View style={styles.sourceHeader}>
-                   <Ionicons name={energyData.gutter.icon as any} size={20} color={energyData.gutter.color} />
-                   <ThemedText style={styles.sourceTitle}>Gutter</ThemedText>
-                 </View>
-                 <ThemedText style={[styles.sourceValue, { color: energyData.gutter.color }]}>
-                   {energyData.gutter.watts.toFixed(1)}W
+                 <ThemedText style={styles.contributionPercentage}>
+                   {energyData.totalOutput > 0 ? ((energyData.wind.watts / energyData.totalOutput) * 100).toFixed(1) : 0}% contribution
                  </ThemedText>
+               </Animated.View>
+
+               {/* Gutter Card */}
+               <Animated.View 
+                 style={[
+                   styles.sourceCard, 
+                   { 
+                     borderLeftColor: energyData.gutter.color,
+                     transform: [{ 
+                       translateX: statsCardAnim.interpolate({
+                         inputRange: [0, 1],
+                         outputRange: [-100, 0],
+                       })
+                     }],
+                     opacity: statsCardAnim,
+                   }
+                 ]}
+               >
+                 <Animated.View 
+                   style={[
+                     styles.sourceCardGlow,
+                     { backgroundColor: energyData.gutter.color }
+                   ]}
+                 />
+                 <View style={styles.sourceHeader}>
+                   <View style={styles.sourceHeaderLeft}>
+                     <Ionicons name={energyData.gutter.icon as any} size={24} color={energyData.gutter.color} />
+                     <ThemedText style={styles.sourceTitle}>Gutter Turbine</ThemedText>
+                   </View>
+                   <View style={[styles.statusBadge, { backgroundColor: energyData.gutter.color + '20' }]}>
+                     <ThemedText style={[styles.statusText, { color: energyData.gutter.color }]}>
+                       {energyData.gutter.status}
+                     </ThemedText>
+                   </View>
+                 </View>
+                 <Animated.Text 
+                   style={[
+                     styles.sourceValue, 
+                     { 
+                       color: energyData.gutter.color,
+                       opacity: countUpAnim,
+                     }
+                   ]}
+                 >
+                   {energyData.gutter.watts.toFixed(1)}W
+                 </Animated.Text>
                  <ThemedText style={styles.sourceSubtext}>
                    {energyData.gutter.amps.toFixed(1)}A • {energyData.gutter.volts.toFixed(1)}V
                  </ThemedText>
                  <View style={styles.contributionBar}>
-                   <View 
+                   <Animated.View 
                      style={[
                        styles.contributionFill, 
                        { 
                          backgroundColor: energyData.gutter.color,
-                         width: `${energyData.totalOutput > 0 ? (energyData.gutter.watts / energyData.totalOutput) * 100 : 0}%`
+                         width: statsProgressAnim.interpolate({
+                           inputRange: [0, 1],
+                           outputRange: ['0%', `${energyData.totalOutput > 0 ? (energyData.gutter.watts / energyData.totalOutput) * 100 : 0}%`]
+                         })
                        }
                      ]} 
                    />
                  </View>
-               </View>
+                 <ThemedText style={styles.contributionPercentage}>
+                   {energyData.totalOutput > 0 ? ((energyData.gutter.watts / energyData.totalOutput) * 100).toFixed(1) : 0}% contribution
+                 </ThemedText>
+               </Animated.View>
              </View>
-
-           
            </Animated.View>
              
         
