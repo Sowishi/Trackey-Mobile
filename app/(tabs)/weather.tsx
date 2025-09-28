@@ -3,6 +3,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Dimensions, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,27 +19,155 @@ interface WeatherData {
   icon: string;
   location: string;
   lastUpdate: string;
+  feelsLike: number;
+  chanceOfRain: number;
+  visibility: number;
+  uvIndex: number;
+  coordinates: {
+    lat: number;
+    lon: number;
+  };
 }
+
+interface OpenWeatherResponse {
+  main: {
+    temp: number;
+    feels_like: number;
+    humidity: number;
+    pressure: number;
+  };
+  weather: Array<{
+    main: string;
+    description: string;
+    icon: string;
+  }>;
+  wind: {
+    speed: number;
+  };
+  visibility: number;
+  name: string;
+  coord: {
+    lat: number;
+    lon: number;
+  };
+}
+
+interface OpenWeatherForecastResponse {
+  list: Array<{
+    main: {
+      temp: number;
+    };
+    weather: Array<{
+      main: string;
+    }>;
+    pop: number; // Probability of precipitation
+    dt: number;
+  }>;
+}
+
+const API_KEY = 'd9c9e08dfa990d4a79b3b87a5b783bf3';
+const BASE_URL = 'https://api.openweathermap.org/data/2.5';
 
 export default function WeatherScreen() {
   const colorScheme = useColorScheme();
-  const [weatherData, setWeatherData] = useState<WeatherData>({
-    temperature: 28,
-    humidity: 65,
-    windSpeed: 12,
-    pressure: 1013,
-    condition: 'Partly Cloudy',
-    icon: 'partly-sunny',
-    location: 'Project Watch Station',
-    lastUpdate: new Date().toLocaleTimeString()
-  });
+  const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
+
+  // Fetch weather data from OpenWeatherMap API
+  const fetchWeatherData = async (lat: number, lon: number) => {
+    try {
+      setError(null);
+      
+      // Fetch current weather
+      const weatherResponse = await fetch(
+        `${BASE_URL}/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric`
+      );
+      
+      if (!weatherResponse.ok) {
+        throw new Error(`Weather API error: ${weatherResponse.status}`);
+      }
+      
+      const weatherJson: OpenWeatherResponse = await weatherResponse.json();
+      
+      // Fetch forecast for chance of rain
+      const forecastResponse = await fetch(
+        `${BASE_URL}/forecast?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric&cnt=8`
+      );
+      
+      if (!forecastResponse.ok) {
+        throw new Error(`Forecast API error: ${forecastResponse.status}`);
+      }
+      
+      const forecastJson: OpenWeatherForecastResponse = await forecastResponse.json();
+      
+      // Calculate chance of rain from next 24 hours
+      const chanceOfRain = Math.max(...forecastJson.list.map(item => item.pop)) * 100;
+      
+      const weatherData: WeatherData = {
+        temperature: Math.round(weatherJson.main.temp),
+        humidity: weatherJson.main.humidity,
+        windSpeed: Math.round(weatherJson.wind.speed * 3.6), // Convert m/s to km/h
+        pressure: weatherJson.main.pressure,
+        condition: weatherJson.weather[0].description
+          .split(' ')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' '),
+        icon: getWeatherIcon(weatherJson.weather[0].main, weatherJson.weather[0].icon),
+        location: weatherJson.name,
+        lastUpdate: new Date().toLocaleTimeString(),
+        feelsLike: Math.round(weatherJson.main.feels_like),
+        chanceOfRain: Math.round(chanceOfRain),
+        visibility: Math.round(weatherJson.visibility / 1000), // Convert to km
+        uvIndex: 0, // Would need UV API for this
+        coordinates: {
+          lat: weatherJson.coord.lat,
+          lon: weatherJson.coord.lon,
+        },
+      };
+      
+      setWeatherData(weatherData);
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Error fetching weather data:', error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch weather data');
+      setIsLoading(false);
+    }
+  };
+
+  // Get user location and fetch weather
+  const loadWeatherData = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Request location permission
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        // Fallback to a default location (Manila, Philippines)
+        await fetchWeatherData(14.5995, 120.9842);
+        return;
+      }
+
+      // Get current location
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      
+      await fetchWeatherData(location.coords.latitude, location.coords.longitude);
+    } catch (error) {
+      console.error('Error getting location:', error);
+      setError('Failed to get location. Using default location.');
+      // Fallback to Manila, Philippines
+      await fetchWeatherData(14.5995, 120.9842);
+    }
+  };
 
   useEffect(() => {
     // Initial animations
@@ -83,22 +212,13 @@ export default function WeatherScreen() {
     pulseAnimation.start();
     rotateAnimation.start();
 
-    // Simulate loading
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 2000);
+    // Load weather data on component mount
+    loadWeatherData();
 
-    // Simulate weather updates every 30 seconds
+    // Update weather data every 10 minutes
     const interval = setInterval(() => {
-      setWeatherData(prev => ({
-        ...prev,
-        temperature: 25 + Math.random() * 10,
-        humidity: 50 + Math.random() * 30,
-        windSpeed: 5 + Math.random() * 20,
-        pressure: 1000 + Math.random() * 30,
-        lastUpdate: new Date().toLocaleTimeString()
-      }));
-    }, 30000);
+      loadWeatherData();
+    }, 600000); // 10 minutes
 
     return () => {
       clearInterval(interval);
@@ -186,6 +306,7 @@ export default function WeatherScreen() {
       fontSize: 64,
       fontWeight: '200',
       marginBottom: 8,
+      padding: 20
     },
     condition: {
       fontSize: 20,
@@ -254,28 +375,44 @@ export default function WeatherScreen() {
   });
 
   const refreshWeather = () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setWeatherData(prev => ({
-        ...prev,
-        temperature: 25 + Math.random() * 10,
-        humidity: 50 + Math.random() * 30,
-        windSpeed: 5 + Math.random() * 20,
-        pressure: 1000 + Math.random() * 30,
-        lastUpdate: new Date().toLocaleTimeString()
-      }));
-      setIsLoading(false);
-    }, 1500);
+    loadWeatherData();
   };
 
-  const getWeatherIcon = (condition: string) => {
-    switch (condition) {
-      case 'Sunny': return 'sunny';
-      case 'Partly Cloudy': return 'partly-sunny';
-      case 'Cloudy': return 'cloudy';
-      case 'Rainy': return 'rainy';
-      default: return 'partly-sunny';
+  const getWeatherIcon = (main: string, iconCode: string) => {
+    // Use OpenWeatherMap icon codes to determine appropriate Ionicon
+    switch (main.toLowerCase()) {
+      case 'clear':
+        return iconCode.includes('d') ? 'sunny' : 'moon';
+      case 'clouds':
+        return iconCode.includes('d') ? 'partly-sunny' : 'cloudy-night';
+      case 'rain':
+      case 'drizzle':
+        return 'rainy';
+      case 'thunderstorm':
+        return 'thunderstorm';
+      case 'snow':
+        return 'snow';
+      case 'mist':
+      case 'fog':
+      case 'haze':
+        return 'cloudy';
+      default:
+        return 'partly-sunny';
     }
+  };
+
+  const getRainChanceColor = (chance: number) => {
+    if (chance >= 70) return '#FF4444'; // High chance - red
+    if (chance >= 40) return '#FF9800'; // Medium chance - orange
+    if (chance >= 20) return '#FFD700'; // Low chance - yellow
+    return '#4CAF50'; // Very low chance - green
+  };
+
+  const getRainChanceText = (chance: number) => {
+    if (chance >= 70) return 'High';
+    if (chance >= 40) return 'Medium';
+    if (chance >= 20) return 'Low';
+    return 'Very Low';
   };
 
   return (
@@ -300,7 +437,7 @@ export default function WeatherScreen() {
             <ThemedText type="title">Weather Station</ThemedText>
           </View>
           <ThemedText style={styles.subtitle}>
-            Real-time weather monitoring for Project Watch
+            Real-time weather data from OpenWeatherMap • Focus: Chance of Rain
           </ThemedText>
         </Animated.View>
         
@@ -315,16 +452,20 @@ export default function WeatherScreen() {
             ]}
           >
             <View style={styles.weatherHeader}>
-              <ThemedText style={styles.locationText}>{weatherData.location}</ThemedText>
-              <Animated.View 
-                style={[
-                  styles.liveIndicator,
-                  { transform: [{ scale: pulseAnim }] }
-                ]}
-              >
-                <View style={styles.liveDot} />
-                <ThemedText style={styles.liveText}>LIVE</ThemedText>
-              </Animated.View>
+              <ThemedText style={styles.locationText}>
+                {weatherData?.location || 'Loading...'}
+              </ThemedText>
+              {!error && (
+                <Animated.View 
+                  style={[
+                    styles.liveIndicator,
+                    { transform: [{ scale: pulseAnim }] }
+                  ]}
+                >
+                  <View style={styles.liveDot} />
+                  <ThemedText style={styles.liveText}>LIVE</ThemedText>
+                </Animated.View>
+              )}
             </View>
 
             {isLoading ? (
@@ -343,9 +484,24 @@ export default function WeatherScreen() {
                     color={Colors[colorScheme ?? 'light'].tabIconDefault}
                   />
                 </Animated.View>
-                <ThemedText style={styles.loadingText}>Loading weather data...</ThemedText>
+                <ThemedText style={styles.loadingText}>Loading real weather data...</ThemedText>
               </View>
-            ) : (
+            ) : error ? (
+              <View style={styles.loadingContainer}>
+                <Ionicons 
+                  name="alert-circle" 
+                  size={40} 
+                  color="#FF4444"
+                />
+                <ThemedText style={styles.loadingText}>{error}</ThemedText>
+                <TouchableOpacity 
+                  style={[styles.refreshButton, { marginTop: 16 }]}
+                  onPress={refreshWeather}
+                >
+                  <Ionicons name="refresh" size={20} color="white" />
+                </TouchableOpacity>
+              </View>
+            ) : weatherData ? (
               <>
                 <View style={styles.mainWeather}>
                   <Animated.View 
@@ -362,17 +518,42 @@ export default function WeatherScreen() {
                     ]}
                   >
                     <Ionicons 
-                      name={getWeatherIcon(weatherData.condition)} 
+                      name={weatherData.icon as any} 
                       size={80} 
                       color={Colors[colorScheme ?? 'light'].tint}
                     />
                   </Animated.View>
                   <ThemedText style={styles.temperature}>
-                    {Math.round(weatherData.temperature)}°C
+                    {weatherData.temperature}°C
                   </ThemedText>
                   <ThemedText style={styles.condition}>{weatherData.condition}</ThemedText>
                   <ThemedText style={styles.lastUpdate}>
                     Last updated: {weatherData.lastUpdate}
+                  </ThemedText>
+                </View>
+
+                {/* Chance of Rain - Key Feature */}
+                <View style={[styles.weatherMetric, { 
+                  width: '100%', 
+                  marginBottom: 20,
+                  backgroundColor: getRainChanceColor(weatherData.chanceOfRain) + '20',
+                  borderColor: getRainChanceColor(weatherData.chanceOfRain) + '50',
+                  borderWidth: 2,
+                }]}>
+                  <Ionicons 
+                    name="rainy" 
+                    size={32} 
+                    color={getRainChanceColor(weatherData.chanceOfRain)}
+                    style={styles.metricIcon}
+                  />
+                  <ThemedText style={[styles.metricValue, { 
+                    fontSize: 36, 
+                    color: getRainChanceColor(weatherData.chanceOfRain) 
+                  }]}>
+                    {weatherData.chanceOfRain}%
+                  </ThemedText>
+                  <ThemedText style={[styles.metricLabel, { fontSize: 16, fontWeight: '600' }]}>
+                    Chance of Rain - {getRainChanceText(weatherData.chanceOfRain)}
                   </ThemedText>
                 </View>
 
@@ -384,7 +565,7 @@ export default function WeatherScreen() {
                       color={Colors[colorScheme ?? 'light'].tint}
                       style={styles.metricIcon}
                     />
-                    <ThemedText style={styles.metricValue}>{Math.round(weatherData.humidity)}%</ThemedText>
+                    <ThemedText style={styles.metricValue}>{weatherData.humidity}%</ThemedText>
                     <ThemedText style={styles.metricLabel}>Humidity</ThemedText>
                   </View>
 
@@ -395,7 +576,7 @@ export default function WeatherScreen() {
                       color={Colors[colorScheme ?? 'light'].tint}
                       style={styles.metricIcon}
                     />
-                    <ThemedText style={styles.metricValue}>{Math.round(weatherData.windSpeed)} km/h</ThemedText>
+                    <ThemedText style={styles.metricValue}>{weatherData.windSpeed} km/h</ThemedText>
                     <ThemedText style={styles.metricLabel}>Wind Speed</ThemedText>
                   </View>
 
@@ -406,7 +587,7 @@ export default function WeatherScreen() {
                       color={Colors[colorScheme ?? 'light'].tint}
                       style={styles.metricIcon}
                     />
-                    <ThemedText style={styles.metricValue}>{Math.round(weatherData.pressure)} hPa</ThemedText>
+                    <ThemedText style={styles.metricValue}>{weatherData.pressure} hPa</ThemedText>
                     <ThemedText style={styles.metricLabel}>Pressure</ThemedText>
                   </View>
 
@@ -417,21 +598,48 @@ export default function WeatherScreen() {
                       color={Colors[colorScheme ?? 'light'].tint}
                       style={styles.metricIcon}
                     />
-                    <ThemedText style={styles.metricValue}>{Math.round(weatherData.temperature - 3)}°C</ThemedText>
+                    <ThemedText style={styles.metricValue}>{weatherData.feelsLike}°C</ThemedText>
                     <ThemedText style={styles.metricLabel}>Feels Like</ThemedText>
+                  </View>
+
+                  <View style={styles.weatherMetric}>
+                    <Ionicons 
+                      name="eye" 
+                      size={24} 
+                      color={Colors[colorScheme ?? 'light'].tint}
+                      style={styles.metricIcon}
+                    />
+                    <ThemedText style={styles.metricValue}>{weatherData.visibility} km</ThemedText>
+                    <ThemedText style={styles.metricLabel}>Visibility</ThemedText>
+                  </View>
+
+                  <View style={styles.weatherMetric}>
+                    <Ionicons 
+                      name="location" 
+                      size={24} 
+                      color={Colors[colorScheme ?? 'light'].tint}
+                      style={styles.metricIcon}
+                    />
+                    <ThemedText style={styles.metricValue}>
+                      {weatherData.coordinates.lat.toFixed(2)}, {weatherData.coordinates.lon.toFixed(2)}
+                    </ThemedText>
+                    <ThemedText style={styles.metricLabel}>Coordinates</ThemedText>
                   </View>
                 </View>
               </>
+            ) : (
+              <View style={styles.loadingContainer}>
+                <Ionicons 
+                  name="alert-circle" 
+                  size={40} 
+                  color="#FF4444"
+                />
+                <ThemedText style={styles.loadingText}>No weather data available</ThemedText>
+              </View>
             )}
           </Animated.View>
 
-          <TouchableOpacity style={styles.refreshButton} onPress={refreshWeather}>
-            <Ionicons 
-              name="refresh" 
-              size={28} 
-              color="white"
-            />
-          </TouchableOpacity>
+         
         </ScrollView>
       </ThemedView>
     </SafeAreaView>
