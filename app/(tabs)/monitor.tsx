@@ -141,16 +141,16 @@ export default function MonitorScreen() {
       flex: 1,
     },
     statusCard: {
-      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      backgroundColor: '#2A2A2A',
       borderRadius: 20,
       padding: 20,
       marginBottom: 20,
       borderWidth: 1,
-      borderColor: Colors[colorScheme ?? 'light'].tabIconDefault + '20',
+      borderColor: Colors[colorScheme ?? 'light'].tabIconDefault + '30',
       elevation: 3,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
+      shadowOpacity: 0.3,
       shadowRadius: 8,
     },
     statusHeader: {
@@ -184,10 +184,12 @@ export default function MonitorScreen() {
     },
     metricCard: {
       width: '48%',
-      backgroundColor: Colors[colorScheme ?? 'light'].tabIconDefault + '10',
+      backgroundColor: '#333333',
       borderRadius: 16,
       padding: 16,
       marginBottom: 16,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].tint + '20',
     },
     metricHeader: {
       flexDirection: 'row',
@@ -238,12 +240,12 @@ export default function MonitorScreen() {
     alertCard: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      backgroundColor: '#2A2A2A',
       borderRadius: 12,
       padding: 16,
       marginBottom: 12,
       borderWidth: 1,
-      borderColor: Colors[colorScheme ?? 'light'].tabIconDefault + '20',
+      borderColor: Colors[colorScheme ?? 'light'].tabIconDefault + '30',
     },
     alertIcon: {
       marginRight: 12,
@@ -279,7 +281,7 @@ export default function MonitorScreen() {
       height: 200,
       justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: Colors[colorScheme ?? 'light'].tabIconDefault + '10',
+      backgroundColor: '#333333',
       borderRadius: 16,
     },
     loadingText: {

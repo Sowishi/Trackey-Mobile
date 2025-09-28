@@ -136,16 +136,16 @@ export default function WeatherScreen() {
       flex: 1,
     },
     weatherCard: {
-      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      backgroundColor: '#2A2A2A',
       borderRadius: 20,
       padding: 24,
       marginBottom: 20,
       borderWidth: 1,
-      borderColor: Colors[colorScheme ?? 'light'].tabIconDefault + '20',
+      borderColor: Colors[colorScheme ?? 'light'].tabIconDefault + '30',
       elevation: 3,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
+      shadowOpacity: 0.3,
       shadowRadius: 8,
     },
     weatherHeader: {
@@ -204,11 +204,13 @@ export default function WeatherScreen() {
     },
     weatherMetric: {
       width: '48%',
-      backgroundColor: Colors[colorScheme ?? 'light'].tabIconDefault + '10',
+      backgroundColor: '#333333',
       borderRadius: 16,
       padding: 16,
       marginBottom: 12,
       alignItems: 'center',
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].tint + '20',
     },
     metricIcon: {
       marginBottom: 8,
@@ -242,7 +244,7 @@ export default function WeatherScreen() {
       height: 200,
       justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: Colors[colorScheme ?? 'light'].tabIconDefault + '10',
+      backgroundColor: '#333333',
       borderRadius: 16,
     },
     loadingText: {
