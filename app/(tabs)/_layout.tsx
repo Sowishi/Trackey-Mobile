@@ -45,6 +45,19 @@ export default function TabLayout() {
           ),
         }}
       />
+         <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Tracking',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              size={focused ? 32 : 28} 
+              name={focused ? "map" : "map-outline"} 
+              color={color} 
+            />
+          ),
+        }}
+      />
       <Tabs.Screen
         name="schedule"
         options={{
@@ -58,6 +71,7 @@ export default function TabLayout() {
           ),
         }}
       />
+     
       <Tabs.Screen
         name="keyswitch"
         options={{
@@ -71,19 +85,7 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Tracking',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              size={focused ? 32 : 28} 
-              name={focused ? "map" : "map-outline"} 
-              color={color} 
-            />
-          ),
-        }}
-      />
+    
       <Tabs.Screen
         name="logs"
         options={{

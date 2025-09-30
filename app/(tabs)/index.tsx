@@ -227,7 +227,7 @@ export default function TrackingScreen() {
         <View style={styles.mapContainer}>
           <WebView
             style={styles.map}
-            source={{ html: mapHtml }}
+            source={{ uri: 'https://projects-b1c71.web.app/trackey/tracking-mobile' }}
             javaScriptEnabled={true}
             domStorageEnabled={true}
             startInLoadingState={true}
