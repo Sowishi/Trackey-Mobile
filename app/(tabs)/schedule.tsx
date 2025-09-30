@@ -294,6 +294,25 @@ export default function ScheduleScreen() {
       color: Colors[colorScheme ?? 'light'].tabIconDefault,
       marginTop: 2,
     },
+    instructionCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      marginHorizontal: 20,
+      marginTop: 16,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].primary,
+    },
+    instructionText: {
+      marginLeft: 12,
+      fontSize: 14,
+      fontWeight: '500',
+      color: Colors[colorScheme ?? 'light'].primary,
+      flex: 1,
+    },
   });
 
   return (
@@ -316,6 +335,18 @@ export default function ScheduleScreen() {
             <ThemedText style={styles.userName}>{user.name}</ThemedText>
             <ThemedText style={styles.userRfid}>RFID: {user.rfid}</ThemedText>
           </View>
+        </View>
+
+        {/* RFID Instruction */}
+        <View style={styles.instructionCard}>
+          <Ionicons 
+            name="card" 
+            size={24} 
+            color={Colors[colorScheme ?? 'light'].primary}
+          />
+          <ThemedText style={styles.instructionText}>
+            Please scan your RFID to device to get your key
+          </ThemedText>
         </View>
 
         {/* Schedule Content */}

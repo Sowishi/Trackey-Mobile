@@ -32,19 +32,7 @@ export default function TabLayout() {
           right: 0,
         },
       }}>
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              size={focused ? 32 : 28} 
-              name={focused ? "person" : "person-outline"} 
-              color={color} 
-            />
-          ),
-        }}
-      />
+    
          <Tabs.Screen
         name="index"
         options={{
@@ -94,6 +82,19 @@ export default function TabLayout() {
             <Ionicons 
               size={focused ? 32 : 28} 
               name={focused ? "document-text" : "document-text-outline"} 
+              color={color} 
+            />
+          ),
+        }}
+      />
+        <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              size={focused ? 32 : 28} 
+              name={focused ? "person" : "person-outline"} 
               color={color} 
             />
           ),
