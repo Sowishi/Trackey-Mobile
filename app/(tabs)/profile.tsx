@@ -1,8 +1,10 @@
 import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
+import { useUser } from '@/contexts/UserContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
     Alert,
     ScrollView,
@@ -13,55 +15,75 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// Sample user data
-const sampleUser = {
-  id: 'USER001',
-  name: 'John Mitchell',
-  email: 'john.mitchell@trackey.com',
-  phone: '+1 (555) 123-4567',
-  department: 'Field Operations',
-  role: 'Senior Tracker',
-  joinDate: '2023-01-15',
-  lastActive: '2024-09-30T14:30:00Z',
-  avatar: null, // Using default avatar
-  stats: {
+export default function ProfileScreen() {
+  const colorScheme = useColorScheme();
+  const { user: contextUser, setUser: setContextUser } = useUser();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedName, setEditedName] = useState('');
+  const [editedEmail, setEditedEmail] = useState('');
+  const [editedRfid, setEditedRfid] = useState('');
+
+  // Sample stats data (could be fetched from database in the future)
+  const stats = {
     totalTracks: 1247,
     activeDevices: 8,
     completedMissions: 89,
     accuracy: 98.5
-  },
-  preferences: {
-    notifications: true,
-    locationSharing: true,
-    darkMode: false,
-    language: 'English'
-  }
-};
+  };
 
-export default function ProfileScreen() {
-  const colorScheme = useColorScheme();
-  const [user, setUser] = useState(sampleUser);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedName, setEditedName] = useState(user.name);
-  const [editedEmail, setEditedEmail] = useState(user.email);
-  const [editedPhone, setEditedPhone] = useState(user.phone);
+  useEffect(() => {
+    if (!contextUser) {
+      // If no user is logged in, redirect to login
+      router.replace('/login');
+      return;
+    }
+    
+    // Initialize form fields with user data
+    setEditedName(contextUser.name);
+    setEditedEmail(contextUser.email);
+    setEditedRfid(contextUser.rfid);
+  }, [contextUser]);
+
+  if (!contextUser) {
+    return null; // or a loading spinner
+  }
 
   const handleSave = () => {
-    setUser({
-      ...user,
+    // Update user in context
+    const updatedUser = {
+      ...contextUser,
       name: editedName,
       email: editedEmail,
-      phone: editedPhone
-    });
+      rfid: editedRfid
+    };
+    setContextUser(updatedUser);
     setIsEditing(false);
     Alert.alert('Success', 'Profile updated successfully!');
   };
 
   const handleCancel = () => {
-    setEditedName(user.name);
-    setEditedEmail(user.email);
-    setEditedPhone(user.phone);
+    setEditedName(contextUser.name);
+    setEditedEmail(contextUser.email);
+    setEditedRfid(contextUser.rfid);
     setIsEditing(false);
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Logout', 
+          style: 'destructive',
+          onPress: () => {
+            setContextUser(null);
+            router.replace('/login');
+          }
+        }
+      ]
+    );
   };
 
   const styles = StyleSheet.create({
@@ -251,6 +273,27 @@ export default function ProfileScreen() {
       fontSize: 16,
       fontWeight: '500',
     },
+    logoutContainer: {
+      marginTop: 30,
+      alignItems: 'center',
+    },
+    logoutButton: {
+      backgroundColor: Colors[colorScheme ?? 'light'].primary,
+      borderRadius: 8,
+      paddingVertical: 12,
+      paddingHorizontal: 24,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    logoutIcon: {
+      marginRight: 8,
+    },
+    logoutButtonText: {
+      color: 'white',
+      fontSize: 16,
+      fontWeight: '500',
+    },
   });
 
   const formatDate = (dateString: string) => {
@@ -285,11 +328,11 @@ export default function ProfileScreen() {
           <View style={styles.profileSection}>
             <View style={styles.avatarContainer}>
               <ThemedText style={styles.avatarText}>
-                {getInitials(user.name)}
+                {getInitials(contextUser.name)}
               </ThemedText>
             </View>
-            <ThemedText style={styles.nameText}>{user.name}</ThemedText>
-            <ThemedText style={styles.roleText}>{user.role}</ThemedText>
+            <ThemedText style={styles.nameText}>{contextUser.name}</ThemedText>
+            <ThemedText style={styles.roleText}>{contextUser.position}</ThemedText>
             <View style={styles.statusContainer}>
               <View style={styles.statusDot} />
               <ThemedText style={styles.statusText}>Active</ThemedText>
@@ -315,110 +358,118 @@ export default function ProfileScreen() {
                     onChangeText={setEditedName}
                     placeholder="Enter name"
                   />
-                ) : (
-                  <ThemedText style={styles.infoValue}>{user.name}</ThemedText>
-                )}
-              </View>
-              
-              <View style={styles.infoRow}>
-                <Ionicons 
-                  name="mail-outline" 
-                  size={20} 
-                  color={Colors[colorScheme ?? 'light'].primary}
-                  style={styles.infoIcon}
-                />
-                <ThemedText style={styles.infoLabel}>Email</ThemedText>
-                {isEditing ? (
-                  <TextInput
-                    style={styles.input}
-                    value={editedEmail}
-                    onChangeText={setEditedEmail}
-                    placeholder="Enter email"
-                    keyboardType="email-address"
-                  />
-                ) : (
-                  <ThemedText style={styles.infoValue}>{user.email}</ThemedText>
-                )}
-              </View>
-              
-              <View style={styles.infoRow}>
-                <Ionicons 
-                  name="call-outline" 
-                  size={20} 
-                  color={Colors[colorScheme ?? 'light'].primary}
-                  style={styles.infoIcon}
-                />
-                <ThemedText style={styles.infoLabel}>Phone</ThemedText>
-                {isEditing ? (
-                  <TextInput
-                    style={styles.input}
-                    value={editedPhone}
-                    onChangeText={setEditedPhone}
-                    placeholder="Enter phone"
-                    keyboardType="phone-pad"
-                  />
-                ) : (
-                  <ThemedText style={styles.infoValue}>{user.phone}</ThemedText>
-                )}
-              </View>
-              
-              <View style={styles.infoRow}>
-                <Ionicons 
-                  name="business-outline" 
-                  size={20} 
-                  color={Colors[colorScheme ?? 'light'].primary}
-                  style={styles.infoIcon}
-                />
-                <ThemedText style={styles.infoLabel}>Department</ThemedText>
-                <ThemedText style={styles.infoValue}>{user.department}</ThemedText>
-              </View>
-              
-              <View style={[styles.infoRow, { borderBottomWidth: 0 }]}>
-                <Ionicons 
-                  name="calendar-outline" 
-                  size={20} 
-                  color={Colors[colorScheme ?? 'light'].primary}
-                  style={styles.infoIcon}
-                />
-                <ThemedText style={styles.infoLabel}>Join Date</ThemedText>
-                <ThemedText style={styles.infoValue}>{formatDate(user.joinDate)}</ThemedText>
-              </View>
+                 ) : (
+                   <ThemedText style={styles.infoValue}>{contextUser.name}</ThemedText>
+                 )}
+               </View>
+               
+               <View style={styles.infoRow}>
+                 <Ionicons 
+                   name="mail-outline" 
+                   size={20} 
+                   color={Colors[colorScheme ?? 'light'].primary}
+                   style={styles.infoIcon}
+                 />
+                 <ThemedText style={styles.infoLabel}>Email</ThemedText>
+                 {isEditing ? (
+                   <TextInput
+                     style={styles.input}
+                     value={editedEmail}
+                     onChangeText={setEditedEmail}
+                     placeholder="Enter email"
+                     keyboardType="email-address"
+                   />
+                 ) : (
+                   <ThemedText style={styles.infoValue}>{contextUser.email}</ThemedText>
+                 )}
+               </View>
+               
+               <View style={styles.infoRow}>
+                 <Ionicons 
+                   name="card-outline" 
+                   size={20} 
+                   color={Colors[colorScheme ?? 'light'].primary}
+                   style={styles.infoIcon}
+                 />
+                 <ThemedText style={styles.infoLabel}>RFID</ThemedText>
+                 {isEditing ? (
+                   <TextInput
+                     style={styles.input}
+                     value={editedRfid}
+                     onChangeText={setEditedRfid}
+                     placeholder="Enter RFID"
+                   />
+                 ) : (
+                   <ThemedText style={styles.infoValue}>{contextUser.rfid}</ThemedText>
+                 )}
+               </View>
+               
+               <View style={styles.infoRow}>
+                 <Ionicons 
+                   name="person-outline" 
+                   size={20} 
+                   color={Colors[colorScheme ?? 'light'].primary}
+                   style={styles.infoIcon}
+                 />
+                 <ThemedText style={styles.infoLabel}>Gender</ThemedText>
+                 <ThemedText style={styles.infoValue}>{contextUser.gender}</ThemedText>
+               </View>
+               
+               <View style={[styles.infoRow, { borderBottomWidth: 0 }]}>
+                 <Ionicons 
+                   name="briefcase-outline" 
+                   size={20} 
+                   color={Colors[colorScheme ?? 'light'].primary}
+                   style={styles.infoIcon}
+                 />
+                 <ThemedText style={styles.infoLabel}>Position</ThemedText>
+                 <ThemedText style={styles.infoValue}>{contextUser.position}</ThemedText>
+               </View>
             </View>
           </View>
 
           {/* Statistics */}
           <View style={styles.section}>
             <ThemedText style={styles.sectionTitle}>Statistics</ThemedText>
-            <View style={styles.statsGrid}>
-              <View style={styles.statItem}>
-                <ThemedText style={styles.statNumber}>{user.stats.totalTracks.toLocaleString()}</ThemedText>
-                <ThemedText style={styles.statLabel}>Total Tracks</ThemedText>
-              </View>
-              <View style={styles.statItem}>
-                <ThemedText style={styles.statNumber}>{user.stats.activeDevices}</ThemedText>
-                <ThemedText style={styles.statLabel}>Active Devices</ThemedText>
-              </View>
-              <View style={styles.statItem}>
-                <ThemedText style={styles.statNumber}>{user.stats.completedMissions}</ThemedText>
-                <ThemedText style={styles.statLabel}>Completed Missions</ThemedText>
-              </View>
-              <View style={styles.statItem}>
-                <ThemedText style={styles.statNumber}>{user.stats.accuracy}%</ThemedText>
-                <ThemedText style={styles.statLabel}>Accuracy Rate</ThemedText>
-              </View>
-            </View>
+             <View style={styles.statsGrid}>
+               <View style={styles.statItem}>
+                 <ThemedText style={styles.statNumber}>{stats.totalTracks.toLocaleString()}</ThemedText>
+                 <ThemedText style={styles.statLabel}>Total Tracks</ThemedText>
+               </View>
+               <View style={styles.statItem}>
+                 <ThemedText style={styles.statNumber}>{stats.activeDevices}</ThemedText>
+                 <ThemedText style={styles.statLabel}>Active Devices</ThemedText>
+               </View>
+               <View style={styles.statItem}>
+                 <ThemedText style={styles.statNumber}>{stats.completedMissions}</ThemedText>
+                 <ThemedText style={styles.statLabel}>Completed Missions</ThemedText>
+               </View>
+               <View style={styles.statItem}>
+                 <ThemedText style={styles.statNumber}>{stats.accuracy}%</ThemedText>
+                 <ThemedText style={styles.statLabel}>Accuracy Rate</ThemedText>
+               </View>
+             </View>
           </View>
 
-          {isEditing && (
-            <View style={styles.saveButtons}>
-              <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-                <ThemedText style={styles.buttonText}>Save Changes</ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
-                <ThemedText style={styles.buttonText}>Cancel</ThemedText>
-              </TouchableOpacity>
-            </View>
-          )}
+           {isEditing && (
+             <View style={styles.saveButtons}>
+               <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+                 <ThemedText style={styles.buttonText}>Save Changes</ThemedText>
+               </TouchableOpacity>
+               <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
+                 <ThemedText style={styles.buttonText}>Cancel</ThemedText>
+               </TouchableOpacity>
+             </View>
+           )}
+
+           {!isEditing && (
+             <View style={styles.logoutContainer}>
+               <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+                 <Ionicons name="log-out-outline" size={20} color="white" style={styles.logoutIcon} />
+                 <ThemedText style={styles.logoutButtonText}>Logout</ThemedText>
+               </TouchableOpacity>
+             </View>
+           )}
         </ScrollView>
       </View>
     </SafeAreaView>

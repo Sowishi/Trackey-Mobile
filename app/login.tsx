@@ -1,9 +1,11 @@
 import { Colors } from '@/constants/theme';
+import { User, useUser } from '@/contexts/UserContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
     KeyboardAvoidingView,
     Platform,
@@ -14,14 +16,17 @@ import {
     View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { database, off, onValue, ref } from '../firebase';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
   const colorScheme = useColorScheme();
+  const { setUser } = useUser();
 
-  const handleLogin = () => {
-    // Simple validation - in a real app, you'd validate against a backend
+  const handleLogin = async () => {
+    // Simple validation
     if (email.trim() === '' || password.trim() === '') {
       Alert.alert('Error', 'Please fill in all fields');
       return;
@@ -34,14 +39,66 @@ export default function LoginScreen() {
       return;
     }
 
-    // For demo purposes, accept any email/password combination
-    // In a real app, you'd authenticate with your backend
-    Alert.alert('Success', 'Login successful!', [
-      {
-        text: 'OK',
-        onPress: () => router.replace('/(tabs)'),
-      },
-    ]);
+    setLoading(true);
+
+    try {
+      // Reference to the users in the database
+      const usersRef = ref(database, 'trackey/users');
+      
+      // Listen for users data
+      onValue(usersRef, (snapshot) => {
+        const users = snapshot.val();
+        let userFound = false;
+        let authenticatedUser: User | null = null;
+
+        if (users) {
+          // Search through all users to find matching email and password
+          Object.keys(users).forEach((userId) => {
+            const userData = users[userId];
+            if (userData.email === email.trim() && userData.password === password.trim()) {
+              userFound = true;
+              authenticatedUser = {
+                email: userData.email,
+                gender: userData.gender,
+                name: userData.name,
+                password: userData.password,
+                position: userData.position,
+                rfid: userData.rfid
+              };
+            }
+          });
+        }
+
+        setLoading(false);
+
+        if (userFound && authenticatedUser) {
+          // Set user in context
+          setUser(authenticatedUser);
+          
+          Alert.alert('Success', `Welcome back, ${authenticatedUser.name}!`, [
+            {
+              text: 'OK',
+              onPress: () => router.replace('/(tabs)'),
+            },
+          ]);
+        } else {
+          Alert.alert('Error', 'Invalid email or password. Please try again.');
+        }
+
+        // Clean up the listener
+        off(usersRef);
+      }, (error) => {
+        setLoading(false);
+        console.error('Database error:', error);
+        Alert.alert('Error', 'Unable to connect to the database. Please try again.');
+        off(usersRef);
+      });
+
+    } catch (error) {
+      setLoading(false);
+      console.error('Login error:', error);
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+    }
   };
 
   const styles = StyleSheet.create({
@@ -136,6 +193,9 @@ export default function LoginScreen() {
       fontSize: 18,
       fontWeight: '600',
     },
+    loginButtonDisabled: {
+      opacity: 0.7,
+    },
     demoText: {
       textAlign: 'center',
       marginTop: 20,
@@ -208,13 +268,23 @@ export default function LoginScreen() {
               </View>
             </View>
 
-            <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-              <Ionicons name="log-in-outline" size={20} color="white" style={styles.buttonIcon} />
-              <Text style={styles.loginButtonText}>Sign In to Trackey</Text>
+            <TouchableOpacity 
+              style={[styles.loginButton, loading && styles.loginButtonDisabled]} 
+              onPress={handleLogin}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color="white" style={styles.buttonIcon} />
+              ) : (
+                <Ionicons name="log-in-outline" size={20} color="white" style={styles.buttonIcon} />
+              )}
+              <Text style={styles.loginButtonText}>
+                {loading ? 'Signing In...' : 'Sign In to Trackey'}
+              </Text>
             </TouchableOpacity>
 
             <Text style={styles.demoText}>
-              Demo: Enter any email and password to access Trackey
+              Enter your registered email and password to access Trackey
             </Text>
           </View>
         </View>
