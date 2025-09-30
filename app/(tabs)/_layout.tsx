@@ -33,9 +33,48 @@ export default function TabLayout() {
         },
       }}>
       <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              size={focused ? 32 : 28} 
+              name={focused ? "person" : "person-outline"} 
+              color={color} 
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="schedule"
+        options={{
+          title: 'Schedule',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              size={focused ? 32 : 28} 
+              name={focused ? "calendar" : "calendar-outline"} 
+              color={color} 
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="keyswitch"
+        options={{
+          title: 'Key Switch',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              size={focused ? 32 : 28} 
+              name={focused ? "toggle" : "toggle-outline"} 
+              color={color} 
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="index"
         options={{
-          title: 'Map',
+          title: 'Tracking',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               size={focused ? 32 : 28} 
@@ -46,39 +85,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="overload"
+        name="logs"
         options={{
-          title: 'Overload Collection',
+          title: 'Logs',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               size={focused ? 32 : 28} 
-              name={focused ? "albums" : "albums-outline"} 
-              color={color} 
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="seismic"
-        options={{
-          title: 'Seismic Vibration',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              size={focused ? 32 : 28} 
-              name={focused ? "pulse" : "pulse-outline"} 
-              color={color} 
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="about"
-        options={{
-          title: 'About',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              size={focused ? 32 : 28} 
-              name={focused ? "information-circle" : "information-circle-outline"} 
+              name={focused ? "document-text" : "document-text-outline"} 
               color={color} 
             />
           ),

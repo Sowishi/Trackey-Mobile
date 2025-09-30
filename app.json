@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Struxis",
-    "slug": "Struxis",
+    "name": "Trackey",
+    "slug": "Trackey",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "struxis",
+    "scheme": "trackey",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -35,7 +35,7 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
       ],
-      "package": "com.sowishi1738.Struxis"
+      "package": "com.sowishi1738.Trackey"
     },
     "web": {
       "output": "static",

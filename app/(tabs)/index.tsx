@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { database, off, onValue, ref } from '../../firebase';
 
-export default function MapScreen() {
+export default function TrackingScreen() {
   const colorScheme = useColorScheme();
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -43,8 +43,8 @@ export default function MapScreen() {
     })();
 
     // Set up Firebase realtime database listeners
-    const latRef = ref(database, 'BNHS-Struxis/location_1/coordinates/lat');
-    const lonRef = ref(database, 'BNHS-Struxis/location_1/coordinates/lon');
+    const latRef = ref(database, 'Trackey/location_1/coordinates/lat');
+    const lonRef = ref(database, 'Trackey/location_1/coordinates/lon');
 
     let latValue: number | null = null;
     let lonValue: number | null = null;
@@ -185,7 +185,7 @@ export default function MapScreen() {
                 new google.maps.Marker({
                     position: { lat: ${firebaseCoordinates.lat}, lng: ${firebaseCoordinates.lon} },
                     map: map,
-                    title: "BNHS Struxis Monitoring Station",
+                    title: "Trackey Monitoring Station",
                     icon: {
                         url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23FF4444" width="32" height="32"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>'),
                         scaledSize: new google.maps.Size(32, 32),

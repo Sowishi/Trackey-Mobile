@@ -5,25 +5,33 @@
 
 import { Platform } from 'react-native';
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
+const tintColorLight = '#DC2626'; // Red
+const tintColorDark = '#EF4444'; // Lighter red for dark mode
 
 export const Colors = {
   light: {
-    text: '#11181C',
-    background: '#fff',
+    text: '#1F2937', // Dark gray text
+    background: '#FFFFFF', // Pure white
     tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
+    icon: '#6B7280', // Gray icons
+    tabIconDefault: '#9CA3AF', // Light gray for inactive tabs
+    tabIconSelected: tintColorLight, // Red for active tabs
+    primary: '#DC2626', // Primary red
+    secondary: '#FECACA', // Light red/pink
+    accent: '#FEF2F2', // Very light red background
+    border: '#E5E7EB', // Light gray borders
   },
   dark: {
-    text: '#ECEDEE',
-    background: '#151718',
+    text: '#F9FAFB', // Light text
+    background: '#111827', // Dark background
     tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
+    icon: '#9CA3AF', // Gray icons
+    tabIconDefault: '#6B7280', // Darker gray for inactive tabs
+    tabIconSelected: tintColorDark, // Light red for active tabs
+    primary: '#EF4444', // Primary red for dark mode
+    secondary: '#7F1D1D', // Dark red
+    accent: '#1F2937', // Dark accent
+    border: '#374151', // Dark gray borders
   },
 };
 
