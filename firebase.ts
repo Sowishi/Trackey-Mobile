@@ -5,6 +5,7 @@ import { getDatabase, off, onValue, ref } from "firebase/database";
 // https://firebase.google.com/docs/web/setup#available-libraries
 
 // Your web app's Firebase configuration
+// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyAksBfuSTJe4kQnqlAY-RDeqErCsuf00lY",
   authDomain: "projects-b1c71.firebaseapp.com",
@@ -22,3 +23,4 @@ const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
 
 export { database, off, onValue, ref };
+

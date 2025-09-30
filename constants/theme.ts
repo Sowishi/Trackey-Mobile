@@ -22,16 +22,16 @@ export const Colors = {
     border: '#E5E7EB', // Light gray borders
   },
   dark: {
-    text: '#F9FAFB', // Light text
-    background: '#111827', // Dark background
-    tint: tintColorDark,
-    icon: '#9CA3AF', // Gray icons
-    tabIconDefault: '#6B7280', // Darker gray for inactive tabs
-    tabIconSelected: tintColorDark, // Light red for active tabs
-    primary: '#EF4444', // Primary red for dark mode
-    secondary: '#7F1D1D', // Dark red
-    accent: '#1F2937', // Dark accent
-    border: '#374151', // Dark gray borders
+    text: '#1F2937', // Dark gray text (same as light mode for consistency)
+    background: '#FFFFFF', // Pure white (same as light mode)
+    tint: tintColorLight, // Use same red as light mode
+    icon: '#6B7280', // Gray icons (same as light mode)
+    tabIconDefault: '#9CA3AF', // Light gray for inactive tabs (same as light mode)
+    tabIconSelected: tintColorLight, // Red for active tabs (same as light mode)
+    primary: '#DC2626', // Primary red (same as light mode)
+    secondary: '#FECACA', // Light red/pink (same as light mode)
+    accent: '#FEF2F2', // Very light red background (same as light mode)
+    border: '#E5E7EB', // Light gray borders (same as light mode)
   },
 };
 

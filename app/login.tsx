@@ -4,14 +4,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -88,15 +88,20 @@ export default function LoginScreen() {
       fontSize: 16,
       fontWeight: '600',
       marginBottom: 8,
-      color: Colors[colorScheme ?? 'light'].text,
+      color: Colors[colorScheme ?? 'light'].primary,
     },
     inputWrapper: {
       flexDirection: 'row',
       alignItems: 'center',
-      borderWidth: 1,
-      borderColor: Colors[colorScheme ?? 'light'].tabIconDefault,
+      borderWidth: 2,
+      borderColor: Colors[colorScheme ?? 'light'].border,
       borderRadius: 12,
       backgroundColor: Colors[colorScheme ?? 'light'].background,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
+      elevation: 2,
     },
     inputIcon: {
       marginLeft: 16,
@@ -110,19 +115,24 @@ export default function LoginScreen() {
       color: Colors[colorScheme ?? 'light'].text,
     },
     loginButton: {
-      backgroundColor: Colors[colorScheme ?? 'light'].tint,
+      backgroundColor: Colors[colorScheme ?? 'light'].primary,
       borderRadius: 12,
       paddingVertical: 16,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       marginTop: 20,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      elevation: 4,
     },
     buttonIcon: {
       marginRight: 8,
     },
     loginButtonText: {
-      color: 'black',
+      color: 'white',
       fontSize: 18,
       fontWeight: '600',
     },
@@ -144,13 +154,13 @@ export default function LoginScreen() {
         <View style={styles.content}>
           <View style={styles.header}>
             <Ionicons 
-              name="shield-checkmark" 
+              name="location" 
               size={60} 
-              color={Colors[colorScheme ?? 'light'].tint} 
+              color={Colors[colorScheme ?? 'light'].primary} 
               style={styles.logo}
             />
-            <Text style={styles.title}>Welcome to Struxis</Text>
-            <Text style={styles.subtitle}>Sign in to continue</Text>
+            <Text style={styles.title}>Welcome to Trackey</Text>
+            <Text style={styles.subtitle}>Your tracking solution awaits</Text>
           </View>
 
           <View style={styles.form}>
@@ -160,7 +170,7 @@ export default function LoginScreen() {
                 <Ionicons 
                   name="mail-outline" 
                   size={20} 
-                  color={Colors[colorScheme ?? 'light'].tabIconDefault}
+                  color={Colors[colorScheme ?? 'light'].primary}
                   style={styles.inputIcon}
                 />
                 <TextInput
@@ -182,7 +192,7 @@ export default function LoginScreen() {
                 <Ionicons 
                   name="lock-closed-outline" 
                   size={20} 
-                  color={Colors[colorScheme ?? 'light'].tabIconDefault}
+                  color={Colors[colorScheme ?? 'light'].primary}
                   style={styles.inputIcon}
                 />
                 <TextInput
@@ -199,12 +209,12 @@ export default function LoginScreen() {
             </View>
 
             <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-              <Ionicons name="log-in-outline" size={20} color="black" style={styles.buttonIcon} />
-              <Text style={styles.loginButtonText}>Sign In</Text>
+              <Ionicons name="log-in-outline" size={20} color="white" style={styles.buttonIcon} />
+              <Text style={styles.loginButtonText}>Sign In to Trackey</Text>
             </TouchableOpacity>
 
             <Text style={styles.demoText}>
-              Demo: Enter any email and password to login
+              Demo: Enter any email and password to access Trackey
             </Text>
           </View>
         </View>
