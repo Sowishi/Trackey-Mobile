@@ -417,13 +417,11 @@ export default function KeyTransferScreen() {
     if (!user) return;
 
     const logEntry = {
-      action,
-      fromUser,
-      toUser,
-      details,
-      timestamp: Date.now(),
-      is_mobile: true,
-      owner: user.rfid
+      action: action,
+      details: details,
+      timestamp: new Date().toISOString(),
+      type: "transfer",
+      user: user.name
     };
 
     const logsRef = ref(database, 'CNSHS-TRACKEY/logs');

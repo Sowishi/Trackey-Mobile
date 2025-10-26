@@ -18,12 +18,10 @@ import { database, off, onValue, ref } from '../../firebase';
 interface LogEntry {
   id: string;
   action: string;
-  fromUser: string;
-  toUser: string;
   details: string;
-  timestamp: number;
-  is_mobile: boolean;
-  owner: string;
+  timestamp: string;
+  type: string;
+  user: string;
 }
 
 export default function LogsScreen() {
@@ -57,8 +55,8 @@ export default function LogsScreen() {
             id: key,
             ...data[key]
           }))
-          .filter(log => log.is_mobile && log.owner === user.rfid)
-          .sort((a, b) => b.timestamp - a.timestamp); // Sort by newest first
+          .filter(log => log.type === "transfer" && log.user === user.name)
+          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()); // Sort by newest first
         
         setLogs(logsArray);
       } else {
@@ -83,7 +81,7 @@ export default function LogsScreen() {
     fetchLogs();
   };
 
-  const formatTimestamp = (timestamp: number): string => {
+  const formatTimestamp = (timestamp: string): string => {
     const date = new Date(timestamp);
     return date.toLocaleString();
   };
@@ -316,7 +314,7 @@ export default function LogsScreen() {
                   <ThemedText style={styles.logText}>{log.details}</ThemedText>
                 </View>
 
-                {/* Users Involved */}
+                {/* User */}
                 <View style={styles.logUsers}>
                   <Ionicons 
                     name="person-outline" 
@@ -325,7 +323,7 @@ export default function LogsScreen() {
                     style={styles.userIcon}
                   />
                   <ThemedText style={styles.userText}>
-                    From: {log.fromUser} → To: {log.toUser}
+                    User: {log.user}
                   </ThemedText>
                 </View>
               </View>
