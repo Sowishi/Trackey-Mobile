@@ -44,42 +44,56 @@ export default function ScheduleScreen() {
     if (!user?.rfid) return;
 
     setLoading(true);
-    const scheduleRef = ref(database, `CNSHS-TRACKEY/schedules/${user.rfid}`);
+    const allSchedulesRef = ref(database, 'CNSHS-TRACKEY/schedules');
     
-    onValue(scheduleRef, (snapshot) => {
+    onValue(allSchedulesRef, (snapshot) => {
       const data = snapshot.val();
-      console.log('Schedule data:', data);
+      console.log('All schedules data:', data);
+      
       if (data) {
-        // Check if data is a single object or multiple objects
-        if (data.key !== undefined && data.start !== undefined && data.end !== undefined) {
-          // Single schedule object
-          const scheduleItem: ScheduleItem = {
-            key: data.key,
-            name_of_day: data.name_of_day || '',
-            start: data.start,
-            end: data.end
-          };
-          setSchedules([scheduleItem]);
-        } else {
-          // Multiple schedule objects - convert to array
-          const scheduleArray = Object.keys(data).map(key => {
-            const item = data[key];
-            return {
-              key: item.key || parseInt(key),
-              name_of_day: item.name_of_day || '',
-              start: item.start || 0,
-              end: item.end || 0
-            };
-          }).filter(item => item.start && item.end);
-          setSchedules(scheduleArray);
-        }
+        const userSchedules: ScheduleItem[] = [];
+        
+        // Search through all users' schedules to find schedules where current user is the holder
+        Object.keys(data).forEach(userRfid => {
+          const userSchedulesData = data[userRfid];
+          
+          if (userSchedulesData) {
+            // Check if it's a single schedule or multiple schedules
+            if (userSchedulesData.key !== undefined && userSchedulesData.start !== undefined && userSchedulesData.end !== undefined) {
+              // Single schedule case
+              if (userSchedulesData.rfid === user.rfid) {
+                userSchedules.push({
+                  key: userSchedulesData.key,
+                  name_of_day: userSchedulesData.name_of_day || '',
+                  start: userSchedulesData.start,
+                  end: userSchedulesData.end
+                });
+              }
+            } else {
+              // Multiple schedules case
+              Object.keys(userSchedulesData).forEach(scheduleKey => {
+                const schedule = userSchedulesData[scheduleKey];
+                if (schedule.start && schedule.end && schedule.rfid === user.rfid) {
+                  userSchedules.push({
+                    key: schedule.key || parseInt(scheduleKey),
+                    name_of_day: schedule.name_of_day || '',
+                    start: schedule.start,
+                    end: schedule.end
+                  });
+                }
+              });
+            }
+          }
+        });
+        
+        setSchedules(userSchedules);
       } else {
         setSchedules([]);
       }
       setLoading(false);
       setRefreshing(false);
     }, (error) => {
-      console.error('Error fetching schedule:', error);
+      console.error('Error fetching schedules:', error);
       setSchedules([]);
       setLoading(false);
       setRefreshing(false);
@@ -87,7 +101,7 @@ export default function ScheduleScreen() {
 
     // Cleanup function
     return () => {
-      off(scheduleRef);
+      off(allSchedulesRef);
     };
   };
 
@@ -388,7 +402,7 @@ export default function ScheduleScreen() {
                 {/* Schedule Header */}
                 <View style={styles.scheduleHeader}>
                   <View style={styles.scheduleKey}>
-                    <ThemedText style={styles.scheduleKeyText}>#{schedule.key}</ThemedText>
+                    <ThemedText style={styles.scheduleKeyText}>Key Slot #{schedule.key}</ThemedText>
                   </View>
                 </View>
 
