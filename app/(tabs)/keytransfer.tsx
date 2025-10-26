@@ -236,7 +236,7 @@ export default function KeyTransferScreen() {
               .then(() => {
                 Alert.alert('Success', 'Transfer request sent successfully!');
               })
-              .catch((error) => {
+              .catch((error: any) => {
                 console.error('Error creating transfer request:', error);
                 Alert.alert('Error', 'Failed to send transfer request. Please try again.');
               });
@@ -281,7 +281,7 @@ export default function KeyTransferScreen() {
                     const scheduleData = snapshot.val();
                     
                     if (scheduleData) {
-                      // Move the entire schedule data to the receiver
+                      // Move the entire schedule data to the receiver using update() to completely replace
                       update(toScheduleRef, scheduleData)
                         .then(() => {
                           // Remove the schedules from the sender
@@ -289,12 +289,12 @@ export default function KeyTransferScreen() {
                             .then(() => {
                               Alert.alert('Success', 'All schedules transferred successfully!');
                             })
-                            .catch((error) => {
+                            .catch((error: any) => {
                               console.error('Error removing schedules from sender:', error);
                               Alert.alert('Error', 'Failed to complete transfer. Please try again.');
                             });
                         })
-                        .catch((error) => {
+                        .catch((error: any) => {
                           console.error('Error transferring schedules:', error);
                           Alert.alert('Error', 'Failed to transfer schedules. Please try again.');
                         });
@@ -305,7 +305,7 @@ export default function KeyTransferScreen() {
                     off(fromScheduleRef);
                   });
                 })
-                .catch((error) => {
+                .catch((error: any) => {
                   console.error('Error updating request:', error);
                   Alert.alert('Error', 'Failed to update request. Please try again.');
                 });
@@ -315,7 +315,7 @@ export default function KeyTransferScreen() {
                 .then(() => {
                   Alert.alert('Success', 'Transfer request denied.');
                 })
-                .catch((error) => {
+                .catch((error: any) => {
                   console.error('Error updating request:', error);
                   Alert.alert('Error', 'Failed to update request. Please try again.');
                 });
