@@ -17,22 +17,26 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { database, off, onValue, push, ref, remove, update } from '../../firebase';
 
+interface UserWithSchedule {
+  rfid: string;
+  name: string;
+  scheduleCount: number;
+  schedules: ScheduleItem[];
+}
+
 interface ScheduleItem {
   key: number;
   name_of_day?: string;
   start: number;
   end: number;
-  currentHolder?: string;
-  currentHolderName?: string;
 }
 
 interface TransferRequest {
   id: string;
-  scheduleKey: number;
-  requesterRfid: string;
-  requesterName: string;
-  currentHolderRfid: string;
-  currentHolderName: string;
+  fromUserRfid: string;
+  fromUserName: string;
+  toUserRfid: string;
+  toUserName: string;
   status: 'pending' | 'accepted' | 'denied';
   timestamp: number;
 }
@@ -40,7 +44,7 @@ interface TransferRequest {
 export default function KeyTransferScreen() {
   const colorScheme = useColorScheme();
   const { user } = useUser();
-  const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
+  const [usersWithSchedules, setUsersWithSchedules] = useState<UserWithSchedule[]>([]);
   const [transferRequests, setTransferRequests] = useState<TransferRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -53,67 +57,100 @@ export default function KeyTransferScreen() {
       return;
     }
 
-    fetchAllSchedules();
+    fetchUsersWithSchedules();
     fetchTransferRequests();
   }, [user]);
 
-  const fetchAllSchedules = () => {
+  const fetchUsersWithSchedules = () => {
     if (!user?.rfid) return;
 
     setLoading(true);
-    const schedulesRef = ref(database, 'CNSHS-TRACKEY/schedule');
+    const schedulesRef = ref(database, 'CNSHS-TRACKEY/schedules');
     
     onValue(schedulesRef, (snapshot) => {
       const data = snapshot.val();
       console.log('All schedules data:', data);
       
       if (data) {
-        const allSchedules: ScheduleItem[] = [];
+        const usersWithSchedulesList: UserWithSchedule[] = [];
         
-        // Iterate through all users' schedules
-        Object.keys(data).forEach(userRfid => {
-          const userSchedules = data[userRfid];
+        // First, fetch all users to get their names
+        const usersRef = ref(database, 'trackey/users');
+        onValue(usersRef, (usersSnapshot) => {
+          const usersData = usersSnapshot.val();
+          const userMap: { [rfid: string]: string } = {};
           
-          if (userSchedules) {
-            // Check if it's a single schedule or multiple schedules
-            if (userSchedules.key !== undefined && userSchedules.start !== undefined && userSchedules.end !== undefined) {
-              // Single schedule
-              allSchedules.push({
-                key: userSchedules.key,
-                name_of_day: userSchedules.name_of_day || '',
-                start: userSchedules.start,
-                end: userSchedules.end,
-                currentHolder: userRfid,
-                currentHolderName: userSchedules.currentHolderName || 'Unknown'
-              });
-            } else {
-              // Multiple schedules
-              Object.keys(userSchedules).forEach(scheduleKey => {
-                const schedule = userSchedules[scheduleKey];
-                if (schedule.start && schedule.end) {
-                  allSchedules.push({
-                    key: schedule.key || parseInt(scheduleKey),
-                    name_of_day: schedule.name_of_day || '',
-                    start: schedule.start,
-                    end: schedule.end,
-                    currentHolder: userRfid,
-                    currentHolderName: schedule.currentHolderName || 'Unknown'
-                  });
-                }
-              });
-            }
+          if (usersData) {
+            Object.keys(usersData).forEach(userId => {
+              const userData = usersData[userId];
+              if (userData.rfid && userData.name) {
+                userMap[userData.rfid] = userData.name;
+              }
+            });
           }
+          
+          // Now iterate through all users' schedules
+          Object.keys(data).forEach(userRfid => {
+            const userSchedules = data[userRfid];
+            
+            if (userSchedules) {
+              const schedules: ScheduleItem[] = [];
+              
+              // Check if it's a single schedule or multiple schedules
+              if (userSchedules.key !== undefined && userSchedules.start !== undefined && userSchedules.end !== undefined) {
+                // Single schedule
+                schedules.push({
+                  key: userSchedules.key,
+                  name_of_day: userSchedules.name_of_day || '',
+                  start: userSchedules.start,
+                  end: userSchedules.end
+                });
+              } else {
+                // Multiple schedules
+                Object.keys(userSchedules).forEach(scheduleKey => {
+                  const schedule = userSchedules[scheduleKey];
+                  if (schedule.start && schedule.end) {
+                    schedules.push({
+                      key: schedule.key || parseInt(scheduleKey),
+                      name_of_day: schedule.name_of_day || '',
+                      start: schedule.start,
+                      end: schedule.end
+                    });
+                  }
+                });
+              }
+              
+              if (schedules.length > 0) {
+                usersWithSchedulesList.push({
+                  rfid: userRfid,
+                  name: userMap[userRfid] || 'Unknown User',
+                  scheduleCount: schedules.length,
+                  schedules: schedules
+                });
+              }
+            }
+          });
+          
+          setUsersWithSchedules(usersWithSchedulesList);
+          setLoading(false);
+          setRefreshing(false);
+          
+          // Clean up users listener
+          off(usersRef);
+        }, (error) => {
+          console.error('Error fetching users:', error);
+          setUsersWithSchedules([]);
+          setLoading(false);
+          setRefreshing(false);
         });
-        
-        setSchedules(allSchedules);
       } else {
-        setSchedules([]);
+        setUsersWithSchedules([]);
+        setLoading(false);
+        setRefreshing(false);
       }
-      setLoading(false);
-      setRefreshing(false);
     }, (error) => {
       console.error('Error fetching schedules:', error);
-      setSchedules([]);
+      setUsersWithSchedules([]);
       setLoading(false);
       setRefreshing(false);
     });
@@ -152,45 +189,44 @@ export default function KeyTransferScreen() {
 
   const handleRefresh = () => {
     setRefreshing(true);
-    fetchAllSchedules();
+    fetchUsersWithSchedules();
     fetchTransferRequests();
   };
 
-  const requestTransfer = (schedule: ScheduleItem) => {
+  const requestTransfer = (targetUser: UserWithSchedule) => {
     if (!user) return;
 
-    // Check if user is already the holder
-    if (schedule.currentHolder === user.rfid) {
-      Alert.alert('Cannot Request', 'You already hold this schedule.');
+    // Check if user is requesting from themselves
+    if (targetUser.rfid === user.rfid) {
+      Alert.alert('Cannot Request', 'You cannot request transfer from yourself.');
       return;
     }
 
-    // Check if there's already a pending request for this schedule
+    // Check if there's already a pending request between these users
     const existingRequest = transferRequests.find(req => 
-      req.scheduleKey === schedule.key && 
       req.status === 'pending' &&
-      (req.requesterRfid === user.rfid || req.currentHolderRfid === user.rfid)
+      ((req.fromUserRfid === user.rfid && req.toUserRfid === targetUser.rfid) ||
+       (req.fromUserRfid === targetUser.rfid && req.toUserRfid === user.rfid))
     );
 
     if (existingRequest) {
-      Alert.alert('Request Exists', 'There is already a pending request for this schedule.');
+      Alert.alert('Request Exists', 'There is already a pending transfer request between you and this user.');
       return;
     }
 
     Alert.alert(
       'Request Transfer',
-      `Are you sure you want to request transfer of Schedule #${schedule.key} from ${schedule.currentHolderName}?`,
+      `Are you sure you want to request transfer of ALL schedules from ${targetUser.name}? This will transfer ${targetUser.scheduleCount} schedule(s).`,
       [
         { text: 'Cancel', style: 'cancel' },
         { 
           text: 'Request', 
           onPress: () => {
             const newRequest: Omit<TransferRequest, 'id'> = {
-              scheduleKey: schedule.key,
-              requesterRfid: user.rfid,
-              requesterName: user.name,
-              currentHolderRfid: schedule.currentHolder || '',
-              currentHolderName: schedule.currentHolderName || 'Unknown',
+              fromUserRfid: targetUser.rfid,
+              fromUserName: targetUser.name,
+              toUserRfid: user.rfid,
+              toUserName: user.name,
               status: 'pending',
               timestamp: Date.now()
             };
@@ -213,9 +249,9 @@ export default function KeyTransferScreen() {
   const handleTransferResponse = (request: TransferRequest, accept: boolean) => {
     if (!user) return;
 
-    // Check if current user is the holder
-    if (request.currentHolderRfid !== user.rfid) {
-      Alert.alert('Unauthorized', 'Only the current holder can respond to transfer requests.');
+    // Check if current user is the sender (the one who has the schedules)
+    if (request.fromUserRfid !== user.rfid) {
+      Alert.alert('Unauthorized', 'Only the schedule holder can respond to transfer requests.');
       return;
     }
 
@@ -224,7 +260,7 @@ export default function KeyTransferScreen() {
 
     Alert.alert(
       `${actionText.charAt(0).toUpperCase() + actionText.slice(1)} Transfer`,
-      `Are you sure you want to ${actionText} the transfer request for Schedule #${request.scheduleKey}?`,
+      `Are you sure you want to ${actionText} the transfer request to ${request.toUserName}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         { 
@@ -236,59 +272,37 @@ export default function KeyTransferScreen() {
               // Update request status to accepted
               update(requestRef, { status: 'accepted' })
                 .then(() => {
-                  // Transfer the schedule to the requester
-                  const scheduleRef = ref(database, `CNSHS-TRACKEY/schedule/${request.currentHolderRfid}`);
+                  // Transfer all schedules by moving from one RFID path to another
+                  const fromScheduleRef = ref(database, `CNSHS-TRACKEY/schedules/${request.fromUserRfid}`);
+                  const toScheduleRef = ref(database, `CNSHS-TRACKEY/schedules/${request.toUserRfid}`);
                   
-                  // First, get the current schedule data
-                  onValue(scheduleRef, (snapshot) => {
+                  // Get the schedules from the sender
+                  onValue(fromScheduleRef, (snapshot) => {
                     const scheduleData = snapshot.val();
                     
                     if (scheduleData) {
-                      // Find the specific schedule to transfer
-                      let scheduleToTransfer = null;
-                      
-                      if (scheduleData.key === request.scheduleKey) {
-                        scheduleToTransfer = scheduleData;
-                      } else {
-                        Object.keys(scheduleData).forEach(key => {
-                          if (scheduleData[key].key === request.scheduleKey) {
-                            scheduleToTransfer = scheduleData[key];
-                          }
+                      // Move the entire schedule data to the receiver
+                      update(toScheduleRef, scheduleData)
+                        .then(() => {
+                          // Remove the schedules from the sender
+                          remove(fromScheduleRef)
+                            .then(() => {
+                              Alert.alert('Success', 'All schedules transferred successfully!');
+                            })
+                            .catch((error) => {
+                              console.error('Error removing schedules from sender:', error);
+                              Alert.alert('Error', 'Failed to complete transfer. Please try again.');
+                            });
+                        })
+                        .catch((error) => {
+                          console.error('Error transferring schedules:', error);
+                          Alert.alert('Error', 'Failed to transfer schedules. Please try again.');
                         });
-                      }
-                      
-                      if (scheduleToTransfer) {
-                        // Remove from current holder
-                        const currentScheduleRef = ref(database, `CNSHS-TRACKEY/schedule/${request.currentHolderRfid}`);
-                        if (scheduleData.key === request.scheduleKey) {
-                          remove(currentScheduleRef);
-                        } else {
-                          Object.keys(scheduleData).forEach(key => {
-                            if (scheduleData[key].key === request.scheduleKey) {
-                              remove(ref(database, `CNSHS-TRACKEY/schedule/${request.currentHolderRfid}/${key}`));
-                            }
-                          });
-                        }
-                        
-                        // Add to requester
-                        const newScheduleRef = ref(database, `CNSHS-TRACKEY/schedule/${request.requesterRfid}`);
-                        const scheduleWithNewHolder = {
-                          ...scheduleToTransfer,
-                          currentHolderName: request.requesterName
-                        };
-                        
-                        push(newScheduleRef, scheduleWithNewHolder)
-                          .then(() => {
-                            Alert.alert('Success', 'Schedule transferred successfully!');
-                          })
-                          .catch((error) => {
-                            console.error('Error transferring schedule:', error);
-                            Alert.alert('Error', 'Failed to transfer schedule. Please try again.');
-                          });
-                      }
+                    } else {
+                      Alert.alert('Error', 'No schedules found to transfer.');
                     }
                     
-                    off(scheduleRef);
+                    off(fromScheduleRef);
                   });
                 })
                 .catch((error) => {
@@ -340,7 +354,7 @@ export default function KeyTransferScreen() {
   const getPendingRequestsForUser = () => {
     return transferRequests.filter(req => 
       req.status === 'pending' && 
-      (req.requesterRfid === user?.rfid || req.currentHolderRfid === user?.rfid)
+      (req.fromUserRfid === user?.rfid || req.toUserRfid === user?.rfid)
     );
   };
 
@@ -586,6 +600,28 @@ export default function KeyTransferScreen() {
       textAlign: 'center',
       lineHeight: 24,
     },
+    schedulesPreview: {
+      marginBottom: 16,
+    },
+    schedulePreviewItem: {
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 8,
+      marginBottom: 8,
+    },
+    schedulePreviewText: {
+      fontSize: 12,
+      color: Colors[colorScheme ?? 'light'].text,
+      fontWeight: '500',
+    },
+    moreSchedulesText: {
+      fontSize: 12,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+      fontStyle: 'italic',
+      textAlign: 'center',
+      marginTop: 4,
+    },
   });
 
   const pendingRequests = getPendingRequestsForUser();
@@ -618,20 +654,20 @@ export default function KeyTransferScreen() {
               {pendingRequests.map((request) => (
                 <View key={request.id} style={styles.requestCard}>
                   <View style={styles.requestHeader}>
-                    <ThemedText style={styles.requestTitle}>Schedule #{request.scheduleKey}</ThemedText>
+                    <ThemedText style={styles.requestTitle}>Transfer Request</ThemedText>
                     <ThemedText style={styles.requestStatus}>PENDING</ThemedText>
                   </View>
                   
                   <View style={styles.requestDetails}>
                     <ThemedText style={styles.requestText}>
-                      {request.requesterRfid === user.rfid 
-                        ? `You requested this schedule from ${request.currentHolderName}`
-                        : `${request.requesterName} requested this schedule from you`
+                      {request.fromUserRfid === user.rfid 
+                        ? `You requested schedules from ${request.toUserName}`
+                        : `${request.fromUserName} requested schedules from you`
                       }
                     </ThemedText>
                   </View>
 
-                  {request.currentHolderRfid === user.rfid && (
+                  {request.fromUserRfid === user.rfid && (
                     <View style={styles.actionButtons}>
                       <TouchableOpacity 
                         style={[styles.actionButton, styles.acceptButton]}
@@ -652,8 +688,8 @@ export default function KeyTransferScreen() {
             </>
           )}
 
-          {/* Available Schedules Section */}
-          <ThemedText style={styles.sectionTitle}>Available Schedules</ThemedText>
+          {/* Available Users Section */}
+          <ThemedText style={styles.sectionTitle}>Users with Schedules</ThemedText>
           
           {loading ? (
             <View style={styles.loadingContainer}>
@@ -661,9 +697,9 @@ export default function KeyTransferScreen() {
                 size="large" 
                 color={Colors[colorScheme ?? 'light'].primary} 
               />
-              <ThemedText style={styles.loadingText}>Loading schedules...</ThemedText>
+              <ThemedText style={styles.loadingText}>Loading users...</ThemedText>
             </View>
-          ) : schedules.length === 0 ? (
+          ) : usersWithSchedules.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Ionicons 
                 name="key-outline" 
@@ -671,22 +707,22 @@ export default function KeyTransferScreen() {
                 color={Colors[colorScheme ?? 'light'].tabIconDefault}
                 style={styles.emptyIcon}
               />
-              <ThemedText style={styles.emptyTitle}>No Schedules Available</ThemedText>
+              <ThemedText style={styles.emptyTitle}>No Users with Schedules</ThemedText>
               <ThemedText style={styles.emptyText}>
-                No schedules are currently available for transfer.
+                No users currently have schedules assigned.
               </ThemedText>
             </View>
           ) : (
-            schedules.map((schedule, index) => (
-              <View key={schedule.key || index} style={styles.scheduleCard}>
-                {/* Schedule Header */}
+            usersWithSchedules.map((userWithSchedule, index) => (
+              <View key={userWithSchedule.rfid || index} style={styles.scheduleCard}>
+                {/* User Header */}
                 <View style={styles.scheduleHeader}>
                   <View style={styles.scheduleKey}>
-                    <ThemedText style={styles.scheduleKeyText}>#{schedule.key}</ThemedText>
+                    <ThemedText style={styles.scheduleKeyText}>{userWithSchedule.scheduleCount}</ThemedText>
                   </View>
                 </View>
 
-                {/* Current Holder */}
+                {/* User Info */}
                 <View style={styles.holderInfo}>
                   <Ionicons 
                     name="person-circle" 
@@ -695,58 +731,35 @@ export default function KeyTransferScreen() {
                     style={styles.holderIcon}
                   />
                   <ThemedText style={styles.holderText}>
-                    Current Holder: {schedule.currentHolderName}
+                    {userWithSchedule.name} ({userWithSchedule.scheduleCount} schedule{userWithSchedule.scheduleCount > 1 ? 's' : ''})
                   </ThemedText>
                 </View>
 
-                {/* Time Information */}
-                <View style={styles.timeContainer}>
-                  <View style={styles.timeBox}>
-                    <ThemedText style={styles.timeLabel}>START TIME</ThemedText>
-                    <ThemedText style={styles.timeText}>{formatTime(schedule.start)}</ThemedText>
-                  </View>
-                  
-                  <Ionicons 
-                    name="arrow-forward" 
-                    size={20} 
-                    color={Colors[colorScheme ?? 'light'].primary}
-                    style={styles.arrow}
-                  />
-                  
-                  <View style={styles.timeBox}>
-                    <ThemedText style={styles.timeLabel}>END TIME</ThemedText>
-                    <ThemedText style={styles.timeText}>{formatTime(schedule.end)}</ThemedText>
-                  </View>
-                </View>
-
-                {/* Days */}
-                <View style={styles.daysContainer}>
-                  {parseDays(schedule.name_of_day).map((day, dayIndex) => {
-                    const dayIndices = schedule.name_of_day?.split(',') || [];
-                    const currentDayIndex = dayIndices[dayIndex];
-                    return (
-                      <View 
-                        key={dayIndex} 
-                        style={[
-                          styles.dayChip, 
-                          { backgroundColor: getDayColor(currentDayIndex) }
-                        ]}
-                      >
-                        <ThemedText style={styles.dayText}>{day}</ThemedText>
-                      </View>
-                    );
-                  })}
+                {/* Schedule Preview */}
+                <View style={styles.schedulesPreview}>
+                  {userWithSchedule.schedules.slice(0, 2).map((schedule, scheduleIndex) => (
+                    <View key={scheduleIndex} style={styles.schedulePreviewItem}>
+                      <ThemedText style={styles.schedulePreviewText}>
+                        Schedule #{schedule.key}: {formatTime(schedule.start)} - {formatTime(schedule.end)}
+                      </ThemedText>
+                    </View>
+                  ))}
+                  {userWithSchedule.schedules.length > 2 && (
+                    <ThemedText style={styles.moreSchedulesText}>
+                      +{userWithSchedule.schedules.length - 2} more schedule{userWithSchedule.schedules.length - 2 > 1 ? 's' : ''}
+                    </ThemedText>
+                  )}
                 </View>
 
                 {/* Request Button */}
                 <TouchableOpacity 
                   style={styles.requestButton}
-                  onPress={() => requestTransfer(schedule)}
-                  disabled={schedule.currentHolder === user.rfid}
+                  onPress={() => requestTransfer(userWithSchedule)}
+                  disabled={userWithSchedule.rfid === user.rfid}
                 >
                   <Ionicons name="swap-horizontal" size={20} color="white" />
                   <ThemedText style={styles.requestButtonText}>
-                    {schedule.currentHolder === user.rfid ? 'You Hold This' : 'Request Transfer'}
+                    {userWithSchedule.rfid === user.rfid ? 'You Hold These' : 'Request All Schedules'}
                   </ThemedText>
                 </TouchableOpacity>
               </View>

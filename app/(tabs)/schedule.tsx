@@ -44,7 +44,7 @@ export default function ScheduleScreen() {
     if (!user?.rfid) return;
 
     setLoading(true);
-    const scheduleRef = ref(database, `CNSHS-TRACKEY/schedule/${user.rfid}`);
+    const scheduleRef = ref(database, `CNSHS-TRACKEY/schedules/${user.rfid}`);
     
     onValue(scheduleRef, (snapshot) => {
       const data = snapshot.val();
