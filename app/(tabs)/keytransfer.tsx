@@ -467,6 +467,7 @@ export default function KeyTransferScreen() {
     scrollContent: {
       padding: 20,
       paddingTop: 30,
+      paddingBottom: 100,
     },
     sectionTitle: {
       fontSize: 20,

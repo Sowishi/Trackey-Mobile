@@ -6,11 +6,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    View
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { database, off, onValue, ref } from '../../firebase';
@@ -161,6 +161,7 @@ export default function LogsScreen() {
     scrollContent: {
       padding: 20,
       paddingTop: 30,
+      paddingBottom: 100,
     },
     logCard: {
       backgroundColor: Colors[colorScheme ?? 'light'].background,
@@ -253,7 +254,7 @@ export default function LogsScreen() {
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <ThemedText style={styles.headerTitle}>Transfer Logs</ThemedText>
+          <ThemedText style={styles.headerTitle}>Logs</ThemedText>
           <ThemedText style={styles.headerSubtitle}>Your schedule transfer history</ThemedText>
         </View>
 

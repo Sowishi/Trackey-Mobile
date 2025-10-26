@@ -171,6 +171,7 @@ export default function ScheduleScreen() {
     scrollContent: {
       padding: 20,
       paddingTop: 30,
+      paddingBottom: 100,
     },
     scheduleCard: {
       backgroundColor: Colors[colorScheme ?? 'light'].background,
