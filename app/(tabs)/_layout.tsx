@@ -61,13 +61,13 @@ export default function TabLayout() {
       />
      
       <Tabs.Screen
-        name="keyswitch"
+        name="keytransfer"
         options={{
-          title: 'Key Switch',
+          title: 'Key Transfer',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               size={focused ? 32 : 28} 
-              name={focused ? "toggle" : "toggle-outline"} 
+              name={focused ? "swap-horizontal" : "swap-horizontal-outline"} 
               color={color} 
             />
           ),
