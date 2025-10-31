@@ -16,7 +16,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { database, off, onValue, ref } from '../firebase';
+import { collection, db, getDocs, query, where } from '../firebase';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -42,56 +42,55 @@ export default function LoginScreen() {
     setLoading(true);
 
     try {
-      // Reference to the users in the database
-      const usersRef = ref(database, 'trackey/users');
+      // Query users collection in Firestore
+      const usersRef = collection(db, 'users');
+      const q = query(
+        usersRef,
+        where('email', '==', email.toLowerCase().trim()),
+        where('password', '==', password.trim()),
+        where('status', '==', 'active')
+      );
       
-      // Listen for users data
-      onValue(usersRef, (snapshot) => {
-        const users = snapshot.val();
-        let authenticatedUser: User | null = null;
+      const querySnapshot = await getDocs(q);
+      let authenticatedUser: User | null = null;
 
-        if (users) {
-          // Search through all users to find matching email and password
-          for (const userId of Object.keys(users)) {
-            const userData = users[userId];
-            if (userData.email === email.trim() && userData.password === password.trim()) {
-              authenticatedUser = {
-                email: userData.email,
-                gender: userData.gender,
-                name: userData.name,
-                password: userData.password,
-                position: userData.position,
-                rfid: userData.rfid
-              };
-              break;
-            }
-          }
+      if (!querySnapshot.empty) {
+        // Get the first matching user document
+        const userDoc = querySnapshot.docs[0];
+        const userData = userDoc.data();
+        
+        // Check if user is not archived
+        if (userData.isArchived !== true) {
+          // Map database fields to User interface
+          authenticatedUser = {
+            email: userData.email || '',
+            gender: userData.gender || '',
+            name: userData.fullName || userData.name || '', // Support both fullName and name
+            password: userData.password || '',
+            position: userData.role || userData.position || '', // Support both role and position
+            rfid: userData.meterNumber || userData.rfid || '' // Support both meterNumber and rfid
+          };
         }
+      }
 
-        setLoading(false);
+      setLoading(false);
 
-        if (authenticatedUser) {
-          // Set user in context
-          setUser(authenticatedUser);
-          
-          Alert.alert('Success', `Welcome back, ${authenticatedUser.name}!`, [
-            {
-              text: 'OK',
-              onPress: () => router.replace('/(tabs)'),
-            },
-          ]);
-        } else {
-          Alert.alert('Error', 'Invalid email or password. Please try again.');
-        }
-
-        // Clean up the listener
-        off(usersRef);
-      }, (error) => {
-        setLoading(false);
-        console.error('Database error:', error);
-        Alert.alert('Error', 'Unable to connect to the database. Please try again.');
-        off(usersRef);
-      });
+      if (authenticatedUser) {
+        // Set user in context
+        setUser(authenticatedUser);
+        
+        // Enhanced welcome message
+        const welcomeMessage = `Welcome, ${authenticatedUser.name}! 🎉\n\nYou've successfully logged in.`;
+        
+        Alert.alert('Login Successful', welcomeMessage, [
+          {
+            text: 'OK',
+            onPress: () => router.replace('/(tabs)'),
+          },
+        ]);
+      } else {
+        Alert.alert('Error', 'Invalid email or password. Please check your credentials and try again.');
+      }
 
     } catch (error) {
       setLoading(false);
