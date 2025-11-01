@@ -3,20 +3,24 @@ import { Colors } from '@/constants/theme';
 import { useUser } from '@/contexts/UserContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Image,
+  Modal,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { collection, db, getDocs, query, where } from '../../firebase';
+import { collection, db, doc, getDocs, query, updateDoc, where } from '../../firebase';
 
 interface UserProfile {
   id?: string;
@@ -39,6 +43,12 @@ export default function ProfileScreen() {
   const { user: contextUser, setUser: setContextUser } = useUser();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [changingPicture, setChangingPicture] = useState(false);
 
   useEffect(() => {
     if (!contextUser) {
@@ -126,6 +136,124 @@ export default function ProfileScreen() {
 
   const getInitials = (name: string) => {
     return name.split(' ').map((n) => n[0]).join('').toUpperCase();
+  };
+
+  const handleChangePassword = () => {
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordModalVisible(true);
+  };
+
+  const handleSubmitPasswordChange = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      Alert.alert('Error', 'Password must be at least 6 characters long');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Error', 'New password and confirm password do not match');
+      return;
+    }
+
+    if (!userProfile?.id) {
+      Alert.alert('Error', 'User information not available');
+      return;
+    }
+
+    // Verify current password
+    if (userProfile.password !== currentPassword) {
+      Alert.alert('Error', 'Current password is incorrect');
+      return;
+    }
+
+    setChangingPassword(true);
+
+    try {
+      const userRef = doc(db, 'users', userProfile.id);
+      await updateDoc(userRef, {
+        password: newPassword,
+        passwordChanged: true,
+        updatedAt: new Date().toISOString(),
+      });
+
+      // Update local state
+      setUserProfile({
+        ...userProfile,
+        password: newPassword,
+        passwordChanged: true,
+      });
+
+      setPasswordModalVisible(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      Alert.alert('Success', 'Password changed successfully!');
+    } catch (error) {
+      console.error('Error changing password:', error);
+      Alert.alert('Error', 'Failed to change password. Please try again.');
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  const handleChangeProfilePicture = async () => {
+    try {
+      // Request permissions
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'We need permission to access your photos to change your profile picture.');
+        return;
+      }
+
+      // Launch image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const imageUri = result.assets[0].uri;
+        setChangingPicture(true);
+
+        try {
+          if (!userProfile?.id) {
+            Alert.alert('Error', 'User information not available');
+            return;
+          }
+
+          // Update profile picture in Firestore
+          const userRef = doc(db, 'users', userProfile.id);
+          await updateDoc(userRef, {
+            profilePicUrl: imageUri,
+            updatedAt: new Date().toISOString(),
+          });
+
+          // Update local state
+          setUserProfile({
+            ...userProfile,
+            profilePicUrl: imageUri,
+          });
+
+          Alert.alert('Success', 'Profile picture updated successfully!');
+        } catch (error) {
+          console.error('Error updating profile picture:', error);
+          Alert.alert('Error', 'Failed to update profile picture. Please try again.');
+        } finally {
+          setChangingPicture(false);
+        }
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
   };
 
   const styles = StyleSheet.create({
@@ -268,6 +396,128 @@ export default function ProfileScreen() {
       color: Colors[colorScheme ?? 'light'].text,
       opacity: 0.6,
     },
+    editIconOverlay: {
+      position: 'absolute',
+      bottom: 0,
+      right: 0,
+      backgroundColor: Colors[colorScheme ?? 'light'].primary,
+      borderRadius: 16,
+      width: 32,
+      height: 32,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: Colors[colorScheme ?? 'light'].background,
+    },
+    actionButtons: {
+      marginTop: 16,
+    },
+    actionButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+    },
+    actionButtonText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+      marginLeft: 8,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'flex-end',
+    },
+    modalContent: {
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      maxHeight: '85%',
+      paddingBottom: 20,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors[colorScheme ?? 'light'].border,
+    },
+    modalTitle: {
+      fontSize: 22,
+      fontWeight: 'bold',
+      color: Colors[colorScheme ?? 'light'].text,
+    },
+    closeButton: {
+      padding: 4,
+    },
+    modalBody: {
+      padding: 20,
+    },
+    inputGroup: {
+      marginBottom: 20,
+    },
+    inputLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+      marginBottom: 8,
+    },
+    textInput: {
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+      borderRadius: 10,
+      padding: 14,
+      fontSize: 16,
+      color: Colors[colorScheme ?? 'light'].text,
+    },
+    modalFooter: {
+      flexDirection: 'row',
+      paddingHorizontal: 20,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: Colors[colorScheme ?? 'light'].border,
+    },
+    modalCancelButton: {
+      flex: 1,
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      paddingVertical: 16,
+      borderRadius: 12,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+      marginRight: 12,
+    },
+    modalCancelText: {
+      color: Colors[colorScheme ?? 'light'].text,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    modalSubmitButton: {
+      flex: 1,
+      backgroundColor: Colors[colorScheme ?? 'light'].primary,
+      paddingVertical: 16,
+      borderRadius: 12,
+      alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'center',
+    },
+    modalSubmitText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '600',
+      marginLeft: 8,
+    },
+    disabledButton: {
+      opacity: 0.6,
+    },
   });
 
   if (loading) {
@@ -297,20 +547,27 @@ export default function ProfileScreen() {
         {/* Profile Card */}
         <View style={styles.profileCard}>
           <View style={styles.avatarSection}>
-            {displayUser.profilePicUrl ? (
-              <View style={styles.avatarContainer}>
+            <TouchableOpacity
+              style={styles.avatarContainer}
+              onPress={handleChangeProfilePicture}
+              disabled={changingPicture}
+            >
+              {changingPicture ? (
+                <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].primary} />
+              ) : displayUser.profilePicUrl ? (
                 <Image
                   source={{ uri: displayUser.profilePicUrl }}
                   style={styles.avatarImage}
                 />
-              </View>
-            ) : (
-              <View style={styles.avatarContainer}>
+              ) : (
                 <Text style={styles.avatarText}>
                   {getInitials(displayUser.fullName)}
                 </Text>
+              )}
+              <View style={styles.editIconOverlay}>
+                <Ionicons name="camera" size={20} color="#FFFFFF" />
               </View>
-            )}
+            </TouchableOpacity>
             <Text style={styles.nameText}>{displayUser.fullName}</Text>
             <Text style={styles.roleText}>{displayUser.role}</Text>
           </View>
@@ -427,6 +684,21 @@ export default function ProfileScreen() {
               </View>
             )}
           </View>
+
+          {/* Action Buttons */}
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={handleChangePassword}
+            >
+              <Ionicons
+                name="lock-closed"
+                size={20}
+                color={Colors[colorScheme ?? 'light'].primary}
+              />
+              <Text style={styles.actionButtonText}>Update</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Logout Section */}
@@ -442,6 +714,100 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Change Password Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={passwordModalVisible}
+        onRequestClose={() => setPasswordModalVisible(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setPasswordModalVisible(false)}
+        >
+          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Change Password</Text>
+              <TouchableOpacity
+                onPress={() => setPasswordModalVisible(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons
+                  name="close"
+                  size={24}
+                  color={Colors[colorScheme ?? 'light'].text}
+                />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Current Password</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Enter current password"
+                  placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
+                  value={currentPassword}
+                  onChangeText={setCurrentPassword}
+                  secureTextEntry
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>New Password</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Enter new password"
+                  placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  secureTextEntry
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Confirm New Password</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Confirm new password"
+                  placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry
+                  autoCapitalize="none"
+                />
+              </View>
+            </View>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={[styles.modalCancelButton, changingPassword && styles.disabledButton]}
+                onPress={() => setPasswordModalVisible(false)}
+                disabled={changingPassword}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSubmitButton, changingPassword && styles.disabledButton]}
+                onPress={handleSubmitPasswordChange}
+                disabled={changingPassword}
+              >
+                {changingPassword ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+                    <Text style={styles.modalSubmitText}>Change Password</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
