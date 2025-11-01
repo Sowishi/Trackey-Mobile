@@ -16,7 +16,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { db, collection, query, where, getDocs } from '../../firebase';
+import { collection, db, getDocs, query, where } from '../../firebase';
 
 interface UserProfile {
   id?: string;
@@ -132,6 +132,7 @@ export default function ProfileScreen() {
     safeArea: {
       flex: 1,
       backgroundColor: Colors[colorScheme ?? 'light'].background,
+      paddingBottom: 50
     },
     container: {
       flex: 1,

@@ -2,18 +2,24 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Modal,
+  Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { db, collection, query, where, getDocs } from '../../firebase';
+import { collection, db, getDocs, query, where } from '../../firebase';
 
 interface UserDetail {
   id: string;
@@ -39,6 +45,15 @@ export default function UserDetailScreen() {
   const { userId, email } = params;
   const [userDetail, setUserDetail] = useState<UserDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [formModalVisible, setFormModalVisible] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const [coverageDateFrom, setCoverageDateFrom] = useState<Date | null>(null);
+  const [coverageDateTo, setCoverageDateTo] = useState<Date | null>(null);
+  const [dueDate, setDueDate] = useState<Date | null>(null);
+  const [consumption, setConsumption] = useState('');
+  const [totalAmount, setTotalAmount] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState<'from' | 'to' | 'due' | null>(null);
 
   useEffect(() => {
     if (userId || email) {
@@ -107,14 +122,142 @@ export default function UserDetailScreen() {
     }
   };
 
+  const formatDateForDisplay = (date: Date | null) => {
+    if (!date) return 'Select date';
+    return date.toLocaleDateString('en-US', {
+      month: '2-digit',
+      day: '2-digit',
+      year: 'numeric',
+    });
+  };
+
   const getInitials = (name: string) => {
     return name.split(' ').map((n) => n[0]).join('').toUpperCase();
+  };
+
+  const months = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
+
+  const getMonthNumber = (monthName: string): number => {
+    const index = months.findIndex(m => m === monthName);
+    return index >= 0 ? index : new Date().getMonth();
+  };
+
+  const getDateInSelectedMonth = (monthName: string, day: number = 1): Date => {
+    const now = new Date();
+    const monthIndex = getMonthNumber(monthName);
+    return new Date(now.getFullYear(), monthIndex, day);
+  };
+
+  const getLastDayOfMonth = (monthName: string): number => {
+    const now = new Date();
+    const monthIndex = getMonthNumber(monthName);
+    return new Date(now.getFullYear(), monthIndex + 1, 0).getDate();
+  };
+
+  const handleMonthSelect = (month: string) => {
+    setSelectedMonth(month);
+    setModalVisible(false);
+    // Set default dates based on selected month
+    const monthStartDate = getDateInSelectedMonth(month, 1);
+    const lastDay = getLastDayOfMonth(month);
+    const monthEndDate = getDateInSelectedMonth(month, lastDay);
+    const monthMiddleDate = getDateInSelectedMonth(month, 15);
+    
+    setCoverageDateFrom(monthStartDate);
+    setCoverageDateTo(monthEndDate);
+    setDueDate(monthMiddleDate);
+    setConsumption('');
+    setTotalAmount('');
+    setShowDatePicker(null);
+    // Open form modal
+    setFormModalVisible(true);
+  };
+
+  const handleSubmitBill = () => {
+    // Validate form fields
+    if (!coverageDateFrom || !coverageDateTo || !dueDate || !consumption || !totalAmount) {
+      alert('Please fill in all fields');
+      return;
+    }
+
+    // TODO: Save bill to Firestore
+    console.log('Bill submitted:', {
+      month: selectedMonth,
+      coverageDateFrom: coverageDateFrom.toISOString(),
+      coverageDateTo: coverageDateTo.toISOString(),
+      dueDate: dueDate.toISOString(),
+      consumption: parseFloat(consumption),
+      totalAmount: parseFloat(totalAmount),
+      userId: userDetail?.id,
+      userEmail: userDetail?.email,
+    });
+
+    // Close form and reset
+    setFormModalVisible(false);
+    setSelectedMonth('');
+    setCoverageDateFrom(null);
+    setCoverageDateTo(null);
+    setDueDate(null);
+    setConsumption('');
+    setTotalAmount('');
+    setShowDatePicker(null);
+  };
+
+  const handleCancelForm = () => {
+    setFormModalVisible(false);
+    setSelectedMonth('');
+    setCoverageDateFrom(null);
+    setCoverageDateTo(null);
+    setDueDate(null);
+    setConsumption('');
+    setTotalAmount('');
+    setShowDatePicker(null);
+  };
+
+  const handleDateChange = (event: any, selectedDate?: Date, field: 'from' | 'to' | 'due' = 'from') => {
+    const currentDate = selectedDate || new Date();
+
+    if (Platform.OS === 'android') {
+      setShowDatePicker(null);
+      if (event.type === 'set') {
+        if (field === 'from') {
+          setCoverageDateFrom(currentDate);
+        } else if (field === 'to') {
+          setCoverageDateTo(currentDate);
+        } else if (field === 'due') {
+          setDueDate(currentDate);
+        }
+      }
+    } else {
+      // iOS
+      if (field === 'from') {
+        setCoverageDateFrom(currentDate);
+      } else if (field === 'to') {
+        setCoverageDateTo(currentDate);
+      } else if (field === 'due') {
+        setDueDate(currentDate);
+      }
+    }
   };
 
   const styles = StyleSheet.create({
     safeArea: {
       flex: 1,
       backgroundColor: Colors[colorScheme ?? 'light'].background,
+      paddingBottom: 80,
     },
     container: {
       flex: 1,
@@ -260,6 +403,195 @@ export default function UserDetailScreen() {
       fontSize: 16,
       color: Colors[colorScheme ?? 'light'].text,
       opacity: 0.6,
+    },
+    buttonContainer: {
+      paddingHorizontal: 20,
+      paddingBottom: 20,
+    },
+    addBillButton: {
+      backgroundColor: Colors[colorScheme ?? 'light'].primary,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 16,
+      paddingHorizontal: 24,
+      borderRadius: 12,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      elevation: 4,
+    },
+    buttonIcon: {
+      marginRight: 8,
+    },
+    addBillButtonText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'flex-end',
+    },
+    modalContent: {
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      maxHeight: '70%',
+      paddingBottom: 20,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors[colorScheme ?? 'light'].border,
+    },
+    modalTitle: {
+      fontSize: 22,
+      fontWeight: 'bold',
+      color: Colors[colorScheme ?? 'light'].text,
+    },
+    closeButton: {
+      padding: 4,
+    },
+    monthsContainer: {
+      paddingHorizontal: 20,
+    },
+    monthItem: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 16,
+      paddingHorizontal: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors[colorScheme ?? 'light'].border,
+    },
+    monthText: {
+      fontSize: 16,
+      color: Colors[colorScheme ?? 'light'].text,
+      fontWeight: '500',
+    },
+    formModalContent: {
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      maxHeight: '85%',
+      paddingBottom: 20,
+    },
+    formHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors[colorScheme ?? 'light'].border,
+    },
+    formTitle: {
+      fontSize: 22,
+      fontWeight: 'bold',
+      color: Colors[colorScheme ?? 'light'].text,
+    },
+    formContent: {
+      padding: 20,
+    },
+    formField: {
+      marginBottom: 20,
+    },
+    formLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+      marginBottom: 8,
+    },
+    formInput: {
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+      borderRadius: 12,
+      padding: 14,
+      fontSize: 16,
+      color: Colors[colorScheme ?? 'light'].text,
+    },
+    dateInput: {
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+      borderRadius: 12,
+      padding: 14,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    dateInputText: {
+      fontSize: 16,
+      color: Colors[colorScheme ?? 'light'].text,
+    },
+    dateInputPlaceholder: {
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+    },
+    iosPickerContainer: {
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      borderRadius: 12,
+      marginTop: 8,
+      overflow: 'hidden',
+    },
+    iosPickerButtons: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors[colorScheme ?? 'light'].border,
+    },
+    iosPickerButton: {
+      paddingVertical: 8,
+    },
+    iosPickerButtonText: {
+      fontSize: 16,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+      fontWeight: '500',
+    },
+    iosPickerButtonConfirm: {
+      color: Colors[colorScheme ?? 'light'].primary,
+      fontWeight: '600',
+    },
+    formButtons: {
+      flexDirection: 'row',
+      paddingHorizontal: 20,
+      marginTop: 10,
+    },
+    formButtonSpacing: {
+      width: 12,
+    },
+    cancelButton: {
+      flex: 1,
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      paddingVertical: 16,
+      borderRadius: 12,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+    },
+    cancelButtonText: {
+      color: Colors[colorScheme ?? 'light'].text,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    submitButton: {
+      flex: 1,
+      backgroundColor: Colors[colorScheme ?? 'light'].primary,
+      paddingVertical: 16,
+      borderRadius: 12,
+      alignItems: 'center',
+    },
+    submitButtonText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '600',
     },
   });
 
@@ -477,7 +809,317 @@ export default function UserDetailScreen() {
             )}
           </View>
         </View>
+
+        {/* Add Bill Button */}
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={styles.addBillButton}
+            onPress={() => setModalVisible(true)}
+          >
+            <Ionicons
+              name="add-circle"
+              size={24}
+              color="#FFFFFF"
+              style={styles.buttonIcon}
+            />
+            <Text style={styles.addBillButtonText}>Add Bill</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
+
+      {/* Month Selection Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setModalVisible(false)}
+        >
+          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Month</Text>
+              <TouchableOpacity
+                onPress={() => setModalVisible(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons
+                  name="close"
+                  size={24}
+                  color={Colors[colorScheme ?? 'light'].text}
+                />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.monthsContainer}>
+              {months.map((month, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.monthItem}
+                  onPress={() => handleMonthSelect(month)}
+                >
+                  <Text style={styles.monthText}>{month}</Text>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={20}
+                    color={Colors[colorScheme ?? 'light'].tabIconDefault}
+                  />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Bill Form Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={formModalVisible}
+        onRequestClose={handleCancelForm}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={handleCancelForm}
+        >
+          <View style={styles.formModalContent} onStartShouldSetResponder={() => true}>
+            <View style={styles.formHeader}>
+              <Text style={styles.formTitle}>Add Bill - {selectedMonth}</Text>
+              <TouchableOpacity
+                onPress={handleCancelForm}
+                style={styles.closeButton}
+              >
+                <Ionicons
+                  name="close"
+                  size={24}
+                  color={Colors[colorScheme ?? 'light'].text}
+                />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.formContent}>
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Coverage Date From</Text>
+                <TouchableOpacity
+                  style={styles.dateInput}
+                  onPress={() => setShowDatePicker('from')}
+                >
+                  <Text style={[
+                    styles.dateInputText,
+                    !coverageDateFrom && styles.dateInputPlaceholder
+                  ]}>
+                    {formatDateForDisplay(coverageDateFrom)}
+                  </Text>
+                  <Ionicons
+                    name="calendar-outline"
+                    size={20}
+                    color={Colors[colorScheme ?? 'light'].primary}
+                  />
+                </TouchableOpacity>
+                {showDatePicker === 'from' && (
+                  <>
+                    {Platform.OS === 'ios' && (
+                      <View style={styles.iosPickerContainer}>
+                        <View style={styles.iosPickerButtons}>
+                          <TouchableOpacity
+                            onPress={() => setShowDatePicker(null)}
+                            style={styles.iosPickerButton}
+                          >
+                            <Text style={styles.iosPickerButtonText}>Cancel</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={() => setShowDatePicker(null)}
+                            style={styles.iosPickerButton}
+                          >
+                            <Text style={[styles.iosPickerButtonText, styles.iosPickerButtonConfirm]}>Done</Text>
+                          </TouchableOpacity>
+                        </View>
+                        <DateTimePicker
+                          value={coverageDateFrom || (selectedMonth ? getDateInSelectedMonth(selectedMonth, 1) : new Date())}
+                          mode="date"
+                          display="spinner"
+                          onChange={(event, date) => handleDateChange(event, date, 'from')}
+                          textColor={Colors[colorScheme ?? 'light'].text}
+                        />
+                      </View>
+                    )}
+                    {Platform.OS === 'android' && (
+                      <DateTimePicker
+                        value={coverageDateFrom || (selectedMonth ? getDateInSelectedMonth(selectedMonth, 1) : new Date())}
+                        mode="date"
+                        display="default"
+                        onChange={(event, date) => {
+                          handleDateChange(event, date, 'from');
+                          setShowDatePicker(null);
+                        }}
+                      />
+                    )}
+                  </>
+                )}
+              </View>
+
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Coverage Date To</Text>
+                <TouchableOpacity
+                  style={styles.dateInput}
+                  onPress={() => setShowDatePicker('to')}
+                >
+                  <Text style={[
+                    styles.dateInputText,
+                    !coverageDateTo && styles.dateInputPlaceholder
+                  ]}>
+                    {formatDateForDisplay(coverageDateTo)}
+                  </Text>
+                  <Ionicons
+                    name="calendar-outline"
+                    size={20}
+                    color={Colors[colorScheme ?? 'light'].primary}
+                  />
+                </TouchableOpacity>
+                {showDatePicker === 'to' && (
+                  <>
+                    {Platform.OS === 'ios' && (
+                      <View style={styles.iosPickerContainer}>
+                        <View style={styles.iosPickerButtons}>
+                          <TouchableOpacity
+                            onPress={() => setShowDatePicker(null)}
+                            style={styles.iosPickerButton}
+                          >
+                            <Text style={styles.iosPickerButtonText}>Cancel</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={() => setShowDatePicker(null)}
+                            style={styles.iosPickerButton}
+                          >
+                            <Text style={[styles.iosPickerButtonText, styles.iosPickerButtonConfirm]}>Done</Text>
+                          </TouchableOpacity>
+                        </View>
+                        <DateTimePicker
+                          value={coverageDateTo || (selectedMonth ? getDateInSelectedMonth(selectedMonth, getLastDayOfMonth(selectedMonth)) : new Date())}
+                          mode="date"
+                          display="spinner"
+                          onChange={(event, date) => handleDateChange(event, date, 'to')}
+                          textColor={Colors[colorScheme ?? 'light'].text}
+                        />
+                      </View>
+                    )}
+                    {Platform.OS === 'android' && (
+                      <DateTimePicker
+                        value={coverageDateTo || (selectedMonth ? getDateInSelectedMonth(selectedMonth, getLastDayOfMonth(selectedMonth)) : new Date())}
+                        mode="date"
+                        display="default"
+                        onChange={(event, date) => {
+                          handleDateChange(event, date, 'to');
+                          setShowDatePicker(null);
+                        }}
+                      />
+                    )}
+                  </>
+                )}
+              </View>
+
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Due Date</Text>
+                <TouchableOpacity
+                  style={styles.dateInput}
+                  onPress={() => setShowDatePicker('due')}
+                >
+                  <Text style={[
+                    styles.dateInputText,
+                    !dueDate && styles.dateInputPlaceholder
+                  ]}>
+                    {formatDateForDisplay(dueDate)}
+                  </Text>
+                  <Ionicons
+                    name="calendar-outline"
+                    size={20}
+                    color={Colors[colorScheme ?? 'light'].primary}
+                  />
+                </TouchableOpacity>
+                {showDatePicker === 'due' && (
+                  <>
+                    {Platform.OS === 'ios' && (
+                      <View style={styles.iosPickerContainer}>
+                        <View style={styles.iosPickerButtons}>
+                          <TouchableOpacity
+                            onPress={() => setShowDatePicker(null)}
+                            style={styles.iosPickerButton}
+                          >
+                            <Text style={styles.iosPickerButtonText}>Cancel</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={() => setShowDatePicker(null)}
+                            style={styles.iosPickerButton}
+                          >
+                            <Text style={[styles.iosPickerButtonText, styles.iosPickerButtonConfirm]}>Done</Text>
+                          </TouchableOpacity>
+                        </View>
+                        <DateTimePicker
+                          value={dueDate || (selectedMonth ? getDateInSelectedMonth(selectedMonth, 15) : new Date())}
+                          mode="date"
+                          display="spinner"
+                          onChange={(event, date) => handleDateChange(event, date, 'due')}
+                          textColor={Colors[colorScheme ?? 'light'].text}
+                        />
+                      </View>
+                    )}
+                    {Platform.OS === 'android' && (
+                      <DateTimePicker
+                        value={dueDate || (selectedMonth ? getDateInSelectedMonth(selectedMonth, 15) : new Date())}
+                        mode="date"
+                        display="default"
+                        onChange={(event, date) => {
+                          handleDateChange(event, date, 'due');
+                          setShowDatePicker(null);
+                        }}
+                      />
+                    )}
+                  </>
+                )}
+              </View>
+
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Consumption (cubic meters)</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="0.00"
+                  placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
+                  value={consumption}
+                  onChangeText={setConsumption}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Total Amount (PHP)</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="0.00"
+                  placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
+                  value={totalAmount}
+                  onChangeText={setTotalAmount}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+            </ScrollView>
+            <View style={styles.formButtons}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={handleCancelForm}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <View style={styles.formButtonSpacing} />
+              <TouchableOpacity
+                style={styles.submitButton}
+                onPress={handleSubmitBill}
+              >
+                <Text style={styles.submitButtonText}>Submit</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
