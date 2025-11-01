@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-export default function DashboardScreen() {
+export default function UsersScreen() {
   const colorScheme = useColorScheme();
 
   const styles = StyleSheet.create({
@@ -39,14 +39,15 @@ export default function DashboardScreen() {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         <Ionicons 
-          name="home" 
+          name="people" 
           size={80} 
           color={Colors[colorScheme ?? 'light'].primary}
           style={styles.icon}
         />
-        <Text style={styles.title}>Dashboard</Text>
-        <Text style={styles.subtitle}>Welcome to your dashboard</Text>
+        <Text style={styles.title}>List of Users</Text>
+        <Text style={styles.subtitle}>Manage your users here</Text>
       </View>
     </SafeAreaView>
   );
 }
+

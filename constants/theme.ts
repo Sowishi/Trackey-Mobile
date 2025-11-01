@@ -5,8 +5,8 @@
 
 import { Platform } from 'react-native';
 
-const tintColorLight = '#DC2626'; // Red
-const tintColorDark = '#EF4444'; // Lighter red for dark mode
+const tintColorLight = '#0077b6'; // Blue
+const tintColorDark = '#0077b6'; // Blue for dark mode
 
 export const Colors = {
   light: {
@@ -15,22 +15,22 @@ export const Colors = {
     tint: tintColorLight,
     icon: '#6B7280', // Gray icons
     tabIconDefault: '#9CA3AF', // Light gray for inactive tabs
-    tabIconSelected: tintColorLight, // Red for active tabs
-    primary: '#DC2626', // Primary red
-    secondary: '#FECACA', // Light red/pink
-    accent: '#FEF2F2', // Very light red background
+    tabIconSelected: tintColorLight, // Blue for active tabs
+    primary: '#0077b6', // Primary blue
+    secondary: '#90E0EF', // Light blue
+    accent: '#E0F7FA', // Very light blue background
     border: '#E5E7EB', // Light gray borders
   },
   dark: {
     text: '#1F2937', // Dark gray text (same as light mode for consistency)
     background: '#FFFFFF', // Pure white (same as light mode)
-    tint: tintColorLight, // Use same red as light mode
+    tint: tintColorLight, // Use same blue as light mode
     icon: '#6B7280', // Gray icons (same as light mode)
     tabIconDefault: '#9CA3AF', // Light gray for inactive tabs (same as light mode)
-    tabIconSelected: tintColorLight, // Red for active tabs (same as light mode)
-    primary: '#DC2626', // Primary red (same as light mode)
-    secondary: '#FECACA', // Light red/pink (same as light mode)
-    accent: '#FEF2F2', // Very light red background (same as light mode)
+    tabIconSelected: tintColorLight, // Blue for active tabs (same as light mode)
+    primary: '#0077b6', // Primary blue (same as light mode)
+    secondary: '#90E0EF', // Light blue (same as light mode)
+    accent: '#E0F7FA', // Very light blue background (same as light mode)
     border: '#E5E7EB', // Light gray borders (same as light mode)
   },
 };

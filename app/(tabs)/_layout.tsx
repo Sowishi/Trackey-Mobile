@@ -32,69 +32,66 @@ export default function TabLayout() {
           right: 0,
         },
       }}>
-    
-         <Tabs.Screen
+      <Tabs.Screen
         name="index"
         options={{
-          title: 'Tracking',
+          title: 'Dashboard',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               size={focused ? 32 : 28} 
-              name={focused ? "map" : "map-outline"} 
+              name={focused ? "home" : "home-outline"} 
               color={color} 
             />
           ),
         }}
       />
       <Tabs.Screen
-        name="schedule"
+        name="users"
         options={{
-          title: 'Schedule',
+          title: 'Users',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               size={focused ? 32 : 28} 
-              name={focused ? "calendar" : "calendar-outline"} 
+              name={focused ? "people" : "people-outline"} 
               color={color} 
             />
           ),
         }}
       />
-     
       <Tabs.Screen
-        name="keytransfer"
+        name="qrcode"
         options={{
-          title: 'Key Transfer',
+          title: 'QR Code',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               size={focused ? 32 : 28} 
-              name={focused ? "swap-horizontal" : "swap-horizontal-outline"} 
+              name={focused ? "qr-code" : "qr-code-outline"} 
               color={color} 
             />
           ),
         }}
       />
-    
       <Tabs.Screen
-        name="logs"
+        name="payment-history"
         options={{
-          title: 'Logs',
+          title: 'Payment History',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               size={focused ? 32 : 28} 
-              name={focused ? "document-text" : "document-text-outline"} 
+              name={focused ? "receipt" : "receipt-outline"} 
               color={color} 
             />
           ),
         }}
       />
-        <Tabs.Screen
-        name="profile"
+      <Tabs.Screen
+        name="notifications"
         options={{
-          title: 'Profile',
+          title: 'Notifications',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               size={focused ? 32 : 28} 
-              name={focused ? "person" : "person-outline"} 
+              name={focused ? "notifications" : "notifications-outline"} 
               color={color} 
             />
           ),
