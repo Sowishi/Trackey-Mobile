@@ -1,5 +1,6 @@
 import { ScreenHeader } from '@/components/screen-header';
 import { Colors } from '@/constants/theme';
+import { useUser } from '@/contexts/UserContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -38,6 +39,7 @@ interface Resident {
 
 export default function UsersScreen() {
   const colorScheme = useColorScheme();
+  const { user } = useUser();
   const [residents, setResidents] = useState<Resident[]>([]);
   const [filteredResidents, setFilteredResidents] = useState<Resident[]>([]);
   const [loading, setLoading] = useState(true);
@@ -312,6 +314,7 @@ export default function UsersScreen() {
         <ScreenHeader 
         title="List of Users" 
         onUserPress={() => router.push('/(tabs)/profile')}
+        profilePicUrl={user?.profilePicUrl}
       />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].primary} />
@@ -326,6 +329,7 @@ export default function UsersScreen() {
       <ScreenHeader 
         title="List of Users" 
         onUserPress={() => router.push('/(tabs)/profile')}
+        profilePicUrl={user?.profilePicUrl}
       />
       <View style={styles.container}>
         {/* Search Bar */}

@@ -7,6 +7,7 @@ export interface User {
   password: string;
   position: string;
   rfid: string;
+  profilePicUrl?: string;
 }
 
 interface UserContextType {

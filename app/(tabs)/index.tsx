@@ -1123,6 +1123,7 @@ export default function DashboardScreen() {
         <ScreenHeader 
           title="My Bills" 
           onUserPress={() => router.push('/(tabs)/profile')}
+          profilePicUrl={user?.profilePicUrl}
         />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].primary} />
@@ -1135,7 +1136,7 @@ export default function DashboardScreen() {
   if (!isResident && loading) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <ScreenHeader title="Dashboard" />
+        <ScreenHeader title="Dashboard" profilePicUrl={user?.profilePicUrl} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].primary} />
           <Text style={styles.loadingText}>Loading dashboard...</Text>
@@ -1151,6 +1152,7 @@ export default function DashboardScreen() {
         <ScreenHeader 
           title="My Bills" 
           onUserPress={() => router.push('/(tabs)/profile')}
+          profilePicUrl={user?.profilePicUrl}
         />
         <FlatList
           data={residentBills}
@@ -1410,6 +1412,7 @@ export default function DashboardScreen() {
       <ScreenHeader 
         title="Dashboard" 
         onUserPress={() => router.push('/(tabs)/profile')}
+        profilePicUrl={user?.profilePicUrl}
       />
       <ScrollView
         style={styles.container}

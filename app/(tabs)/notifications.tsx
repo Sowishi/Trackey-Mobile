@@ -414,6 +414,7 @@ export default function NotificationsScreen() {
         <ScreenHeader
           title="Notifications"
           onUserPress={() => router.push('/(tabs)/profile')}
+          profilePicUrl={user?.profilePicUrl}
         />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].primary} />
@@ -428,6 +429,7 @@ export default function NotificationsScreen() {
       <ScreenHeader
         title="Notifications"
         onUserPress={() => router.push('/(tabs)/profile')}
+        profilePicUrl={user?.profilePicUrl}
       />
       <FlatList
         data={notifications}

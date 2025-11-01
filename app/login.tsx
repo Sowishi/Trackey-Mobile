@@ -68,7 +68,8 @@ export default function LoginScreen() {
             name: userData.fullName || userData.name || '', // Support both fullName and name
             password: userData.password || '',
             position: userData.role || userData.position || '', // Support both role and position
-            rfid: userData.meterNumber || userData.rfid || '' // Support both meterNumber and rfid
+            rfid: userData.meterNumber || userData.rfid || '', // Support both meterNumber and rfid
+            profilePicUrl: userData.profilePicUrl || '' // Include profile picture URL
           };
         }
       }

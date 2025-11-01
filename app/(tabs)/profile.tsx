@@ -246,6 +246,14 @@ export default function ProfileScreen() {
             profilePicUrl: downloadURL,
           });
 
+          // Update context user with new profile picture
+          if (contextUser) {
+            setContextUser({
+              ...contextUser,
+              profilePicUrl: downloadURL,
+            });
+          }
+
           Alert.alert('Success', 'Profile picture updated successfully!');
         } catch (error) {
           console.error('Error updating profile picture:', error);
@@ -527,7 +535,7 @@ export default function ProfileScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <ScreenHeader title="Profile" />
+        <ScreenHeader title="Profile" profilePicUrl={userProfile?.profilePicUrl} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].primary} />
           <Text style={styles.loadingText}>Loading profile...</Text>
@@ -542,11 +550,16 @@ export default function ProfileScreen() {
     role: contextUser.position,
     gender: contextUser.gender,
     meterNumber: contextUser.rfid,
+    profilePicUrl: contextUser.profilePicUrl,
+    contactNumber: undefined,
+    age: undefined,
+    status: 'active',
+    createdAt: undefined,
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScreenHeader title="Profile" />
+      <ScreenHeader title="Profile" profilePicUrl={displayUser.profilePicUrl} />
       <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
         {/* Profile Card */}
         <View style={styles.profileCard}>

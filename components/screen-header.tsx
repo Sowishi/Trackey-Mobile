@@ -6,9 +6,10 @@ import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 interface ScreenHeaderProps {
   title: string;
   onUserPress?: () => void;
+  profilePicUrl?: string;
 }
 
-export function ScreenHeader({ title, onUserPress }: ScreenHeaderProps) {
+export function ScreenHeader({ title, onUserPress, profilePicUrl }: ScreenHeaderProps) {
   const colorScheme = useColorScheme();
 
   const styles = StyleSheet.create({
@@ -41,6 +42,23 @@ export function ScreenHeader({ title, onUserPress }: ScreenHeaderProps) {
     userIcon: {
       padding: 8,
     },
+    profilePicture: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      borderWidth: 2,
+      borderColor: Colors[colorScheme ?? 'light'].primary,
+    },
+    profilePicturePlaceholder: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: Colors[colorScheme ?? 'light'].primary,
+    },
   });
 
   return (
@@ -56,11 +74,20 @@ export function ScreenHeader({ title, onUserPress }: ScreenHeaderProps) {
         style={styles.userIcon}
         onPress={onUserPress}
       >
-        <Ionicons 
-          name="person-circle-outline" 
-          size={32} 
-          color={Colors[colorScheme ?? 'light'].primary}
-        />
+        {profilePicUrl ? (
+          <Image
+            source={{ uri: profilePicUrl }}
+            style={styles.profilePicture}
+          />
+        ) : (
+          <View style={styles.profilePicturePlaceholder}>
+            <Ionicons 
+              name="person" 
+              size={24} 
+              color={Colors[colorScheme ?? 'light'].primary}
+            />
+          </View>
+        )}
       </TouchableOpacity>
     </View>
   );
