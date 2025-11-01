@@ -1,3 +1,4 @@
+import { ScreenHeader } from '@/components/screen-header';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
@@ -37,6 +38,7 @@ export default function UsersScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <ScreenHeader title="List of Users" />
       <View style={styles.container}>
         <Ionicons 
           name="people" 
