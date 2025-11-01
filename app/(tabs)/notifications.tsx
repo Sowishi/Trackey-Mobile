@@ -185,7 +185,7 @@ export default function NotificationsScreen() {
         >
           <Ionicons
             name={getNotificationIcon(item.type) as any}
-            size={24}
+            size={20}
             color={getNotificationColor(item.type)}
           />
         </View>
@@ -213,7 +213,7 @@ export default function NotificationsScreen() {
             style={styles.proofThumbnail}
           />
           <View style={styles.proofOverlay}>
-            <Ionicons name="expand-outline" size={20} color="#FFFFFF" />
+            <Ionicons name="expand-outline" size={16} color="#FFFFFF" />
             <Text style={styles.proofText}>View Payment Proof</Text>
           </View>
         </TouchableOpacity>
@@ -228,6 +228,7 @@ export default function NotificationsScreen() {
     },
     container: {
       padding: 16,
+      paddingBottom: 102,
       flexGrow: 1,
     },
     loadingContainer: {
@@ -260,76 +261,76 @@ export default function NotificationsScreen() {
     },
     notificationCard: {
       backgroundColor: Colors[colorScheme ?? 'light'].background,
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 12,
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 8,
       borderWidth: 1,
       borderColor: Colors[colorScheme ?? 'light'].border,
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.08,
+      shadowRadius: 3,
+      elevation: 2,
     },
     unreadCard: {
-      borderLeftWidth: 4,
+      borderLeftWidth: 3,
       borderLeftColor: Colors[colorScheme ?? 'light'].primary,
       backgroundColor: Colors[colorScheme ?? 'light'].accent,
     },
     notificationHeader: {
       flexDirection: 'row',
       alignItems: 'flex-start',
-      marginBottom: 12,
+      marginBottom: 8,
     },
     iconContainer: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
       justifyContent: 'center',
       alignItems: 'center',
-      marginRight: 12,
+      marginRight: 10,
     },
     notificationContent: {
       flex: 1,
     },
     notificationTitle: {
-      fontSize: 16,
+      fontSize: 15,
       fontWeight: 'bold',
       color: Colors[colorScheme ?? 'light'].text,
-      marginBottom: 4,
+      marginBottom: 2,
     },
     userName: {
-      fontSize: 13,
+      fontSize: 12,
       fontWeight: '600',
       color: Colors[colorScheme ?? 'light'].primary,
       marginBottom: 2,
     },
     notificationTime: {
-      fontSize: 12,
+      fontSize: 11,
       color: Colors[colorScheme ?? 'light'].tabIconDefault,
     },
     unreadDot: {
-      width: 10,
-      height: 10,
-      borderRadius: 5,
+      width: 8,
+      height: 8,
+      borderRadius: 4,
       backgroundColor: Colors[colorScheme ?? 'light'].primary,
-      marginTop: 4,
+      marginTop: 3,
     },
     notificationMessage: {
-      fontSize: 14,
+      fontSize: 13,
       color: Colors[colorScheme ?? 'light'].text,
-      lineHeight: 20,
-      marginTop: 8,
+      lineHeight: 18,
+      marginTop: 6,
     },
     proofContainer: {
-      marginTop: 12,
-      borderRadius: 8,
+      marginTop: 8,
+      borderRadius: 6,
       overflow: 'hidden',
       position: 'relative',
     },
     proofThumbnail: {
       width: '100%',
-      height: 150,
+      height: 120,
       resizeMode: 'cover',
     },
     proofOverlay: {
@@ -338,16 +339,16 @@ export default function NotificationsScreen() {
       left: 0,
       right: 0,
       backgroundColor: 'rgba(0, 0, 0, 0.6)',
-      padding: 8,
+      padding: 6,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
     },
     proofText: {
       color: '#FFFFFF',
-      fontSize: 12,
+      fontSize: 11,
       fontWeight: '600',
-      marginLeft: 6,
+      marginLeft: 4,
     },
     imageModal: {
       flex: 1,
@@ -397,6 +398,7 @@ export default function NotificationsScreen() {
         renderItem={renderNotificationItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={true}
         ListEmptyComponent={() => (
           <View style={styles.emptyContainer}>
             <Ionicons

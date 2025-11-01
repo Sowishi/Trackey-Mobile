@@ -12,11 +12,10 @@ import {
   Modal,
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { collection, db, getDocs, query, where } from '../../firebase';
@@ -175,7 +174,7 @@ export default function PaymentHistoryScreen() {
             style={styles.proofThumbnail}
           />
           <View style={styles.proofOverlay}>
-            <Ionicons name="expand-outline" size={24} color="#FFFFFF" />
+            <Ionicons name="expand-outline" size={18} color="#FFFFFF" />
             <Text style={styles.proofText}>View Proof</Text>
           </View>
         </TouchableOpacity>
@@ -189,8 +188,9 @@ export default function PaymentHistoryScreen() {
       backgroundColor: Colors[colorScheme ?? 'light'].background,
     },
     container: {
-      flex: 1,
       padding: 16,
+      paddingBottom: 102,
+      flexGrow: 1,
     },
     loadingContainer: {
       flex: 1,
@@ -222,80 +222,80 @@ export default function PaymentHistoryScreen() {
     },
     paymentCard: {
       backgroundColor: Colors[colorScheme ?? 'light'].background,
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 16,
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 8,
       borderWidth: 1,
       borderColor: Colors[colorScheme ?? 'light'].border,
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.08,
+      shadowRadius: 3,
+      elevation: 2,
     },
     paymentHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'flex-start',
-      marginBottom: 12,
+      marginBottom: 8,
     },
     paymentInfo: {
       flex: 1,
     },
     paymentMonth: {
-      fontSize: 18,
+      fontSize: 16,
       fontWeight: 'bold',
       color: Colors[colorScheme ?? 'light'].text,
-      marginBottom: 4,
+      marginBottom: 2,
     },
     userName: {
-      fontSize: 13,
+      fontSize: 12,
       fontWeight: '600',
       color: Colors[colorScheme ?? 'light'].primary,
       marginBottom: 2,
     },
     paymentDate: {
-      fontSize: 12,
+      fontSize: 11,
       color: Colors[colorScheme ?? 'light'].tabIconDefault,
     },
     statusBadge: {
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 16,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 12,
     },
     statusText: {
-      fontSize: 12,
+      fontSize: 11,
       fontWeight: '600',
     },
     paymentDetails: {
-      marginTop: 12,
-      paddingTop: 12,
+      marginTop: 8,
+      paddingTop: 8,
       borderTopWidth: 1,
       borderTopColor: Colors[colorScheme ?? 'light'].border,
     },
     detailRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      marginBottom: 8,
+      marginBottom: 4,
     },
     detailLabel: {
-      fontSize: 14,
+      fontSize: 13,
       color: Colors[colorScheme ?? 'light'].tabIconDefault,
     },
     detailValue: {
-      fontSize: 14,
+      fontSize: 13,
       fontWeight: '600',
       color: Colors[colorScheme ?? 'light'].text,
     },
     proofContainer: {
-      marginTop: 12,
-      borderRadius: 8,
+      marginTop: 8,
+      borderRadius: 6,
       overflow: 'hidden',
       position: 'relative',
     },
     proofThumbnail: {
       width: '100%',
-      height: 200,
+      height: 120,
       resizeMode: 'cover',
     },
     proofOverlay: {
@@ -304,16 +304,16 @@ export default function PaymentHistoryScreen() {
       left: 0,
       right: 0,
       backgroundColor: 'rgba(0, 0, 0, 0.6)',
-      padding: 12,
+      padding: 8,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
     },
     proofText: {
       color: '#FFFFFF',
-      fontSize: 14,
+      fontSize: 12,
       fontWeight: '600',
-      marginLeft: 8,
+      marginLeft: 6,
     },
     imageModal: {
       flex: 1,
@@ -363,6 +363,7 @@ export default function PaymentHistoryScreen() {
         renderItem={renderPaymentItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={true}
         ListEmptyComponent={() => (
           <View style={styles.emptyContainer}>
             <Ionicons
