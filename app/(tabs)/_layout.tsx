@@ -4,12 +4,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { Colors } from '@/constants/theme';
+import { useUser } from '@/contexts/UserContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const insets = useSafeAreaInsets();
+  const { user } = useUser();
+
+  // Check if user is a resident
+  const isResident = user?.position?.toLowerCase() === 'resident' || user?.position?.toLowerCase() === 'residents';
 
   return (
     <Tabs
@@ -56,6 +61,7 @@ export default function TabLayout() {
               color={color} 
             />
           ),
+          href: isResident ? null : undefined, // Hide from navigation if resident
         }}
       />
       <Tabs.Screen
@@ -69,6 +75,7 @@ export default function TabLayout() {
               color={color} 
             />
           ),
+          href: isResident ? null : undefined, // Hide from navigation if resident
         }}
       />
       <Tabs.Screen

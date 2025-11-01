@@ -7,15 +7,19 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
+  FlatList,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { BarChart, PieChart } from 'react-native-chart-kit';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { collection, db, getDocs, query, where } from '../../firebase';
+import { addDoc, collection, db, doc, getDocs, query, updateDoc, where } from '../../firebase';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -25,6 +29,18 @@ interface DashboardStats {
   unpaidResidents: number;
   totalWaterConsumption: number; // in cubic meters
   totalWaterRate: number; // in pesos
+}
+
+interface Bill {
+  id: string;
+  month: string;
+  coverageDateFrom: string;
+  coverageDateTo: string;
+  dueDate: string;
+  consumption: number;
+  totalAmount: number;
+  status: string;
+  createdAt: string;
 }
 
 export default function DashboardScreen() {
@@ -38,8 +54,74 @@ export default function DashboardScreen() {
     totalWaterRate: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [residentBills, setResidentBills] = useState<Bill[]>([]);
+  const [loadingBills, setLoadingBills] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   
   const WATER_RATE_PER_CUBIC_METER = 20; // 20 pesos per cubic meter
+
+  // Check if user is resident
+  const isResident = user?.position?.toLowerCase() === 'resident' || user?.position?.toLowerCase() === 'residents';
+
+  // Fetch user ID from users collection
+  const fetchUserId = async () => {
+    if (!user?.email) return;
+    try {
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('email', '==', user.email));
+      const querySnapshot = await getDocs(q);
+      if (!querySnapshot.empty) {
+        const userDoc = querySnapshot.docs[0];
+        setUserId(userDoc.id);
+        return userDoc.id;
+      }
+    } catch (error) {
+      console.error('Error fetching user ID:', error);
+    }
+    return null;
+  };
+
+  // Fetch resident bills
+  const fetchResidentBills = async () => {
+    if (!user?.email) return;
+    
+    setLoadingBills(true);
+    try {
+      const currentUserId = userId || await fetchUserId();
+      if (!currentUserId) {
+        setLoadingBills(false);
+        return;
+      }
+
+      const billingRef = collection(db, 'billing');
+      const q = query(billingRef, where('userId', '==', currentUserId));
+      const querySnapshot = await getDocs(q);
+
+      const bills: Bill[] = [];
+      querySnapshot.forEach((doc) => {
+        bills.push({
+          id: doc.id,
+          ...doc.data(),
+        } as Bill);
+      });
+
+      // Sort by month and creation date (newest first)
+      const months = ['January', 'February', 'March', 'April', 'May', 'June', 
+                      'July', 'August', 'September', 'October', 'November', 'December'];
+      bills.sort((a, b) => {
+        const monthOrder = months.indexOf(a.month) - months.indexOf(b.month);
+        if (monthOrder !== 0) return monthOrder;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+
+      setResidentBills(bills);
+    } catch (error) {
+      console.error('Error fetching resident bills:', error);
+    } finally {
+      setLoadingBills(false);
+    }
+  };
 
   const fetchDashboardStats = async () => {
     try {
@@ -90,8 +172,141 @@ export default function DashboardScreen() {
   };
 
   useEffect(() => {
-    fetchDashboardStats();
-  }, []);
+    if (isResident) {
+      fetchUserId().then(() => {
+        fetchResidentBills();
+      });
+    } else {
+      fetchDashboardStats();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (isResident && userId) {
+      fetchResidentBills();
+    }
+  }, [userId]);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    if (isResident) {
+      fetchResidentBills().finally(() => setRefreshing(false));
+    } else {
+      fetchDashboardStats().finally(() => setRefreshing(false));
+    }
+  };
+
+  const handleViewReceipt = (bill: Bill) => {
+    router.push({
+      pathname: '/(tabs)/receipt',
+      params: {
+        billData: JSON.stringify({
+          ...bill,
+          userId: userId || '',
+          userEmail: user?.email || '',
+          userName: user?.name || '',
+          waterRatePerCubicMeter: WATER_RATE_PER_CUBIC_METER,
+        }),
+      },
+    });
+  };
+
+  const handlePayBill = async (bill: Bill) => {
+    Alert.alert(
+      'Confirm Payment',
+      `Are you sure you want to mark the bill for ${bill.month} (₱${bill.totalAmount.toFixed(2)}) as paid?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Pay',
+          onPress: async () => {
+            try {
+              const billRef = doc(db, 'billing', bill.id);
+              await updateDoc(billRef, {
+                status: 'paid',
+                updatedAt: new Date().toISOString(),
+              });
+
+              // Also update user payment status if all bills are paid
+              await fetchResidentBills();
+              
+              Alert.alert('Success', 'Bill marked as paid successfully!');
+            } catch (error) {
+              console.error('Error updating bill:', error);
+              Alert.alert('Error', 'Failed to update bill status. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  const renderBillCard = ({ item }: { item: Bill }) => {
+    return (
+      <View style={styles.billCard}>
+        <View style={styles.billHeader}>
+          <View style={styles.billInfo}>
+            <Text style={styles.billMonth}>{item.month}</Text>
+            <Text style={styles.billDate}>
+              Due: {formatDate(item.dueDate)}
+            </Text>
+          </View>
+          <View style={[
+            styles.billStatusBadge,
+            item.status === 'paid' ? styles.billStatusPaid : styles.billStatusUnpaid
+          ]}>
+            <Text style={styles.billStatusText}>
+              {item.status === 'paid' ? 'Paid' : 'Unpaid'}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.billDetails}>
+          <View style={styles.billDetailRow}>
+            <Text style={styles.billDetailLabel}>Consumption:</Text>
+            <Text style={styles.billDetailValue}>{item.consumption} m³</Text>
+          </View>
+          <View style={styles.billDetailRow}>
+            <Text style={styles.billDetailLabel}>Amount:</Text>
+            <Text style={styles.billAmount}>₱{item.totalAmount.toFixed(2)}</Text>
+          </View>
+        </View>
+        <View style={styles.billActions}>
+          <TouchableOpacity
+            style={styles.receiptButton}
+            onPress={() => handleViewReceipt(item)}
+          >
+            <Ionicons name="receipt" size={18} color={Colors[colorScheme ?? 'light'].primary} />
+            <Text style={styles.receiptButtonText}>View Receipt</Text>
+          </TouchableOpacity>
+          {item.status === 'unpaid' && (
+            <>
+              <View style={styles.billActionSpacing} />
+              <TouchableOpacity
+                style={styles.payButton}
+                onPress={() => handlePayBill(item)}
+              >
+                <Ionicons name="card" size={18} color="#FFFFFF" />
+                <Text style={styles.payButtonText}>Pay Now</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </View>
+    );
+  };
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -101,6 +316,14 @@ export default function DashboardScreen() {
   };
 
   const userName = user?.name || 'User';
+
+  // Calculate resident stats
+  const totalBills = residentBills.length;
+  const paidBills = residentBills.filter(bill => bill.status === 'paid').length;
+  const unpaidBills = residentBills.filter(bill => bill.status === 'unpaid').length;
+  const totalAmountDue = residentBills
+    .filter(bill => bill.status === 'unpaid')
+    .reduce((sum, bill) => sum + bill.totalAmount, 0);
 
   const styles = StyleSheet.create({
     safeArea: {
@@ -241,9 +464,223 @@ export default function DashboardScreen() {
       marginBottom: 12,
       textAlign: 'center',
     },
+    // Resident Dashboard Styles
+    residentContent: {
+      padding: 20,
+      paddingBottom: 100,
+    },
+    residentHeader: {
+      marginBottom: 20,
+    },
+    residentStats: {
+      flexDirection: 'row',
+      marginBottom: 20,
+    },
+    residentStatCardSpacing: {
+      width: 12,
+    },
+    residentStatCard: {
+      flex: 1,
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      borderRadius: 12,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+      alignItems: 'center',
+    },
+    residentStatHeader: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    residentStatLabel: {
+      fontSize: 12,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+      marginBottom: 4,
+    },
+    residentStatValue: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: Colors[colorScheme ?? 'light'].primary,
+    },
+    amountDueCard: {
+      backgroundColor: '#FEE2E2',
+      borderRadius: 12,
+      padding: 20,
+      marginBottom: 20,
+      borderWidth: 2,
+      borderColor: Colors[colorScheme ?? 'light'].primary,
+    },
+    amountDueLabel: {
+      fontSize: 14,
+      color: Colors[colorScheme ?? 'light'].text,
+      marginBottom: 8,
+      fontWeight: '600',
+    },
+    amountDueValue: {
+      fontSize: 28,
+      fontWeight: 'bold',
+      color: Colors[colorScheme ?? 'light'].primary,
+    },
+    billsTitle: {
+      fontSize: 20,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+      marginTop: 8,
+      marginBottom: 16,
+    },
+    billCard: {
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    billHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: 12,
+    },
+    billInfo: {
+      flex: 1,
+    },
+    billMonth: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: Colors[colorScheme ?? 'light'].text,
+      marginBottom: 4,
+    },
+    billDate: {
+      fontSize: 14,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+    },
+    billStatusBadge: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 12,
+    },
+    billStatusPaid: {
+      backgroundColor: '#D1FAE5',
+    },
+    billStatusUnpaid: {
+      backgroundColor: '#FEE2E2',
+    },
+    billStatusText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+    },
+    billDetails: {
+      marginBottom: 16,
+    },
+    billDetailRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 8,
+    },
+    billDetailLabel: {
+      fontSize: 14,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+    },
+    billDetailValue: {
+      fontSize: 14,
+      color: Colors[colorScheme ?? 'light'].text,
+      fontWeight: '600',
+    },
+    billAmount: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: Colors[colorScheme ?? 'light'].primary,
+    },
+    billActions: {
+      flexDirection: 'row',
+      marginTop: 12,
+    },
+    billActionSpacing: {
+      width: 12,
+    },
+    receiptButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].primary,
+      borderRadius: 8,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+    },
+    receiptButtonText: {
+      marginLeft: 8,
+      color: Colors[colorScheme ?? 'light'].primary,
+      fontWeight: '600',
+      fontSize: 14,
+    },
+    payButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: Colors[colorScheme ?? 'light'].primary,
+      borderRadius: 8,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+    },
+    payButtonText: {
+      marginLeft: 8,
+      color: '#FFFFFF',
+      fontWeight: '600',
+      fontSize: 14,
+    },
+    emptyContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 40,
+      marginTop: 40,
+    },
+    emptyText: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+      marginTop: 16,
+    },
+    emptySubtext: {
+      fontSize: 14,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+      marginTop: 8,
+      textAlign: 'center',
+    },
   });
 
-  if (loading) {
+  if (isResident && loadingBills) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <ScreenHeader 
+          title="My Bills" 
+          onUserPress={() => router.push('/(tabs)/profile')}
+        />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].primary} />
+          <Text style={styles.loadingText}>Loading your bills...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!isResident && loading) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <ScreenHeader title="Dashboard" />
@@ -255,6 +692,99 @@ export default function DashboardScreen() {
     );
   }
 
+  // Resident Dashboard View
+  if (isResident) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <ScreenHeader 
+          title="My Bills" 
+          onUserPress={() => router.push('/(tabs)/profile')}
+        />
+        <FlatList
+          data={residentBills}
+          renderItem={renderBillCard}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.residentContent}
+          ListHeaderComponent={() => (
+            <View style={styles.residentHeader}>
+              <View style={styles.greetingContainer}>
+                <Text style={styles.greetingText}>{getGreeting()}</Text>
+                <Text style={styles.greetingName}>{userName}</Text>
+              </View>
+
+              {/* Resident Stats */}
+              <View style={styles.residentStats}>
+                <View style={styles.residentStatCard}>
+                  <View style={styles.residentStatHeader}>
+                    <Ionicons
+                      name="document-text"
+                      size={20}
+                      color={Colors[colorScheme ?? 'light'].primary}
+                    />
+                  </View>
+                  <Text style={styles.residentStatLabel}>Total Bills</Text>
+                  <Text style={styles.residentStatValue}>{totalBills}</Text>
+                </View>
+                <View style={styles.residentStatCardSpacing} />
+                <View style={styles.residentStatCard}>
+                  <View style={[styles.residentStatHeader, { backgroundColor: '#D1FAE5' }]}>
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={20}
+                      color={Colors[colorScheme ?? 'light'].primary}
+                    />
+                  </View>
+                  <Text style={styles.residentStatLabel}>Paid</Text>
+                  <Text style={styles.residentStatValue}>{paidBills}</Text>
+                </View>
+                <View style={styles.residentStatCardSpacing} />
+                <View style={styles.residentStatCard}>
+                  <View style={[styles.residentStatHeader, { backgroundColor: '#FEE2E2' }]}>
+                    <Ionicons
+                      name="alert-circle"
+                      size={20}
+                      color={Colors[colorScheme ?? 'light'].primary}
+                    />
+                  </View>
+                  <Text style={styles.residentStatLabel}>Unpaid</Text>
+                  <Text style={styles.residentStatValue}>{unpaidBills}</Text>
+                </View>
+              </View>
+
+              {totalAmountDue > 0 && (
+                <View style={styles.amountDueCard}>
+                  <Text style={styles.amountDueLabel}>Total Amount Due</Text>
+                  <Text style={styles.amountDueValue}>₱{totalAmountDue.toFixed(2)}</Text>
+                </View>
+              )}
+
+              <Text style={styles.billsTitle}>My Bills</Text>
+            </View>
+          )}
+          ListEmptyComponent={() => (
+            <View style={styles.emptyContainer}>
+              <Ionicons
+                name="document-text-outline"
+                size={80}
+                color={Colors[colorScheme ?? 'light'].icon}
+              />
+              <Text style={styles.emptyText}>No bills found</Text>
+              <Text style={styles.emptySubtext}>Your billing records will appear here</Text>
+            </View>
+          )}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={[Colors[colorScheme ?? 'light'].primary]}
+            />
+          }
+        />
+      </SafeAreaView>
+    );
+  }
+
+  // Admin Dashboard View
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScreenHeader 

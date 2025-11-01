@@ -1089,32 +1089,7 @@ export default function UserDetailScreen() {
               </View>
             </View>
 
-            {userDetail.paymentStatus && (
-              <View style={styles.infoItem}>
-                <View style={styles.infoIcon}>
-                  <Ionicons
-                    name="card"
-                    size={20}
-                    color={Colors[colorScheme ?? 'light'].primary}
-                  />
-                </View>
-                <View style={styles.infoContent}>
-                  <Text style={styles.infoLabel}>Payment Status</Text>
-                  <View
-                    style={[
-                      styles.paymentStatusBadge,
-                      userDetail.paymentStatus === 'paid'
-                        ? styles.paymentPaid
-                        : styles.paymentUnpaid,
-                    ]}
-                  >
-                    <Text style={styles.paymentText}>
-                      {userDetail.paymentStatus === 'paid' ? 'Paid' : 'Unpaid'}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            )}
+           
 
             {userDetail.createdAt && (
               <View style={styles.infoItem}>
