@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const screenWidth = Dimensions.get('window').width;
@@ -19,6 +19,7 @@ export default function QRCodeScreen() {
   const [scanned, setScanned] = useState(false);
   const [scannedData, setScannedData] = useState<string | null>(null);
   const [isCameraActive, setIsCameraActive] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (!permission?.granted) {
@@ -31,25 +32,18 @@ export default function QRCodeScreen() {
       setScanned(true);
       setScannedData(data);
       setIsCameraActive(false);
-      
-      Alert.alert(
-        'QR Code Scanned',
-        `Type: ${type}\nData: ${data}`,
-        [
-          {
-            text: 'Scan Again',
-            onPress: () => {
-              setScanned(false);
-              setScannedData(null);
-              setIsCameraActive(true);
-            },
+      setIsLoading(true);
+
+      // Navigate after 3 seconds
+      setTimeout(() => {
+        setIsLoading(false);
+        router.push({
+          pathname: '/(tabs)/user-detail',
+          params: {
+            userId: data,
           },
-          {
-            text: 'OK',
-            style: 'default',
-          },
-        ]
-      );
+        });
+      }, 3000);
     }
   };
 
@@ -57,6 +51,7 @@ export default function QRCodeScreen() {
     setScanned(false);
     setScannedData(null);
     setIsCameraActive(true);
+    setIsLoading(false);
   };
 
   const styles = StyleSheet.create({
@@ -75,6 +70,7 @@ export default function QRCodeScreen() {
       width: '100%',
       backgroundColor: '#000',
       position: 'relative',
+      paddingBottom: 80,
     },
     camera: {
       flex: 1,
@@ -286,6 +282,40 @@ export default function QRCodeScreen() {
       color: '#FFFFFF',
       lineHeight: 20,
     },
+    loadingOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 1000,
+    },
+    loadingContainer: {
+      alignItems: 'center',
+      backgroundColor: 'rgba(0, 119, 182, 0.2)',
+      padding: 40,
+      borderRadius: 20,
+      borderWidth: 2,
+      borderColor: Colors[colorScheme ?? 'light'].primary,
+    },
+    loadingSpinner: {
+      marginBottom: 20,
+    },
+    loadingText: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: '#FFFFFF',
+      marginBottom: 8,
+    },
+    loadingSubtext: {
+      fontSize: 14,
+      color: '#FFFFFF',
+      opacity: 0.8,
+      textAlign: 'center',
+    },
   });
 
   // Check if permission is not granted
@@ -379,7 +409,7 @@ export default function QRCodeScreen() {
         )}
 
         {/* Scan again button */}
-        {scanned && (
+        {scanned && !isLoading && (
           <View style={styles.bottomControls}>
             <TouchableOpacity 
               style={styles.scanAgainButton}
@@ -388,6 +418,21 @@ export default function QRCodeScreen() {
               <Ionicons name="scan" size={24} color="#FFFFFF" />
               <Text style={styles.scanAgainText}>Scan Again</Text>
             </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Loading overlay */}
+        {isLoading && (
+          <View style={styles.loadingOverlay}>
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator 
+                size="large" 
+                color={Colors[colorScheme ?? 'light'].primary} 
+                style={styles.loadingSpinner}
+              />
+              <Text style={styles.loadingText}>Loading User Details</Text>
+              <Text style={styles.loadingSubtext}>Please wait...</Text>
+            </View>
           </View>
         )}
       </View>

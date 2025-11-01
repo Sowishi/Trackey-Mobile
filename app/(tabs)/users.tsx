@@ -107,6 +107,7 @@ export default function UsersScreen() {
   };
 
   const handleUserPress = (resident: Resident) => {
+    console.log(resident.id);
     router.push({
       pathname: '/(tabs)/user-detail',
       params: {
