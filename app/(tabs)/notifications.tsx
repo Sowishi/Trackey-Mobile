@@ -23,17 +23,19 @@ import { collection, db, getDocs, query, where } from '../../firebase';
 
 interface Notification {
   id: string;
-  userId: string;
-  userEmail: string;
-  userName: string;
+  userId?: string;
+  userEmail?: string;
+  userName?: string;
   type: string;
   title: string;
   message: string;
+  body?: string; // For announcements
   paymentId?: string;
   billId?: string;
   paymentProof?: string;
   status: 'read' | 'unread';
   createdAt: string;
+  isAnnouncement?: boolean; // Flag to identify announcements
 }
 
 export default function NotificationsScreen() {
@@ -55,9 +57,11 @@ export default function NotificationsScreen() {
     }
 
     try {
+      const allNotifications: Notification[] = [];
+
+      // Fetch user-specific notifications or all notifications for collectors
       let notificationsQuery;
       
-      // If collector/admin, fetch all notifications; otherwise, fetch only user's notifications
       if (isCollector) {
         notificationsQuery = query(collection(db, 'notifications'));
       } else {
@@ -67,12 +71,10 @@ export default function NotificationsScreen() {
         );
       }
       
-      const querySnapshot = await getDocs(notificationsQuery);
-
-      const notificationsData: Notification[] = [];
-      querySnapshot.forEach((doc) => {
+      const notificationsSnapshot = await getDocs(notificationsQuery);
+      notificationsSnapshot.forEach((doc) => {
         const data = doc.data();
-        notificationsData.push({
+        allNotifications.push({
           id: doc.id,
           userId: data.userId || '',
           userEmail: data.userEmail || '',
@@ -85,16 +87,35 @@ export default function NotificationsScreen() {
           paymentProof: data.paymentProof,
           status: data.status || 'unread',
           createdAt: data.createdAt || new Date().toISOString(),
+          isAnnouncement: false,
+        } as Notification);
+      });
+
+      // Fetch announcements (visible to all users)
+      const announcementsQuery = query(collection(db, 'announcements'));
+      const announcementsSnapshot = await getDocs(announcementsQuery);
+      
+      announcementsSnapshot.forEach((doc) => {
+        const data = doc.data();
+        allNotifications.push({
+          id: doc.id,
+          type: 'announcement',
+          title: data.title || 'Announcement',
+          message: data.body || data.message || '',
+          body: data.body,
+          status: 'unread', // Announcements are always shown as new
+          createdAt: data.createdAt || new Date().toISOString(),
+          isAnnouncement: true,
         } as Notification);
       });
 
       // Sort by date (newest first)
-      notificationsData.sort(
+      allNotifications.sort(
         (a, b) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
 
-      setNotifications(notificationsData);
+      setNotifications(allNotifications);
     } catch (error) {
       console.error('Error fetching notifications:', error);
       Alert.alert('Error', 'Failed to load notifications. Please try again.');
@@ -149,6 +170,8 @@ export default function NotificationsScreen() {
         return 'close-circle';
       case 'bill_created':
         return 'document-text';
+      case 'announcement':
+        return 'megaphone';
       default:
         return 'notifications';
     }
@@ -164,6 +187,8 @@ export default function NotificationsScreen() {
         return '#DC2626';
       case 'bill_created':
         return '#3B82F6';
+      case 'announcement':
+        return '#F59E0B'; // Orange color for announcements
       default:
         return Colors[colorScheme ?? 'light'].primary;
     }
@@ -174,6 +199,7 @@ export default function NotificationsScreen() {
       style={[
         styles.notificationCard,
         item.status === 'unread' && styles.unreadCard,
+        item.isAnnouncement && styles.announcementCard,
       ]}
     >
       <View style={styles.notificationHeader}>
@@ -190,18 +216,23 @@ export default function NotificationsScreen() {
           />
         </View>
         <View style={styles.notificationContent}>
-          <Text style={styles.notificationTitle}>{item.title}</Text>
-          {isCollector && item.userName && (
+          <Text style={styles.notificationTitle}>
+            {item.isAnnouncement && '📢 '}
+            {item.title}
+          </Text>
+          {isCollector && item.userName && !item.isAnnouncement && (
             <Text style={styles.userName}>{item.userName}</Text>
           )}
           <Text style={styles.notificationTime}>{formatDate(item.createdAt)}</Text>
         </View>
-        {item.status === 'unread' && (
+        {item.status === 'unread' && !item.isAnnouncement && (
           <View style={styles.unreadDot} />
         )}
       </View>
 
-      <Text style={styles.notificationMessage}>{item.message}</Text>
+      <Text style={styles.notificationMessage}>
+        {item.body || item.message}
+      </Text>
 
       {item.paymentProof && (
         <TouchableOpacity
@@ -276,6 +307,11 @@ export default function NotificationsScreen() {
       borderLeftWidth: 3,
       borderLeftColor: Colors[colorScheme ?? 'light'].primary,
       backgroundColor: Colors[colorScheme ?? 'light'].accent,
+    },
+    announcementCard: {
+      borderLeftWidth: 3,
+      borderLeftColor: '#F59E0B',
+      backgroundColor: '#FEF3C7',
     },
     notificationHeader: {
       flexDirection: 'row',
