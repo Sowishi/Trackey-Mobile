@@ -7,6 +7,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   Image,
   Modal,
   Platform,
@@ -55,6 +56,9 @@ export default function UserDetailScreen() {
   const [totalAmount, setTotalAmount] = useState('');
   const [showDatePicker, setShowDatePicker] = useState<'from' | 'to' | 'due' | null>(null);
   const [submittingBill, setSubmittingBill] = useState(false);
+  const [billingModalVisible, setBillingModalVisible] = useState(false);
+  const [billingData, setBillingData] = useState<any[]>([]);
+  const [loadingBilling, setLoadingBilling] = useState(false);
 
   const WATER_RATE_PER_CUBIC_METER = 20; // 20 pesos per cubic meter
 
@@ -282,6 +286,106 @@ export default function UserDetailScreen() {
     setShowDatePicker(null);
   };
 
+  const fetchUserBilling = async () => {
+    if (!userDetail) return;
+
+    setLoadingBilling(true);
+    try {
+      const billingRef = collection(db, 'billing');
+      const q = query(billingRef, where('userId', '==', userDetail.id));
+      const querySnapshot = await getDocs(q);
+
+      const bills: any[] = [];
+      querySnapshot.forEach((doc) => {
+        bills.push({
+          id: doc.id,
+          ...doc.data(),
+        });
+      });
+
+      // Sort by month and then by createdAt (newest first)
+      bills.sort((a, b) => {
+        const monthOrder = months.indexOf(a.month) - months.indexOf(b.month);
+        if (monthOrder !== 0) return monthOrder;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+
+      setBillingData(bills);
+    } catch (error) {
+      console.error('Error fetching billing:', error);
+      alert('Failed to fetch billing data');
+    } finally {
+      setLoadingBilling(false);
+    }
+  };
+
+  const handleViewBilling = () => {
+    setBillingModalVisible(true);
+    fetchUserBilling();
+  };
+
+  const formatDateForBill = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  const groupBillsByMonth = (bills: any[]) => {
+    const grouped: { [key: string]: any[] } = {};
+    bills.forEach((bill) => {
+      const month = bill.month || 'Unknown';
+      if (!grouped[month]) {
+        grouped[month] = [];
+      }
+      grouped[month].push(bill);
+    });
+    return grouped;
+  };
+
+  const renderBillItem = ({ item }: { item: any }) => {
+    return (
+      <View style={styles.billCard}>
+        <View style={styles.billHeader}>
+          <View style={styles.billInfo}>
+            <Text style={styles.billMonth}>{item.month}</Text>
+            <Text style={styles.billDate}>
+              {formatDateForBill(item.coverageDateFrom)} - {formatDateForBill(item.coverageDateTo)}
+            </Text>
+          </View>
+          <View style={[
+            styles.billStatusBadge,
+            item.status === 'paid' ? styles.billStatusPaid : styles.billStatusUnpaid
+          ]}>
+            <Text style={styles.billStatusText}>
+              {item.status === 'paid' ? 'Paid' : 'Unpaid'}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.billDetails}>
+          <View style={styles.billDetailRow}>
+            <Text style={styles.billDetailLabel}>Consumption:</Text>
+            <Text style={styles.billDetailValue}>{item.consumption} m³</Text>
+          </View>
+          <View style={styles.billDetailRow}>
+            <Text style={styles.billDetailLabel}>Due Date:</Text>
+            <Text style={styles.billDetailValue}>{formatDateForBill(item.dueDate)}</Text>
+          </View>
+          <View style={styles.billDetailRow}>
+            <Text style={styles.billDetailLabel}>Total Amount:</Text>
+            <Text style={styles.billDetailAmount}>₱{item.totalAmount.toFixed(2)}</Text>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
   const handleDateChange = (event: any, selectedDate?: Date, field: 'from' | 'to' | 'due' = 'from') => {
     const currentDate = selectedDate || new Date();
 
@@ -462,6 +566,32 @@ export default function UserDetailScreen() {
     buttonContainer: {
       paddingHorizontal: 20,
       paddingBottom: 20,
+    },
+    buttonSpacing: {
+      height: 12,
+    },
+    actionButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 16,
+      paddingHorizontal: 24,
+      borderRadius: 12,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      elevation: 4,
+    },
+    viewBillingButton: {
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      borderWidth: 2,
+      borderColor: Colors[colorScheme ?? 'light'].primary,
+    },
+    viewBillingButtonText: {
+      color: Colors[colorScheme ?? 'light'].primary,
+      fontSize: 16,
+      fontWeight: '600',
     },
     addBillButton: {
       backgroundColor: Colors[colorScheme ?? 'light'].primary,
@@ -668,6 +798,113 @@ export default function UserDetailScreen() {
     },
     submitButtonSpinner: {
       marginRight: 8,
+    },
+    billingModalContent: {
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      maxHeight: '85%',
+      paddingBottom: 20,
+    },
+    billingList: {
+      padding: 20,
+    },
+    billCard: {
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+    },
+    billHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: 12,
+    },
+    billInfo: {
+      flex: 1,
+    },
+    billMonth: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: Colors[colorScheme ?? 'light'].text,
+      marginBottom: 4,
+    },
+    billDate: {
+      fontSize: 14,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+    },
+    billStatusBadge: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 12,
+    },
+    billStatusPaid: {
+      backgroundColor: '#D1FAE5',
+    },
+    billStatusUnpaid: {
+      backgroundColor: '#FEE2E2',
+    },
+    billStatusText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+    },
+    billDetails: {
+      marginTop: 8,
+    },
+    billDetailRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    billDetailLabel: {
+      fontSize: 14,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+      fontWeight: '500',
+    },
+    billDetailValue: {
+      fontSize: 14,
+      color: Colors[colorScheme ?? 'light'].text,
+      fontWeight: '600',
+    },
+    billDetailAmount: {
+      fontSize: 16,
+      color: Colors[colorScheme ?? 'light'].primary,
+      fontWeight: 'bold',
+    },
+    billingLoadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 40,
+    },
+    billingLoadingText: {
+      marginTop: 16,
+      fontSize: 16,
+      color: Colors[colorScheme ?? 'light'].text,
+      opacity: 0.6,
+    },
+    billingEmptyContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 40,
+    },
+    billingEmptyText: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+      marginTop: 16,
+    },
+    billingEmptySubtext: {
+      fontSize: 14,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+      marginTop: 8,
+      textAlign: 'center',
     },
   });
 
@@ -886,8 +1123,21 @@ export default function UserDetailScreen() {
           </View>
         </View>
 
-        {/* Add Bill Button */}
+        {/* Action Buttons */}
         <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.viewBillingButton]}
+            onPress={handleViewBilling}
+          >
+            <Ionicons
+              name="document-text"
+              size={24}
+              color={Colors[colorScheme ?? 'light'].primary}
+              style={styles.buttonIcon}
+            />
+            <Text style={styles.viewBillingButtonText}>View Billing</Text>
+          </TouchableOpacity>
+          <View style={styles.buttonSpacing} />
           <TouchableOpacity
             style={styles.addBillButton}
             onPress={() => setModalVisible(true)}
@@ -1205,6 +1455,59 @@ export default function UserDetailScreen() {
                 )}
               </TouchableOpacity>
             </View>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Billing History Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={billingModalVisible}
+        onRequestClose={() => setBillingModalVisible(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setBillingModalVisible(false)}
+        >
+          <View style={styles.billingModalContent} onStartShouldSetResponder={() => true}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Billing History</Text>
+              <TouchableOpacity
+                onPress={() => setBillingModalVisible(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons
+                  name="close"
+                  size={24}
+                  color={Colors[colorScheme ?? 'light'].text}
+                />
+              </TouchableOpacity>
+            </View>
+            {loadingBilling ? (
+              <View style={styles.billingLoadingContainer}>
+                <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].primary} />
+                <Text style={styles.billingLoadingText}>Loading billing data...</Text>
+              </View>
+            ) : billingData.length === 0 ? (
+              <View style={styles.billingEmptyContainer}>
+                <Ionicons
+                  name="document-text-outline"
+                  size={60}
+                  color={Colors[colorScheme ?? 'light'].icon}
+                />
+                <Text style={styles.billingEmptyText}>No billing records found</Text>
+                <Text style={styles.billingEmptySubtext}>This user hasn't been billed yet</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={billingData}
+                renderItem={renderBillItem}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={styles.billingList}
+                showsVerticalScrollIndicator={true}
+              />
+            )}
           </View>
         </Pressable>
       </Modal>
