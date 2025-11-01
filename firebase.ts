@@ -2,6 +2,7 @@
 import { getAnalytics } from "firebase/analytics";
 import { initializeApp } from "firebase/app";
 import { addDoc, collection, deleteDoc, doc, getDocs, getFirestore, onSnapshot, query, updateDoc, where } from "firebase/firestore";
+import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
@@ -33,5 +34,36 @@ try {
 // Initialize Firestore and get a reference to the service
 const db = getFirestore(app);
 
-export { addDoc, collection, db, deleteDoc, doc, getDocs, onSnapshot, query, updateDoc, where };
+// Initialize Firebase Storage
+const storage = getStorage(app);
+
+/**
+ * Upload an image to Firebase Storage and return the download URL
+ * @param uri - Local URI of the image
+ * @param path - Storage path (e.g., 'profile-pictures/user123.jpg')
+ * @returns Promise<string> - Download URL of the uploaded image
+ */
+export const uploadImageToStorage = async (uri: string, path: string): Promise<string> => {
+  try {
+    // Fetch the image from the local URI
+    const response = await fetch(uri);
+    const blob = await response.blob();
+
+    // Create a reference to the storage location
+    const storageRef = ref(storage, path);
+
+    // Upload the blob
+    await uploadBytes(storageRef, blob);
+
+    // Get the download URL
+    const downloadURL = await getDownloadURL(storageRef);
+
+    return downloadURL;
+  } catch (error) {
+    console.error('Error uploading image to Firebase Storage:', error);
+    throw error;
+  }
+};
+
+export { addDoc, collection, db, deleteDoc, doc, getDocs, onSnapshot, query, storage, updateDoc, where };
 

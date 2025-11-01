@@ -20,7 +20,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { collection, db, doc, getDocs, query, updateDoc, where } from '../../firebase';
+import { collection, db, doc, getDocs, query, updateDoc, uploadImageToStorage, where } from '../../firebase';
 
 interface UserProfile {
   id?: string;
@@ -229,17 +229,21 @@ export default function ProfileScreen() {
             return;
           }
 
-          // Update profile picture in Firestore
+          // Upload image to Firebase Storage
+          const fileName = `profile-pictures/${userProfile.id}_${Date.now()}.jpg`;
+          const downloadURL = await uploadImageToStorage(imageUri, fileName);
+
+          // Update profile picture in Firestore with the download URL
           const userRef = doc(db, 'users', userProfile.id);
           await updateDoc(userRef, {
-            profilePicUrl: imageUri,
+            profilePicUrl: downloadURL,
             updatedAt: new Date().toISOString(),
           });
 
           // Update local state
           setUserProfile({
             ...userProfile,
-            profilePicUrl: imageUri,
+            profilePicUrl: downloadURL,
           });
 
           Alert.alert('Success', 'Profile picture updated successfully!');

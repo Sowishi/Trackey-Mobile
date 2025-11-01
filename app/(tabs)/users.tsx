@@ -16,7 +16,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { db, collection, query, where, getDocs } from '../../firebase';
+import { collection, db, getDocs, query, where } from '../../firebase';
 
 interface Resident {
   id: string;
@@ -166,16 +166,6 @@ export default function UsersScreen() {
             <Text style={styles.detailText}>Meter: {item.meterNumber}</Text>
           </View>
         )}
-        {item.gender && (
-          <View style={styles.detailRow}>
-            <Ionicons
-              name="person-outline"
-              size={16}
-              color={Colors[colorScheme ?? 'light'].icon}
-            />
-            <Text style={styles.detailText}>{item.gender}</Text>
-          </View>
-        )}
       </View>
     </TouchableOpacity>
   );
@@ -214,9 +204,10 @@ export default function UsersScreen() {
       color: Colors[colorScheme ?? 'light'].text,
     },
     content: {
-      flex: 1,
       padding: 16,
       paddingTop: 0,
+      paddingBottom: 20,
+      flexGrow: 1,
     },
     loadingContainer: {
       flex: 1,

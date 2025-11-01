@@ -3,6 +3,7 @@ import { Colors } from '@/constants/theme';
 import { useUser } from '@/contexts/UserContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -21,10 +22,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
 import { BarChart, PieChart } from 'react-native-chart-kit';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { addDoc, collection, db, doc, getDocs, query, updateDoc, where } from '../../firebase';
+import { addDoc, collection, db, doc, getDocs, query, updateDoc, uploadImageToStorage, where } from '../../firebase';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -287,8 +287,11 @@ export default function DashboardScreen() {
     try {
       const finalPaymentMethod = paymentMethod === 'other' ? otherMethod : paymentMethod;
 
-      // Convert image to base64 for storage (or you can use Firebase Storage for production)
-      // For now, we'll store the local URI and you can implement Firebase Storage later
+      // Upload payment proof to Firebase Storage
+      const fileName = `payment-proofs/${userId}_${selectedBill.id}_${Date.now()}.jpg`;
+      const paymentProofURL = await uploadImageToStorage(paymentProof, fileName);
+
+      // Prepare payment data with the Firebase Storage URL
       const paymentData = {
         userId: userId || '',
         userEmail: user?.email || '',
@@ -297,7 +300,7 @@ export default function DashboardScreen() {
         billMonth: selectedBill.month,
         billAmount: selectedBill.totalAmount,
         paymentMethod: finalPaymentMethod,
-        paymentProof: paymentProof, // Store as URI or upload to Firebase Storage
+        paymentProof: paymentProofURL, // Use Firebase Storage download URL
         status: 'pending', // Pending admin approval
         createdAt: new Date().toISOString(),
       };
@@ -316,7 +319,7 @@ export default function DashboardScreen() {
         message: `Payment of ₱${selectedBill.totalAmount.toFixed(2)} for ${selectedBill.month} has been submitted via ${finalPaymentMethod}`,
         paymentId: paymentDocRef.id,
         billId: selectedBill.id,
-        paymentProof: paymentProof,
+        paymentProof: paymentProofURL,
         status: 'unread',
         createdAt: new Date().toISOString(),
       };
@@ -329,7 +332,7 @@ export default function DashboardScreen() {
       await updateDoc(billRef, {
         status: 'pending', // Change to pending instead of paid
         paymentMethod: finalPaymentMethod,
-        paymentProof: paymentProof,
+        paymentProof: paymentProofURL,
         updatedAt: new Date().toISOString(),
       });
 
