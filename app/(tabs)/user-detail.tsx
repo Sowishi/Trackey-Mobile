@@ -253,10 +253,13 @@ export default function UserDetailScreen() {
 
       // Save to Firestore billing collection
       const billingRef = collection(db, 'billing');
-      await addDoc(billingRef, billData);
-
-      // Show success message
-      alert('Bill created successfully!');
+      const docRef = await addDoc(billingRef, billData);
+      
+      // Add document ID to bill data for receipt
+      const receiptBillData = {
+        ...billData,
+        id: docRef.id,
+      };
 
       // Close form and reset
       setFormModalVisible(false);
@@ -267,6 +270,14 @@ export default function UserDetailScreen() {
       setConsumption('');
       setTotalAmount('');
       setShowDatePicker(null);
+
+      // Navigate to receipt screen with bill data
+      router.push({
+        pathname: '/(tabs)/receipt',
+        params: {
+          billData: JSON.stringify(receiptBillData),
+        },
+      });
     } catch (error) {
       console.error('Error saving bill:', error);
       alert('Failed to save bill. Please try again.');
