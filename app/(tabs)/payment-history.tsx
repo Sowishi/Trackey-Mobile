@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Modal,
@@ -18,7 +19,7 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { collection, db, getDocs, query, where } from '../../firebase';
+import { addDoc, collection, db, doc, getDocs, query, updateDoc, where } from '../../firebase';
 
 interface Payment {
   id: string;
@@ -41,6 +42,7 @@ export default function PaymentHistoryScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [confirmingPaymentId, setConfirmingPaymentId] = useState<string | null>(null);
 
   // Check if user is a collector/admin (not a resident)
   const isCollector = user?.position?.toLowerCase() !== 'resident' && 
@@ -96,6 +98,71 @@ export default function PaymentHistoryScreen() {
   const handleRefresh = () => {
     setRefreshing(true);
     fetchPayments();
+  };
+
+  const handleConfirmPayment = async (payment: Payment) => {
+    Alert.alert(
+      'Confirm Payment',
+      `Are you sure you want to confirm the payment of ₱${payment.billAmount.toFixed(2)} for ${payment.billMonth}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          onPress: async () => {
+            setConfirmingPaymentId(payment.id);
+            try {
+              // Update payment status to approved
+              const paymentRef = doc(db, 'payments', payment.id);
+              await updateDoc(paymentRef, {
+                status: 'approved',
+                updatedAt: new Date().toISOString(),
+              });
+
+              // Update bill status to paid
+              if (payment.billId) {
+                const billRef = doc(db, 'billing', payment.billId);
+                await updateDoc(billRef, {
+                  status: 'paid',
+                  updatedAt: new Date().toISOString(),
+                });
+              }
+
+              // Create notification for the user
+              try {
+                const notificationData = {
+                  userId: payment.userId,
+                  userEmail: payment.userEmail,
+                  userName: payment.userName,
+                  type: 'payment_approved',
+                  title: 'Payment Approved',
+                  message: `Your payment of ₱${payment.billAmount.toFixed(2)} for ${payment.billMonth} has been approved.`,
+                  paymentId: payment.id,
+                  billId: payment.billId,
+                  status: 'unread',
+                  createdAt: new Date().toISOString(),
+                };
+
+                const notificationsRef = collection(db, 'notifications');
+                await addDoc(notificationsRef, notificationData);
+              } catch (notificationError) {
+                console.error('Error creating notification:', notificationError);
+                // Don't fail the payment confirmation if notification fails
+              }
+
+              // Refresh payments list
+              await fetchPayments();
+
+              Alert.alert('Success', 'Payment confirmed successfully!');
+            } catch (error) {
+              console.error('Error confirming payment:', error);
+              Alert.alert('Error', 'Failed to confirm payment. Please try again.');
+            } finally {
+              setConfirmingPaymentId(null);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const formatDate = (dateString: string) => {
@@ -177,6 +244,24 @@ export default function PaymentHistoryScreen() {
             <Ionicons name="expand-outline" size={18} color="#FFFFFF" />
             <Text style={styles.proofText}>View Proof</Text>
           </View>
+        </TouchableOpacity>
+      )}
+
+      {/* Confirm Payment Button for Collectors */}
+      {isCollector && item.status === 'pending' && (
+        <TouchableOpacity
+          style={styles.confirmButton}
+          onPress={() => handleConfirmPayment(item)}
+          disabled={confirmingPaymentId === item.id}
+        >
+          {confirmingPaymentId === item.id ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <>
+              <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
+              <Text style={styles.confirmButtonText}>Confirm Payment</Text>
+            </>
+          )}
         </TouchableOpacity>
       )}
     </View>
@@ -314,6 +399,22 @@ export default function PaymentHistoryScreen() {
       fontSize: 12,
       fontWeight: '600',
       marginLeft: 6,
+    },
+    confirmButton: {
+      marginTop: 12,
+      backgroundColor: Colors[colorScheme ?? 'light'].primary,
+      borderRadius: 8,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    confirmButtonText: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '600',
+      marginLeft: 4,
     },
     imageModal: {
       flex: 1,
