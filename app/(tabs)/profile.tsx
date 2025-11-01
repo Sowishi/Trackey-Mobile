@@ -696,7 +696,7 @@ export default function ProfileScreen() {
                 size={20}
                 color={Colors[colorScheme ?? 'light'].primary}
               />
-              <Text style={styles.actionButtonText}>Update</Text>
+              <Text style={styles.actionButtonText}>Change Password</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -800,7 +800,7 @@ export default function ProfileScreen() {
                 ) : (
                   <>
                     <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
-                    <Text style={styles.modalSubmitText}>Change Password</Text>
+                    <Text style={styles.modalSubmitText}>Update</Text>
                   </>
                 )}
               </TouchableOpacity>
