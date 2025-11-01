@@ -43,6 +43,10 @@ export default function PaymentHistoryScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
+  // Check if user is a collector/admin (not a resident)
+  const isCollector = user?.position?.toLowerCase() !== 'resident' && 
+                     user?.position?.toLowerCase() !== 'residents';
+
   const fetchPayments = async () => {
     if (!user?.email) {
       setLoading(false);
@@ -50,10 +54,18 @@ export default function PaymentHistoryScreen() {
     }
 
     try {
-      const paymentsQuery = query(
-        collection(db, 'payments'),
-        where('userEmail', '==', user.email)
-      );
+      let paymentsQuery;
+      
+      // If collector/admin, fetch all payments; otherwise, fetch only user's payments
+      if (isCollector) {
+        paymentsQuery = query(collection(db, 'payments'));
+      } else {
+        paymentsQuery = query(
+          collection(db, 'payments'),
+          where('userEmail', '==', user.email)
+        );
+      }
+      
       const querySnapshot = await getDocs(paymentsQuery);
       
       const paymentsData: Payment[] = [];
@@ -80,7 +92,7 @@ export default function PaymentHistoryScreen() {
 
   useEffect(() => {
     fetchPayments();
-  }, [user]);
+  }, [user, isCollector]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -120,6 +132,9 @@ export default function PaymentHistoryScreen() {
       <View style={styles.paymentHeader}>
         <View style={styles.paymentInfo}>
           <Text style={styles.paymentMonth}>{item.billMonth}</Text>
+          {isCollector && item.userName && (
+            <Text style={styles.userName}>{item.userName}</Text>
+          )}
           <Text style={styles.paymentDate}>{formatDate(item.createdAt)}</Text>
         </View>
         <View
@@ -232,6 +247,12 @@ export default function PaymentHistoryScreen() {
       fontWeight: 'bold',
       color: Colors[colorScheme ?? 'light'].text,
       marginBottom: 4,
+    },
+    userName: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].primary,
+      marginBottom: 2,
     },
     paymentDate: {
       fontSize: 12,

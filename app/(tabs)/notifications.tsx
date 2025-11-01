@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Modal,
@@ -43,6 +44,10 @@ export default function NotificationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
+  // Check if user is a collector/admin (not a resident)
+  const isCollector = user?.position?.toLowerCase() !== 'resident' && 
+                     user?.position?.toLowerCase() !== 'residents';
+
   const fetchNotifications = async () => {
     if (!user?.email) {
       setLoading(false);
@@ -50,17 +55,36 @@ export default function NotificationsScreen() {
     }
 
     try {
-      const notificationsQuery = query(
-        collection(db, 'notifications'),
-        where('userEmail', '==', user.email)
-      );
+      let notificationsQuery;
+      
+      // If collector/admin, fetch all notifications; otherwise, fetch only user's notifications
+      if (isCollector) {
+        notificationsQuery = query(collection(db, 'notifications'));
+      } else {
+        notificationsQuery = query(
+          collection(db, 'notifications'),
+          where('userEmail', '==', user.email)
+        );
+      }
+      
       const querySnapshot = await getDocs(notificationsQuery);
 
       const notificationsData: Notification[] = [];
       querySnapshot.forEach((doc) => {
+        const data = doc.data();
         notificationsData.push({
           id: doc.id,
-          ...doc.data(),
+          userId: data.userId || '',
+          userEmail: data.userEmail || '',
+          userName: data.userName || '',
+          type: data.type || '',
+          title: data.title || '',
+          message: data.message || '',
+          paymentId: data.paymentId,
+          billId: data.billId,
+          paymentProof: data.paymentProof,
+          status: data.status || 'unread',
+          createdAt: data.createdAt || new Date().toISOString(),
         } as Notification);
       });
 
@@ -73,6 +97,7 @@ export default function NotificationsScreen() {
       setNotifications(notificationsData);
     } catch (error) {
       console.error('Error fetching notifications:', error);
+      Alert.alert('Error', 'Failed to load notifications. Please try again.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -81,7 +106,7 @@ export default function NotificationsScreen() {
 
   useEffect(() => {
     fetchNotifications();
-  }, [user]);
+  }, [user, isCollector]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -122,6 +147,8 @@ export default function NotificationsScreen() {
         return 'checkmark-done-circle';
       case 'payment_rejected':
         return 'close-circle';
+      case 'bill_created':
+        return 'document-text';
       default:
         return 'notifications';
     }
@@ -135,6 +162,8 @@ export default function NotificationsScreen() {
         return '#059669';
       case 'payment_rejected':
         return '#DC2626';
+      case 'bill_created':
+        return '#3B82F6';
       default:
         return Colors[colorScheme ?? 'light'].primary;
     }
@@ -162,6 +191,9 @@ export default function NotificationsScreen() {
         </View>
         <View style={styles.notificationContent}>
           <Text style={styles.notificationTitle}>{item.title}</Text>
+          {isCollector && item.userName && (
+            <Text style={styles.userName}>{item.userName}</Text>
+          )}
           <Text style={styles.notificationTime}>{formatDate(item.createdAt)}</Text>
         </View>
         {item.status === 'unread' && (
@@ -195,8 +227,8 @@ export default function NotificationsScreen() {
       backgroundColor: Colors[colorScheme ?? 'light'].background,
     },
     container: {
-      flex: 1,
       padding: 16,
+      flexGrow: 1,
     },
     loadingContainer: {
       flex: 1,
@@ -265,6 +297,12 @@ export default function NotificationsScreen() {
       fontWeight: 'bold',
       color: Colors[colorScheme ?? 'light'].text,
       marginBottom: 4,
+    },
+    userName: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].primary,
+      marginBottom: 2,
     },
     notificationTime: {
       fontSize: 12,

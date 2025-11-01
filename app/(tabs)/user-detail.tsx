@@ -261,6 +261,29 @@ export default function UserDetailScreen() {
         id: docRef.id,
       };
 
+      // Create notification for the user about the new bill
+      try {
+        const notificationData = {
+          userId: userDetail.id,
+          userEmail: userDetail.email,
+          userName: userDetail.fullName,
+          type: 'bill_created',
+          title: 'New Bill Generated',
+          message: `A new water bill for ${selectedMonth} (₱${amountValueFloat.toFixed(2)}) has been generated. Please check your dashboard.`,
+          billId: docRef.id,
+          status: 'unread',
+          createdAt: new Date().toISOString(),
+        };
+
+        const notificationsRef = collection(db, 'notifications');
+        await addDoc(notificationsRef, notificationData);
+        console.log('Notification created successfully for bill:', docRef.id);
+      } catch (notificationError) {
+        // Log error but don't fail the bill creation
+        console.error('Error creating notification:', notificationError);
+        // Bill is already saved, so we continue even if notification fails
+      }
+
       // Close form and reset
       setFormModalVisible(false);
       setSelectedMonth('');
