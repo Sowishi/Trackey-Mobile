@@ -2,11 +2,186 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Image,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { db, collection, query, where, getDocs } from '../../firebase';
+
+interface Resident {
+  id: string;
+  age?: number;
+  contactNumber?: string;
+  createdAt?: string;
+  email: string;
+  fullName: string;
+  gender?: string;
+  isArchived: boolean;
+  meterNumber?: string;
+  password?: string;
+  passwordChanged?: boolean;
+  paymentStatus?: string;
+  profilePicUrl?: string;
+  role: string;
+  status: string;
+}
+
+type PaymentFilter = 'all' | 'paid' | 'unpaid';
 
 export default function UsersScreen() {
   const colorScheme = useColorScheme();
+  const [residents, setResidents] = useState<Resident[]>([]);
+  const [filteredResidents, setFilteredResidents] = useState<Resident[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [searchText, setSearchText] = useState('');
+  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all');
+
+  const fetchResidents = async () => {
+    try {
+      const usersRef = collection(db, 'users');
+      const q = query(
+        usersRef,
+        where('role', '==', 'resident'),
+        where('isArchived', '==', false)
+      );
+
+      const querySnapshot = await getDocs(q);
+      const residentsList: Resident[] = [];
+
+      querySnapshot.forEach((doc) => {
+        residentsList.push({
+          id: doc.id,
+          ...doc.data(),
+        } as Resident);
+      });
+
+      // Sort by fullName alphabetically
+      residentsList.sort((a, b) => a.fullName.localeCompare(b.fullName));
+
+      setResidents(residentsList);
+      setFilteredResidents(residentsList);
+    } catch (error) {
+      console.error('Error fetching residents:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchResidents();
+  }, []);
+
+  // Filter residents based on search text and payment status
+  useEffect(() => {
+    let filtered = [...residents];
+
+    // Filter by payment status
+    if (paymentFilter !== 'all') {
+      filtered = filtered.filter((resident) => {
+        if (paymentFilter === 'paid') {
+          return resident.paymentStatus === 'paid';
+        } else if (paymentFilter === 'unpaid') {
+          return resident.paymentStatus !== 'paid';
+        }
+        return true;
+      });
+    }
+
+    // Filter by search text
+    if (searchText.trim()) {
+      const searchLower = searchText.toLowerCase().trim();
+      filtered = filtered.filter(
+        (resident) =>
+          resident.fullName.toLowerCase().includes(searchLower) ||
+          resident.email.toLowerCase().includes(searchLower) ||
+          resident.contactNumber?.toLowerCase().includes(searchLower) ||
+          resident.meterNumber?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    setFilteredResidents(filtered);
+  }, [residents, searchText, paymentFilter]);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchResidents();
+  };
+
+  const renderResidentCard = ({ item }: { item: Resident }) => (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        {item.profilePicUrl ? (
+          <Image
+            source={{ uri: item.profilePicUrl }}
+            style={styles.avatar}
+          />
+        ) : (
+          <View style={styles.avatarPlaceholder}>
+            <Ionicons
+              name="person"
+              size={24}
+              color={Colors[colorScheme ?? 'light'].primary}
+            />
+          </View>
+        )}
+        <View style={styles.cardInfo}>
+          <Text style={styles.fullName}>{item.fullName}</Text>
+          <Text style={styles.email}>{item.email}</Text>
+        </View>
+        <View style={[
+          styles.statusBadge,
+          item.paymentStatus === 'paid' ? styles.statusPaid : styles.statusUnpaid
+        ]}>
+          <Text style={styles.statusText}>
+            {item.paymentStatus === 'paid' ? 'Paid' : 'Unpaid'}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.cardDetails}>
+        {item.contactNumber && (
+          <View style={styles.detailRow}>
+            <Ionicons
+              name="call-outline"
+              size={16}
+              color={Colors[colorScheme ?? 'light'].icon}
+            />
+            <Text style={styles.detailText}>{item.contactNumber}</Text>
+          </View>
+        )}
+        {item.meterNumber && (
+          <View style={styles.detailRow}>
+            <Ionicons
+              name="flash-outline"
+              size={16}
+              color={Colors[colorScheme ?? 'light'].icon}
+            />
+            <Text style={styles.detailText}>Meter: {item.meterNumber}</Text>
+          </View>
+        )}
+        {item.gender && (
+          <View style={styles.detailRow}>
+            <Ionicons
+              name="person-outline"
+              size={16}
+              color={Colors[colorScheme ?? 'light'].icon}
+            />
+            <Text style={styles.detailText}>{item.gender}</Text>
+          </View>
+        )}
+      </View>
+    </View>
+  );
 
   const styles = StyleSheet.create({
     safeArea: {
@@ -15,39 +190,327 @@ export default function UsersScreen() {
     },
     container: {
       flex: 1,
+      paddingBottom: 80,
+    },
+    searchContainer: {
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      paddingBottom: 8,
+    },
+    searchBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      marginBottom: 12,
+    },
+    searchIcon: {
+      marginRight: 12,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: 16,
+      color: Colors[colorScheme ?? 'light'].text,
+    },
+    filterContainer: {
+      flexDirection: 'row',
+      gap: 8,
+      marginBottom: 8,
+    },
+    filterButton: {
+      flex: 1,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      borderWidth: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    filterButtonActive: {
+      backgroundColor: Colors[colorScheme ?? 'light'].primary,
+      borderColor: Colors[colorScheme ?? 'light'].primary,
+    },
+    filterButtonInactive: {
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+    },
+    filterButtonText: {
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    filterButtonTextActive: {
+      color: '#FFFFFF',
+    },
+    filterButtonTextInactive: {
+      color: Colors[colorScheme ?? 'light'].text,
+    },
+    content: {
+      flex: 1,
+      padding: 16,
+      paddingTop: 0,
+    },
+    loadingContainer: {
+      flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
-      padding: 20,
     },
-    icon: {
+    loadingText: {
+      marginTop: 16,
+      fontSize: 16,
+      color: Colors[colorScheme ?? 'light'].text,
+      opacity: 0.6,
+    },
+    emptyContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 40,
+    },
+    emptyIcon: {
       marginBottom: 16,
     },
-    title: {
-      fontSize: 24,
-      fontWeight: 'bold',
+    emptyText: {
+      fontSize: 18,
+      fontWeight: '600',
       color: Colors[colorScheme ?? 'light'].text,
       marginBottom: 8,
     },
-    subtitle: {
-      fontSize: 16,
+    emptySubtext: {
+      fontSize: 14,
       color: Colors[colorScheme ?? 'light'].text,
       opacity: 0.6,
       textAlign: 'center',
     },
+    card: {
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 12,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+    },
+    cardHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    avatar: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      marginRight: 12,
+    },
+    avatarPlaceholder: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+    },
+    cardInfo: {
+      flex: 1,
+    },
+    fullName: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+      marginBottom: 4,
+    },
+    email: {
+      fontSize: 14,
+      color: Colors[colorScheme ?? 'light'].text,
+      opacity: 0.6,
+    },
+    statusBadge: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 12,
+    },
+    statusPaid: {
+      backgroundColor: '#D1FAE5',
+    },
+    statusUnpaid: {
+      backgroundColor: '#FEE2E2',
+    },
+    statusText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+    },
+    cardDetails: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 16,
+    },
+    detailRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginRight: 16,
+    },
+    detailText: {
+      fontSize: 14,
+      color: Colors[colorScheme ?? 'light'].text,
+      marginLeft: 6,
+      opacity: 0.7,
+    },
   });
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <ScreenHeader title="List of Users" />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].primary} />
+          <Text style={styles.loadingText}>Loading residents...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScreenHeader title="List of Users" />
       <View style={styles.container}>
-        <Ionicons 
-          name="people" 
-          size={80} 
-          color={Colors[colorScheme ?? 'light'].primary}
-          style={styles.icon}
-        />
-        <Text style={styles.title}>List of Users</Text>
-        <Text style={styles.subtitle}>Manage your users here</Text>
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <View style={styles.searchBar}>
+            <Ionicons
+              name="search-outline"
+              size={20}
+              color={Colors[colorScheme ?? 'light'].icon}
+              style={styles.searchIcon}
+            />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search by name, email, contact, or meter..."
+              placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
+              value={searchText}
+              onChangeText={setSearchText}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {searchText.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchText('')}>
+                <Ionicons
+                  name="close-circle"
+                  size={20}
+                  color={Colors[colorScheme ?? 'light'].icon}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Filter Buttons */}
+          <View style={styles.filterContainer}>
+            <TouchableOpacity
+              style={[
+                styles.filterButton,
+                paymentFilter === 'all'
+                  ? styles.filterButtonActive
+                  : styles.filterButtonInactive,
+              ]}
+              onPress={() => setPaymentFilter('all')}
+            >
+              <Text
+                style={[
+                  styles.filterButtonText,
+                  paymentFilter === 'all'
+                    ? styles.filterButtonTextActive
+                    : styles.filterButtonTextInactive,
+                ]}
+              >
+                All
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.filterButton,
+                paymentFilter === 'paid'
+                  ? styles.filterButtonActive
+                  : styles.filterButtonInactive,
+              ]}
+              onPress={() => setPaymentFilter('paid')}
+            >
+              <Text
+                style={[
+                  styles.filterButtonText,
+                  paymentFilter === 'paid'
+                    ? styles.filterButtonTextActive
+                    : styles.filterButtonTextInactive,
+                ]}
+              >
+                Paid
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.filterButton,
+                paymentFilter === 'unpaid'
+                  ? styles.filterButtonActive
+                  : styles.filterButtonInactive,
+              ]}
+              onPress={() => setPaymentFilter('unpaid')}
+            >
+              <Text
+                style={[
+                  styles.filterButtonText,
+                  paymentFilter === 'unpaid'
+                    ? styles.filterButtonTextActive
+                    : styles.filterButtonTextInactive,
+                ]}
+              >
+                Unpaid
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Residents List */}
+        {filteredResidents.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons
+              name="people-outline"
+              size={80}
+              color={Colors[colorScheme ?? 'light'].icon}
+              style={styles.emptyIcon}
+            />
+            <Text style={styles.emptyText}>
+              {residents.length === 0
+                ? 'No residents found'
+                : 'No matching residents found'}
+            </Text>
+            <Text style={styles.emptySubtext}>
+              {residents.length === 0
+                ? 'There are no active residents in the system'
+                : 'Try adjusting your search or filter'}
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={filteredResidents}
+            renderItem={renderResidentCard}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.content}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                colors={[Colors[colorScheme ?? 'light'].primary]}
+              />
+            }
+          />
+        )}
       </View>
     </SafeAreaView>
   );
