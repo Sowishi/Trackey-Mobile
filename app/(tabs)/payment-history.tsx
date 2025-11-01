@@ -2,6 +2,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -38,7 +39,10 @@ export default function PaymentHistoryScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScreenHeader title="Payment History" />
+      <ScreenHeader 
+        title="Payment History" 
+        onUserPress={() => router.push('/(tabs)/profile')}
+      />
       <View style={styles.container}>
         <Ionicons 
           name="receipt" 

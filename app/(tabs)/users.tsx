@@ -2,6 +2,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -35,8 +36,6 @@ interface Resident {
   status: string;
 }
 
-type PaymentFilter = 'all' | 'paid' | 'unpaid';
-
 export default function UsersScreen() {
   const colorScheme = useColorScheme();
   const [residents, setResidents] = useState<Resident[]>([]);
@@ -44,7 +43,6 @@ export default function UsersScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchText, setSearchText] = useState('');
-  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all');
 
   const fetchResidents = async () => {
     try {
@@ -82,21 +80,9 @@ export default function UsersScreen() {
     fetchResidents();
   }, []);
 
-  // Filter residents based on search text and payment status
+  // Filter residents based on search text
   useEffect(() => {
     let filtered = [...residents];
-
-    // Filter by payment status
-    if (paymentFilter !== 'all') {
-      filtered = filtered.filter((resident) => {
-        if (paymentFilter === 'paid') {
-          return resident.paymentStatus === 'paid';
-        } else if (paymentFilter === 'unpaid') {
-          return resident.paymentStatus !== 'paid';
-        }
-        return true;
-      });
-    }
 
     // Filter by search text
     if (searchText.trim()) {
@@ -111,15 +97,29 @@ export default function UsersScreen() {
     }
 
     setFilteredResidents(filtered);
-  }, [residents, searchText, paymentFilter]);
+  }, [residents, searchText]);
 
   const handleRefresh = () => {
     setRefreshing(true);
     fetchResidents();
   };
 
+  const handleUserPress = (resident: Resident) => {
+    router.push({
+      pathname: '/(tabs)/user-detail',
+      params: {
+        userId: resident.id,
+        email: resident.email,
+      },
+    });
+  };
+
   const renderResidentCard = ({ item }: { item: Resident }) => (
-    <View style={styles.card}>
+    <TouchableOpacity 
+      style={styles.card}
+      onPress={() => handleUserPress(item)}
+      activeOpacity={0.7}
+    >
       <View style={styles.cardHeader}>
         {item.profilePicUrl ? (
           <Image
@@ -139,14 +139,11 @@ export default function UsersScreen() {
           <Text style={styles.fullName}>{item.fullName}</Text>
           <Text style={styles.email}>{item.email}</Text>
         </View>
-        <View style={[
-          styles.statusBadge,
-          item.paymentStatus === 'paid' ? styles.statusPaid : styles.statusUnpaid
-        ]}>
-          <Text style={styles.statusText}>
-            {item.paymentStatus === 'paid' ? 'Paid' : 'Unpaid'}
-          </Text>
-        </View>
+        <Ionicons
+          name="chevron-forward"
+          size={20}
+          color={Colors[colorScheme ?? 'light'].icon}
+        />
       </View>
       <View style={styles.cardDetails}>
         {item.contactNumber && (
@@ -180,7 +177,7 @@ export default function UsersScreen() {
           </View>
         )}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   const styles = StyleSheet.create({
@@ -214,38 +211,6 @@ export default function UsersScreen() {
     searchInput: {
       flex: 1,
       fontSize: 16,
-      color: Colors[colorScheme ?? 'light'].text,
-    },
-    filterContainer: {
-      flexDirection: 'row',
-      gap: 8,
-      marginBottom: 8,
-    },
-    filterButton: {
-      flex: 1,
-      paddingVertical: 10,
-      paddingHorizontal: 16,
-      borderRadius: 8,
-      borderWidth: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    filterButtonActive: {
-      backgroundColor: Colors[colorScheme ?? 'light'].primary,
-      borderColor: Colors[colorScheme ?? 'light'].primary,
-    },
-    filterButtonInactive: {
-      backgroundColor: Colors[colorScheme ?? 'light'].background,
-      borderColor: Colors[colorScheme ?? 'light'].border,
-    },
-    filterButtonText: {
-      fontSize: 14,
-      fontWeight: '600',
-    },
-    filterButtonTextActive: {
-      color: '#FFFFFF',
-    },
-    filterButtonTextInactive: {
       color: Colors[colorScheme ?? 'light'].text,
     },
     content: {
@@ -332,22 +297,6 @@ export default function UsersScreen() {
       color: Colors[colorScheme ?? 'light'].text,
       opacity: 0.6,
     },
-    statusBadge: {
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 12,
-    },
-    statusPaid: {
-      backgroundColor: '#D1FAE5',
-    },
-    statusUnpaid: {
-      backgroundColor: '#FEE2E2',
-    },
-    statusText: {
-      fontSize: 12,
-      fontWeight: '600',
-      color: Colors[colorScheme ?? 'light'].text,
-    },
     cardDetails: {
       flexDirection: 'row',
       flexWrap: 'wrap',
@@ -369,7 +318,10 @@ export default function UsersScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <ScreenHeader title="List of Users" />
+        <ScreenHeader 
+        title="List of Users" 
+        onUserPress={() => router.push('/(tabs)/profile')}
+      />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].primary} />
           <Text style={styles.loadingText}>Loading residents...</Text>
@@ -380,7 +332,10 @@ export default function UsersScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScreenHeader title="List of Users" />
+      <ScreenHeader 
+        title="List of Users" 
+        onUserPress={() => router.push('/(tabs)/profile')}
+      />
       <View style={styles.container}>
         {/* Search Bar */}
         <View style={styles.searchContainer}>
@@ -409,70 +364,6 @@ export default function UsersScreen() {
                 />
               </TouchableOpacity>
             )}
-          </View>
-
-          {/* Filter Buttons */}
-          <View style={styles.filterContainer}>
-            <TouchableOpacity
-              style={[
-                styles.filterButton,
-                paymentFilter === 'all'
-                  ? styles.filterButtonActive
-                  : styles.filterButtonInactive,
-              ]}
-              onPress={() => setPaymentFilter('all')}
-            >
-              <Text
-                style={[
-                  styles.filterButtonText,
-                  paymentFilter === 'all'
-                    ? styles.filterButtonTextActive
-                    : styles.filterButtonTextInactive,
-                ]}
-              >
-                All
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.filterButton,
-                paymentFilter === 'paid'
-                  ? styles.filterButtonActive
-                  : styles.filterButtonInactive,
-              ]}
-              onPress={() => setPaymentFilter('paid')}
-            >
-              <Text
-                style={[
-                  styles.filterButtonText,
-                  paymentFilter === 'paid'
-                    ? styles.filterButtonTextActive
-                    : styles.filterButtonTextInactive,
-                ]}
-              >
-                Paid
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.filterButton,
-                paymentFilter === 'unpaid'
-                  ? styles.filterButtonActive
-                  : styles.filterButtonInactive,
-              ]}
-              onPress={() => setPaymentFilter('unpaid')}
-            >
-              <Text
-                style={[
-                  styles.filterButtonText,
-                  paymentFilter === 'unpaid'
-                    ? styles.filterButtonTextActive
-                    : styles.filterButtonTextInactive,
-                ]}
-              >
-                Unpaid
-              </Text>
-            </TouchableOpacity>
           </View>
         </View>
 

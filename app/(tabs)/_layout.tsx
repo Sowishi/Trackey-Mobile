@@ -98,12 +98,17 @@ export default function TabLayout() {
         }}
       />
     <Tabs.Screen
-  name="profile"
-  options={{
-    href: null, // 👈 this removes it from the bottom tab bar
-  }}
-/>
-
+      name="profile"
+      options={{
+        href: null, // 👈 this removes it from the bottom tab bar
+      }}
+    />
+    <Tabs.Screen
+      name="user-detail"
+      options={{
+        href: null, // 👈 this removes it from the bottom tab bar
+      }}
+    />
     </Tabs>
   );
 }

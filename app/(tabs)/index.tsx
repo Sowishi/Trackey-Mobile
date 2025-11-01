@@ -3,6 +3,7 @@ import { Colors } from '@/constants/theme';
 import { useUser } from '@/contexts/UserContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -256,7 +257,10 @@ export default function DashboardScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScreenHeader title="Dashboard" />
+      <ScreenHeader 
+        title="Dashboard" 
+        onUserPress={() => router.push('/(tabs)/profile')}
+      />
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.content}

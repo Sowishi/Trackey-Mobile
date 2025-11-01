@@ -1,113 +1,96 @@
 import { ScreenHeader } from '@/components/screen-header';
 import { Colors } from '@/constants/theme';
-import { useUser } from '@/contexts/UserContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { db, collection, query, where, getDocs } from '../../firebase';
 
-interface UserProfile {
-  id?: string;
+interface UserDetail {
+  id: string;
   age?: number;
   contactNumber?: string;
   createdAt?: string;
   email: string;
   fullName: string;
   gender?: string;
+  isArchived: boolean;
+  meterNumber?: string;
   password?: string;
   passwordChanged?: boolean;
+  paymentStatus?: string;
   profilePicUrl?: string;
   role: string;
   status: string;
-  meterNumber?: string;
 }
 
-export default function ProfileScreen() {
+export default function UserDetailScreen() {
   const colorScheme = useColorScheme();
-  const { user: contextUser, setUser: setContextUser } = useUser();
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const params = useLocalSearchParams();
+  const { userId, email } = params;
+  const [userDetail, setUserDetail] = useState<UserDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!contextUser) {
-      router.replace('/login');
-      return;
+    if (userId || email) {
+      fetchUserDetail();
     }
+  }, [userId, email]);
 
-    fetchUserProfile();
-  }, [contextUser]);
-
-  const fetchUserProfile = async () => {
-    if (!contextUser?.email) {
-      setLoading(false);
-      return;
-    }
-
+  const fetchUserDetail = async () => {
     try {
       const usersRef = collection(db, 'users');
-      const q = query(usersRef, where('email', '==', contextUser.email));
+      let q;
+
+      if (userId) {
+        // If we have userId, we could query by document ID, but Firestore doesn't support that directly
+        // So we'll use email as fallback
+        q = query(usersRef, where('email', '==', email));
+      } else if (email) {
+        q = query(usersRef, where('email', '==', email));
+      } else {
+        setLoading(false);
+        return;
+      }
 
       const querySnapshot = await getDocs(q);
-      
+
       if (!querySnapshot.empty) {
         const userDoc = querySnapshot.docs[0];
         const userData = userDoc.data();
-        
-        setUserProfile({
+
+        setUserDetail({
           id: userDoc.id,
           age: userData.age,
           contactNumber: userData.contactNumber,
           createdAt: userData.createdAt,
           email: userData.email,
-          fullName: userData.fullName || userData.name || contextUser.name,
+          fullName: userData.fullName || userData.name || '',
           gender: userData.gender,
+          isArchived: userData.isArchived || false,
+          meterNumber: userData.meterNumber,
           password: userData.password,
           passwordChanged: userData.passwordChanged,
+          paymentStatus: userData.paymentStatus,
           profilePicUrl: userData.profilePicUrl,
-          role: userData.role || userData.position || contextUser.position,
+          role: userData.role,
           status: userData.status,
-          meterNumber: userData.meterNumber,
         });
       }
     } catch (error) {
-      console.error('Error fetching user profile:', error);
+      console.error('Error fetching user detail:', error);
     } finally {
       setLoading(false);
     }
-  };
-
-  if (!contextUser) {
-    return null;
-  }
-
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: () => {
-            setContextUser(null);
-            router.replace('/login');
-          },
-        },
-      ]
-    );
   };
 
   const formatDate = (dateString?: string) => {
@@ -159,9 +142,9 @@ export default function ProfileScreen() {
       marginBottom: 24,
     },
     avatarContainer: {
-      width: 100,
-      height: 100,
-      borderRadius: 50,
+      width: 120,
+      height: 120,
+      borderRadius: 60,
       backgroundColor: Colors[colorScheme ?? 'light'].accent,
       justifyContent: 'center',
       alignItems: 'center',
@@ -173,15 +156,15 @@ export default function ProfileScreen() {
     avatarImage: {
       width: '100%',
       height: '100%',
-      borderRadius: 50,
+      borderRadius: 60,
     },
     avatarText: {
-      fontSize: 36,
+      fontSize: 42,
       fontWeight: 'bold',
       color: Colors[colorScheme ?? 'light'].primary,
     },
     nameText: {
-      fontSize: 24,
+      fontSize: 26,
       fontWeight: 'bold',
       color: Colors[colorScheme ?? 'light'].text,
       textAlign: 'center',
@@ -230,30 +213,41 @@ export default function ProfileScreen() {
       color: Colors[colorScheme ?? 'light'].text,
       fontWeight: '600',
     },
-    logoutSection: {
-      paddingHorizontal: 20,
-      paddingVertical: 20,
-    },
-    logoutButton: {
-      backgroundColor: Colors[colorScheme ?? 'light'].primary,
+    statusBadge: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
       borderRadius: 12,
-      paddingVertical: 14,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      shadowColor: Colors[colorScheme ?? 'light'].primary,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.2,
-      shadowRadius: 4,
-      elevation: 4,
+      alignSelf: 'flex-start',
+      marginTop: 4,
     },
-    logoutIcon: {
-      marginRight: 10,
+    statusActive: {
+      backgroundColor: '#D1FAE5',
     },
-    logoutButtonText: {
-      color: 'white',
-      fontSize: 16,
-      fontWeight: 'bold',
+    statusInactive: {
+      backgroundColor: '#FEE2E2',
+    },
+    statusText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+    },
+    paymentStatusBadge: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 12,
+      alignSelf: 'flex-start',
+      marginTop: 4,
+    },
+    paymentPaid: {
+      backgroundColor: '#D1FAE5',
+    },
+    paymentUnpaid: {
+      backgroundColor: '#FEE2E2',
+    },
+    paymentText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
     },
     loadingContainer: {
       flex: 1,
@@ -272,46 +266,63 @@ export default function ProfileScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <ScreenHeader title="Profile" />
+        <ScreenHeader 
+          title="User Details" 
+          onUserPress={() => router.push('/(tabs)/profile')}
+        />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].primary} />
-          <Text style={styles.loadingText}>Loading profile...</Text>
+          <Text style={styles.loadingText}>Loading user details...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  const displayUser = userProfile || {
-    email: contextUser.email,
-    fullName: contextUser.name,
-    role: contextUser.position,
-    gender: contextUser.gender,
-    meterNumber: contextUser.rfid,
-  };
+  if (!userDetail) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <ScreenHeader 
+          title="User Details" 
+          onUserPress={() => router.push('/(tabs)/profile')}
+        />
+        <View style={styles.loadingContainer}>
+          <Ionicons
+            name="alert-circle-outline"
+            size={60}
+            color={Colors[colorScheme ?? 'light'].icon}
+          />
+          <Text style={styles.loadingText}>User not found</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScreenHeader title="Profile" />
+      <ScreenHeader 
+        title="User Details" 
+        onUserPress={() => router.push('/(tabs)/profile')}
+      />
       <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
         {/* Profile Card */}
         <View style={styles.profileCard}>
           <View style={styles.avatarSection}>
-            {displayUser.profilePicUrl ? (
+            {userDetail.profilePicUrl ? (
               <View style={styles.avatarContainer}>
                 <Image
-                  source={{ uri: displayUser.profilePicUrl }}
+                  source={{ uri: userDetail.profilePicUrl }}
                   style={styles.avatarImage}
                 />
               </View>
             ) : (
               <View style={styles.avatarContainer}>
                 <Text style={styles.avatarText}>
-                  {getInitials(displayUser.fullName)}
+                  {getInitials(userDetail.fullName)}
                 </Text>
               </View>
             )}
-            <Text style={styles.nameText}>{displayUser.fullName}</Text>
-            <Text style={styles.roleText}>{displayUser.role}</Text>
+            <Text style={styles.nameText}>{userDetail.fullName}</Text>
+            <Text style={styles.roleText}>{userDetail.role}</Text>
           </View>
 
           {/* User Information */}
@@ -326,11 +337,11 @@ export default function ProfileScreen() {
               </View>
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>Email Address</Text>
-                <Text style={styles.infoValue}>{displayUser.email}</Text>
+                <Text style={styles.infoValue}>{userDetail.email}</Text>
               </View>
             </View>
 
-            {displayUser.contactNumber && (
+            {userDetail.contactNumber && (
               <View style={styles.infoItem}>
                 <View style={styles.infoIcon}>
                   <Ionicons
@@ -341,12 +352,12 @@ export default function ProfileScreen() {
                 </View>
                 <View style={styles.infoContent}>
                   <Text style={styles.infoLabel}>Contact Number</Text>
-                  <Text style={styles.infoValue}>{displayUser.contactNumber}</Text>
+                  <Text style={styles.infoValue}>{userDetail.contactNumber}</Text>
                 </View>
               </View>
             )}
 
-            {displayUser.gender && (
+            {userDetail.gender && (
               <View style={styles.infoItem}>
                 <View style={styles.infoIcon}>
                   <Ionicons
@@ -357,12 +368,12 @@ export default function ProfileScreen() {
                 </View>
                 <View style={styles.infoContent}>
                   <Text style={styles.infoLabel}>Gender</Text>
-                  <Text style={styles.infoValue}>{displayUser.gender}</Text>
+                  <Text style={styles.infoValue}>{userDetail.gender}</Text>
                 </View>
               </View>
             )}
 
-            {displayUser.age && (
+            {userDetail.age && (
               <View style={styles.infoItem}>
                 <View style={styles.infoIcon}>
                   <Ionicons
@@ -373,12 +384,12 @@ export default function ProfileScreen() {
                 </View>
                 <View style={styles.infoContent}>
                   <Text style={styles.infoLabel}>Age</Text>
-                  <Text style={styles.infoValue}>{displayUser.age} years old</Text>
+                  <Text style={styles.infoValue}>{userDetail.age} years old</Text>
                 </View>
               </View>
             )}
 
-            {displayUser.meterNumber && (
+            {userDetail.meterNumber && (
               <View style={styles.infoItem}>
                 <View style={styles.infoIcon}>
                   <Ionicons
@@ -389,7 +400,7 @@ export default function ProfileScreen() {
                 </View>
                 <View style={styles.infoContent}>
                   <Text style={styles.infoLabel}>Meter Number</Text>
-                  <Text style={styles.infoValue}>{displayUser.meterNumber}</Text>
+                  <Text style={styles.infoValue}>{userDetail.meterNumber}</Text>
                 </View>
               </View>
             )}
@@ -405,12 +416,51 @@ export default function ProfileScreen() {
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>Status</Text>
                 <Text style={styles.infoValue}>
-                  {displayUser.status ? displayUser.status.charAt(0).toUpperCase() + displayUser.status.slice(1) : 'N/A'}
+                  {userDetail.status ? userDetail.status.charAt(0).toUpperCase() + userDetail.status.slice(1) : 'N/A'}
                 </Text>
+                <View
+                  style={[
+                    styles.statusBadge,
+                    userDetail.status === 'active'
+                      ? styles.statusActive
+                      : styles.statusInactive,
+                  ]}
+                >
+                  <Text style={styles.statusText}>
+                    {userDetail.status === 'active' ? 'Active' : 'Inactive'}
+                  </Text>
+                </View>
               </View>
             </View>
 
-            {displayUser.createdAt && (
+            {userDetail.paymentStatus && (
+              <View style={styles.infoItem}>
+                <View style={styles.infoIcon}>
+                  <Ionicons
+                    name="card"
+                    size={20}
+                    color={Colors[colorScheme ?? 'light'].primary}
+                  />
+                </View>
+                <View style={styles.infoContent}>
+                  <Text style={styles.infoLabel}>Payment Status</Text>
+                  <View
+                    style={[
+                      styles.paymentStatusBadge,
+                      userDetail.paymentStatus === 'paid'
+                        ? styles.paymentPaid
+                        : styles.paymentUnpaid,
+                    ]}
+                  >
+                    <Text style={styles.paymentText}>
+                      {userDetail.paymentStatus === 'paid' ? 'Paid' : 'Unpaid'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {userDetail.createdAt && (
               <View style={styles.infoItem}>
                 <View style={styles.infoIcon}>
                   <Ionicons
@@ -421,26 +471,14 @@ export default function ProfileScreen() {
                 </View>
                 <View style={styles.infoContent}>
                   <Text style={styles.infoLabel}>Member Since</Text>
-                  <Text style={styles.infoValue}>{formatDate(displayUser.createdAt)}</Text>
+                  <Text style={styles.infoValue}>{formatDate(userDetail.createdAt)}</Text>
                 </View>
               </View>
             )}
           </View>
         </View>
-
-        {/* Logout Section */}
-        <View style={styles.logoutSection}>
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <Ionicons
-              name="log-out"
-              size={20}
-              color="white"
-              style={styles.logoutIcon}
-            />
-            <Text style={styles.logoutButtonText}>Logout</Text>
-          </TouchableOpacity>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
+
