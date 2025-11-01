@@ -10,13 +10,18 @@ import {
   Alert,
   Dimensions,
   FlatList,
+  Image,
+  Modal,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { BarChart, PieChart } from 'react-native-chart-kit';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { addDoc, collection, db, doc, getDocs, query, updateDoc, where } from '../../firebase';
@@ -58,6 +63,12 @@ export default function DashboardScreen() {
   const [loadingBills, setLoadingBills] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'gcash' | 'other' | null>(null);
+  const [otherMethod, setOtherMethod] = useState('');
+  const [paymentProof, setPaymentProof] = useState<string | null>(null);
+  const [submittingPayment, setSubmittingPayment] = useState(false);
   
   const WATER_RATE_PER_CUBIC_METER = 20; // 20 pesos per cubic meter
 
@@ -211,34 +222,146 @@ export default function DashboardScreen() {
     });
   };
 
-  const handlePayBill = async (bill: Bill) => {
-    Alert.alert(
-      'Confirm Payment',
-      `Are you sure you want to mark the bill for ${bill.month} (₱${bill.totalAmount.toFixed(2)}) as paid?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Pay',
-          onPress: async () => {
-            try {
-              const billRef = doc(db, 'billing', bill.id);
-              await updateDoc(billRef, {
-                status: 'paid',
-                updatedAt: new Date().toISOString(),
-              });
+  const handlePayBill = (bill: Bill) => {
+    setSelectedBill(bill);
+    setPaymentMethod(null);
+    setOtherMethod('');
+    setPaymentProof(null);
+    setPaymentModalVisible(true);
+  };
 
-              // Also update user payment status if all bills are paid
-              await fetchResidentBills();
-              
-              Alert.alert('Success', 'Bill marked as paid successfully!');
-            } catch (error) {
-              console.error('Error updating bill:', error);
-              Alert.alert('Error', 'Failed to update bill status. Please try again.');
-            }
-          },
-        },
-      ]
-    );
+  const handleSelectPaymentMethod = (method: 'cash' | 'gcash' | 'other') => {
+    setPaymentMethod(method);
+    if (method !== 'other') {
+      setOtherMethod('');
+    }
+  };
+
+  const handlePickImage = async () => {
+    try {
+      // Request permissions
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'We need permission to access your photos to upload payment proof.');
+        return;
+      }
+
+      // Launch image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setPaymentProof(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  };
+
+  const handleSubmitPayment = async () => {
+    if (!selectedBill) return;
+
+    // Validate payment method
+    if (!paymentMethod) {
+      Alert.alert('Validation Error', 'Please select a payment method');
+      return;
+    }
+
+    if (paymentMethod === 'other' && !otherMethod.trim()) {
+      Alert.alert('Validation Error', 'Please specify the payment method');
+      return;
+    }
+
+    if (!paymentProof) {
+      Alert.alert('Validation Error', 'Please upload payment proof');
+      return;
+    }
+
+    setSubmittingPayment(true);
+
+    try {
+      const finalPaymentMethod = paymentMethod === 'other' ? otherMethod : paymentMethod;
+
+      // Convert image to base64 for storage (or you can use Firebase Storage for production)
+      // For now, we'll store the local URI and you can implement Firebase Storage later
+      const paymentData = {
+        userId: userId || '',
+        userEmail: user?.email || '',
+        userName: user?.name || '',
+        billId: selectedBill.id,
+        billMonth: selectedBill.month,
+        billAmount: selectedBill.totalAmount,
+        paymentMethod: finalPaymentMethod,
+        paymentProof: paymentProof, // Store as URI or upload to Firebase Storage
+        status: 'pending', // Pending admin approval
+        createdAt: new Date().toISOString(),
+      };
+
+      // Save to payment history
+      const paymentsRef = collection(db, 'payments');
+      const paymentDocRef = await addDoc(paymentsRef, paymentData);
+
+      // Create notification
+      const notificationData = {
+        userId: userId || '',
+        userEmail: user?.email || '',
+        userName: user?.name || '',
+        type: 'payment_submitted',
+        title: 'Payment Submitted',
+        message: `Payment of ₱${selectedBill.totalAmount.toFixed(2)} for ${selectedBill.month} has been submitted via ${finalPaymentMethod}`,
+        paymentId: paymentDocRef.id,
+        billId: selectedBill.id,
+        paymentProof: paymentProof,
+        status: 'unread',
+        createdAt: new Date().toISOString(),
+      };
+
+      const notificationsRef = collection(db, 'notifications');
+      await addDoc(notificationsRef, notificationData);
+
+      // Update bill status to pending (or keep as unpaid until admin approves)
+      const billRef = doc(db, 'billing', selectedBill.id);
+      await updateDoc(billRef, {
+        status: 'pending', // Change to pending instead of paid
+        paymentMethod: finalPaymentMethod,
+        paymentProof: paymentProof,
+        updatedAt: new Date().toISOString(),
+      });
+
+      // Refresh bills
+      await fetchResidentBills();
+
+      // Close modal and reset
+      setPaymentModalVisible(false);
+      setSelectedBill(null);
+      setPaymentMethod(null);
+      setOtherMethod('');
+      setPaymentProof(null);
+
+      Alert.alert(
+        'Success',
+        'Payment submitted successfully! Your payment is pending admin approval.',
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      console.error('Error submitting payment:', error);
+      Alert.alert('Error', 'Failed to submit payment. Please try again.');
+    } finally {
+      setSubmittingPayment(false);
+    }
+  };
+
+  const handleCancelPayment = () => {
+    setPaymentModalVisible(false);
+    setSelectedBill(null);
+    setPaymentMethod(null);
+    setOtherMethod('');
+    setPaymentProof(null);
   };
 
   const formatDate = (dateString: string) => {
@@ -663,6 +786,192 @@ export default function DashboardScreen() {
       marginTop: 8,
       textAlign: 'center',
     },
+    // Payment Modal Styles
+    paymentModalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'flex-end',
+    },
+    paymentModalContent: {
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      maxHeight: '85%',
+      paddingBottom: 20,
+    },
+    paymentModalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors[colorScheme ?? 'light'].border,
+    },
+    paymentModalTitle: {
+      fontSize: 22,
+      fontWeight: 'bold',
+      color: Colors[colorScheme ?? 'light'].text,
+    },
+    closeButton: {
+      padding: 4,
+    },
+    paymentModalBody: {
+      padding: 20,
+    },
+    paymentBillInfo: {
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 20,
+      alignItems: 'center',
+    },
+    paymentBillMonth: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+      marginBottom: 8,
+    },
+    paymentBillAmount: {
+      fontSize: 28,
+      fontWeight: 'bold',
+      color: Colors[colorScheme ?? 'light'].primary,
+    },
+    paymentMethodSection: {
+      marginBottom: 24,
+    },
+    paymentSectionLabel: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+      marginBottom: 12,
+    },
+    paymentMethodOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 16,
+      borderRadius: 12,
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      marginBottom: 12,
+      borderWidth: 2,
+      borderColor: 'transparent',
+    },
+    paymentMethodSelected: {
+      borderColor: Colors[colorScheme ?? 'light'].primary,
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+    },
+    paymentMethodText: {
+      fontSize: 16,
+      color: Colors[colorScheme ?? 'light'].text,
+      marginLeft: 12,
+      fontWeight: '500',
+    },
+    paymentMethodTextSelected: {
+      color: Colors[colorScheme ?? 'light'].primary,
+      fontWeight: '600',
+    },
+    otherMethodInput: {
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+      borderRadius: 12,
+      padding: 14,
+      marginTop: 12,
+      fontSize: 16,
+      color: Colors[colorScheme ?? 'light'].text,
+    },
+    paymentProofSection: {
+      marginBottom: 20,
+    },
+    uploadProofButton: {
+      borderWidth: 2,
+      borderStyle: 'dashed',
+      borderColor: Colors[colorScheme ?? 'light'].primary,
+      borderRadius: 12,
+      padding: 32,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+    },
+    uploadProofText: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].primary,
+      marginTop: 12,
+    },
+    uploadProofSubtext: {
+      fontSize: 12,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+      marginTop: 4,
+    },
+    paymentProofContainer: {
+      alignItems: 'center',
+    },
+    paymentProofImage: {
+      width: '100%',
+      height: 300,
+      borderRadius: 12,
+      marginBottom: 12,
+      resizeMode: 'contain',
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+    },
+    changeProofButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 20,
+      borderRadius: 8,
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].primary,
+    },
+    changeProofText: {
+      marginLeft: 8,
+      color: Colors[colorScheme ?? 'light'].primary,
+      fontWeight: '600',
+      fontSize: 14,
+    },
+    paymentModalFooter: {
+      flexDirection: 'row',
+      paddingHorizontal: 20,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: Colors[colorScheme ?? 'light'].border,
+    },
+    paymentCancelButton: {
+      flex: 1,
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      paddingVertical: 16,
+      borderRadius: 12,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+    },
+    paymentCancelText: {
+      color: Colors[colorScheme ?? 'light'].text,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    paymentButtonSpacing: {
+      width: 12,
+    },
+    paymentSubmitButton: {
+      flex: 1,
+      backgroundColor: Colors[colorScheme ?? 'light'].primary,
+      paddingVertical: 16,
+      borderRadius: 12,
+      alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'center',
+    },
+    paymentSubmitText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '600',
+      marginLeft: 8,
+    },
+    disabledButton: {
+      opacity: 0.6,
+    },
   });
 
   if (isResident && loadingBills) {
@@ -780,6 +1089,174 @@ export default function DashboardScreen() {
             />
           }
         />
+
+        {/* Payment Modal */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={paymentModalVisible}
+          onRequestClose={handleCancelPayment}
+        >
+          <Pressable
+            style={styles.paymentModalOverlay}
+            onPress={handleCancelPayment}
+          >
+            <View style={styles.paymentModalContent} onStartShouldSetResponder={() => true}>
+              <View style={styles.paymentModalHeader}>
+                <Text style={styles.paymentModalTitle}>Submit Payment</Text>
+                <TouchableOpacity
+                  onPress={handleCancelPayment}
+                  style={styles.closeButton}
+                >
+                  <Ionicons
+                    name="close"
+                    size={24}
+                    color={Colors[colorScheme ?? 'light'].text}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              {selectedBill && (
+                <ScrollView style={styles.paymentModalBody}>
+                  <View style={styles.paymentBillInfo}>
+                    <Text style={styles.paymentBillMonth}>{selectedBill.month}</Text>
+                    <Text style={styles.paymentBillAmount}>₱{selectedBill.totalAmount.toFixed(2)}</Text>
+                  </View>
+
+                  {/* Payment Method Selection */}
+                  <View style={styles.paymentMethodSection}>
+                    <Text style={styles.paymentSectionLabel}>Payment Method</Text>
+                    <TouchableOpacity
+                      style={[
+                        styles.paymentMethodOption,
+                        paymentMethod === 'cash' && styles.paymentMethodSelected
+                      ]}
+                      onPress={() => handleSelectPaymentMethod('cash')}
+                    >
+                      <Ionicons
+                        name={paymentMethod === 'cash' ? 'radio-button-on' : 'radio-button-off'}
+                        size={24}
+                        color={paymentMethod === 'cash' ? Colors[colorScheme ?? 'light'].primary : Colors[colorScheme ?? 'light'].tabIconDefault}
+                      />
+                      <Text style={[
+                        styles.paymentMethodText,
+                        paymentMethod === 'cash' && styles.paymentMethodTextSelected
+                      ]}>Cash</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.paymentMethodOption,
+                        paymentMethod === 'gcash' && styles.paymentMethodSelected
+                      ]}
+                      onPress={() => handleSelectPaymentMethod('gcash')}
+                    >
+                      <Ionicons
+                        name={paymentMethod === 'gcash' ? 'radio-button-on' : 'radio-button-off'}
+                        size={24}
+                        color={paymentMethod === 'gcash' ? Colors[colorScheme ?? 'light'].primary : Colors[colorScheme ?? 'light'].tabIconDefault}
+                      />
+                      <Text style={[
+                        styles.paymentMethodText,
+                        paymentMethod === 'gcash' && styles.paymentMethodTextSelected
+                      ]}>GCash</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.paymentMethodOption,
+                        paymentMethod === 'other' && styles.paymentMethodSelected
+                      ]}
+                      onPress={() => handleSelectPaymentMethod('other')}
+                    >
+                      <Ionicons
+                        name={paymentMethod === 'other' ? 'radio-button-on' : 'radio-button-off'}
+                        size={24}
+                        color={paymentMethod === 'other' ? Colors[colorScheme ?? 'light'].primary : Colors[colorScheme ?? 'light'].tabIconDefault}
+                      />
+                      <Text style={[
+                        styles.paymentMethodText,
+                        paymentMethod === 'other' && styles.paymentMethodTextSelected
+                      ]}>Other</Text>
+                    </TouchableOpacity>
+
+                    {paymentMethod === 'other' && (
+                      <TextInput
+                        style={styles.otherMethodInput}
+                        placeholder="Specify payment method"
+                        placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
+                        value={otherMethod}
+                        onChangeText={setOtherMethod}
+                      />
+                    )}
+                  </View>
+
+                  {/* Payment Proof Upload */}
+                  <View style={styles.paymentProofSection}>
+                    <Text style={styles.paymentSectionLabel}>Payment Proof</Text>
+                    {paymentProof ? (
+                      <View style={styles.paymentProofContainer}>
+                        <Image
+                          source={{ uri: paymentProof }}
+                          style={styles.paymentProofImage}
+                        />
+                        <TouchableOpacity
+                          style={styles.changeProofButton}
+                          onPress={handlePickImage}
+                        >
+                          <Ionicons
+                            name="refresh"
+                            size={20}
+                            color={Colors[colorScheme ?? 'light'].primary}
+                          />
+                          <Text style={styles.changeProofText}>Change Image</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={styles.uploadProofButton}
+                        onPress={handlePickImage}
+                      >
+                        <Ionicons
+                          name="image-outline"
+                          size={32}
+                          color={Colors[colorScheme ?? 'light'].primary}
+                        />
+                        <Text style={styles.uploadProofText}>Upload Payment Proof</Text>
+                        <Text style={styles.uploadProofSubtext}>Tap to select an image</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </ScrollView>
+              )}
+
+              <View style={styles.paymentModalFooter}>
+                <TouchableOpacity
+                  style={[styles.paymentCancelButton, submittingPayment && styles.disabledButton]}
+                  onPress={handleCancelPayment}
+                  disabled={submittingPayment}
+                >
+                  <Text style={styles.paymentCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <View style={styles.paymentButtonSpacing} />
+                <TouchableOpacity
+                  style={[styles.paymentSubmitButton, submittingPayment && styles.disabledButton]}
+                  onPress={handleSubmitPayment}
+                  disabled={submittingPayment}
+                >
+                  {submittingPayment ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+                      <Text style={styles.paymentSubmitText}>Submit</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Pressable>
+        </Modal>
       </SafeAreaView>
     );
   }
