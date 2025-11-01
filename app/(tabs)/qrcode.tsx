@@ -33,6 +33,7 @@ export default function QRCodeScreen() {
       setScannedData(data);
       setIsCameraActive(false);
       setIsLoading(true);
+      console.log(data);
 
       // Navigate after 3 seconds
       setTimeout(() => {
@@ -43,7 +44,7 @@ export default function QRCodeScreen() {
             userId: data,
           },
         });
-      }, 3000);
+      }, 1500);
     }
   };
 

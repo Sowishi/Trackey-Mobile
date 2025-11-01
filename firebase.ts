@@ -1,7 +1,7 @@
 // Import the functions you need from the SDKs you need
 import { getAnalytics } from "firebase/analytics";
 import { initializeApp } from "firebase/app";
-import { addDoc, collection, deleteDoc, doc, getDocs, getFirestore, onSnapshot, query, updateDoc, where } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, getFirestore, onSnapshot, query, updateDoc, where } from "firebase/firestore";
 import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
@@ -65,5 +65,5 @@ export const uploadImageToStorage = async (uri: string, path: string): Promise<s
   }
 };
 
-export { addDoc, collection, db, deleteDoc, doc, getDocs, onSnapshot, query, storage, updateDoc, where };
+export { addDoc, collection, db, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, storage, updateDoc, where };
 

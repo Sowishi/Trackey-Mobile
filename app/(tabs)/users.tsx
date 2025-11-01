@@ -112,7 +112,6 @@ export default function UsersScreen() {
       pathname: '/(tabs)/user-detail',
       params: {
         userId: resident.id,
-        email: resident.email,
       },
     });
   };

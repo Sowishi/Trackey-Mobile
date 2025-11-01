@@ -20,7 +20,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { addDoc, collection, db, getDocs, query, where } from '../../firebase';
+import { addDoc, collection, db, doc, getDoc, getDocs, query, where } from '../../firebase';
 
 interface UserDetail {
   id: string;
@@ -63,10 +63,10 @@ export default function UserDetailScreen() {
   const WATER_RATE_PER_CUBIC_METER = 20; // 20 pesos per cubic meter
 
   useEffect(() => {
-    if (userId || email) {
+    if (userId) {
       fetchUserDetail();
     }
-  }, [userId, email]);
+  }, [userId]);
 
   // Auto-calculate total amount when consumption changes
   useEffect(() => {
@@ -85,28 +85,22 @@ export default function UserDetailScreen() {
 
   const fetchUserDetail = async () => {
     try {
-      const usersRef = collection(db, 'users');
-      let q;
-
-      if (userId) {
-        // If we have userId, we could query by document ID, but Firestore doesn't support that directly
-        // So we'll use email as fallback
-        q = query(usersRef, where('email', '==', email));
-      } else if (email) {
-        q = query(usersRef, where('email', '==', email));
-      } else {
+      // Only accept userId (document ID from QR code)
+      if (!userId || typeof userId !== 'string') {
+        console.log('No valid userId provided');
         setLoading(false);
         return;
       }
 
-      const querySnapshot = await getDocs(q);
+      // Fetch user document directly by ID
+      const userDocRef = doc(db, 'users', userId);
+      const userDocSnap = await getDoc(userDocRef);
 
-      if (!querySnapshot.empty) {
-        const userDoc = querySnapshot.docs[0];
-        const userData = userDoc.data();
+      if (userDocSnap.exists()) {
+        const userData = userDocSnap.data();
 
         setUserDetail({
-          id: userDoc.id,
+          id: userDocSnap.id,
           age: userData.age,
           contactNumber: userData.contactNumber,
           createdAt: userData.createdAt,
@@ -122,6 +116,8 @@ export default function UserDetailScreen() {
           role: userData.role,
           status: userData.status,
         });
+      } else {
+        console.log('No user found with ID:', userId);
       }
     } catch (error) {
       console.error('Error fetching user detail:', error);
