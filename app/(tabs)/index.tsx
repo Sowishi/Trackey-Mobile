@@ -32,8 +32,12 @@ interface DashboardStats {
   totalResidents: number;
   paidResidents: number;
   unpaidResidents: number;
+  pendingPayments: number;
   totalWaterConsumption: number; // in cubic meters
   totalWaterRate: number; // in pesos
+  totalRevenue: number; // Total amount collected
+  totalDue: number; // Total amount outstanding
+  collectionRate: number; // Percentage of payments collected
 }
 
 interface Bill {
@@ -55,8 +59,12 @@ export default function DashboardScreen() {
     totalResidents: 0,
     paidResidents: 0,
     unpaidResidents: 0,
+    pendingPayments: 0,
     totalWaterConsumption: 0,
     totalWaterRate: 0,
+    totalRevenue: 0,
+    totalDue: 0,
+    collectionRate: 0,
   });
   const [loading, setLoading] = useState(true);
   const [residentBills, setResidentBills] = useState<Bill[]>([]);
@@ -136,6 +144,7 @@ export default function DashboardScreen() {
 
   const fetchDashboardStats = async () => {
     try {
+      // Fetch resident users
       const usersRef = collection(db, 'users');
       const q = query(
         usersRef,
@@ -144,36 +153,51 @@ export default function DashboardScreen() {
       );
 
       const querySnapshot = await getDocs(q);
-      let total = 0;
-      let paid = 0;
-      let unpaid = 0;
-      let totalConsumption = 0;
+      let totalResidents = querySnapshot.size;
 
-      querySnapshot.forEach((doc) => {
+      // Fetch all billing data
+      const billingRef = collection(db, 'billing');
+      const billingSnapshot = await getDocs(billingRef);
+
+      let paidCount = 0;
+      let unpaidCount = 0;
+      let pendingCount = 0;
+      let totalConsumption = 0;
+      let totalRevenue = 0;
+      let totalDue = 0;
+
+      billingSnapshot.forEach((doc) => {
         const data = doc.data();
-        total++;
-        if (data.paymentStatus === 'paid') {
-          paid++;
-        } else {
-          unpaid++;
-        }
-        
-        // Calculate water consumption from meter reading or consumption field
-        // Assuming waterConsumption field exists, or use meterNumber if it represents consumption
-        const consumption = data.waterConsumption || 
-                          data.waterReading || 
-                          (data.meterNumber ? parseFloat(data.meterNumber) || 0 : 0);
+        const consumption = data.consumption || 0;
+        const amount = data.totalAmount || 0;
+
         totalConsumption += consumption;
+
+        if (data.status === 'paid') {
+          paidCount++;
+          totalRevenue += amount;
+        } else if (data.status === 'pending') {
+          pendingCount++;
+          totalDue += amount;
+        } else if (data.status === 'unpaid') {
+          unpaidCount++;
+          totalDue += amount;
+        }
       });
 
-      const totalWaterRate = totalConsumption * WATER_RATE_PER_CUBIC_METER;
+      const totalBills = paidCount + unpaidCount + pendingCount;
+      const collectionRate = totalBills > 0 ? (paidCount / totalBills) * 100 : 0;
 
       setStats({
-        totalResidents: total,
-        paidResidents: paid,
-        unpaidResidents: unpaid,
+        totalResidents: totalResidents,
+        paidResidents: paidCount,
+        unpaidResidents: unpaidCount,
+        pendingPayments: pendingCount,
         totalWaterConsumption: totalConsumption,
-        totalWaterRate: totalWaterRate,
+        totalWaterRate: totalConsumption * WATER_RATE_PER_CUBIC_METER,
+        totalRevenue: totalRevenue,
+        totalDue: totalDue,
+        collectionRate: collectionRate,
       });
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
@@ -559,6 +583,122 @@ export default function DashboardScreen() {
       fontSize: 16,
       color: Colors[colorScheme ?? 'light'].text,
       opacity: 0.6,
+    },
+    topMetricsContainer: {
+      flexDirection: 'row',
+      marginBottom: 16,
+      gap: 12,
+    },
+    metricCardLarge: {
+      flex: 1,
+      borderRadius: 16,
+      padding: 20,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 6,
+      elevation: 4,
+    },
+    metricHeader: {
+      marginBottom: 12,
+    },
+    metricIconContainer: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    metricLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+      opacity: 0.7,
+      marginBottom: 8,
+    },
+    metricValue: {
+      fontSize: 28,
+      fontWeight: 'bold',
+      marginBottom: 4,
+    },
+    metricSubtext: {
+      fontSize: 12,
+      color: Colors[colorScheme ?? 'light'].text,
+      opacity: 0.6,
+    },
+    collectionRateCard: {
+      borderRadius: 16,
+      padding: 20,
+      marginBottom: 20,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 6,
+      elevation: 4,
+    },
+    collectionRateContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    collectionRateIcon: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 16,
+    },
+    collectionRateInfo: {
+      flex: 1,
+    },
+    collectionRateLabel: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+      marginBottom: 4,
+    },
+    collectionRateValue: {
+      fontSize: 32,
+      fontWeight: 'bold',
+    },
+    collectionRateSubtext: {
+      fontSize: 14,
+      color: Colors[colorScheme ?? 'light'].text,
+      opacity: 0.7,
+      textAlign: 'center',
+    },
+    quickActionsContainer: {
+      marginTop: 8,
+      marginBottom: 20,
+    },
+    quickActionsGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+    },
+    quickActionButton: {
+      flex: 1,
+      minWidth: '45%',
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      borderRadius: 12,
+      padding: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.08,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    quickActionText: {
+      marginTop: 8,
+      fontSize: 14,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+      textAlign: 'center',
     },
     chartsContainer: {
       marginTop: 8,
@@ -1275,6 +1415,13 @@ export default function DashboardScreen() {
         style={styles.container}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[Colors[colorScheme ?? 'light'].primary]}
+          />
+        }
       >
         {/* Greeting */}
         <View style={styles.greetingContainer}>
@@ -1284,14 +1431,134 @@ export default function DashboardScreen() {
           <Text style={styles.greetingName}>{userName}</Text>
         </View>
 
+        {/* Key Metrics - Top Cards */}
+        <View style={styles.topMetricsContainer}>
+          {/* Total Revenue Card */}
+          <View style={[styles.metricCardLarge, { backgroundColor: '#D1FAE5' }]}>
+            <View style={styles.metricHeader}>
+              <View style={[styles.metricIconContainer, { backgroundColor: '#059669' }]}>
+                <Ionicons name="cash" size={24} color="#FFFFFF" />
+              </View>
+            </View>
+            <Text style={styles.metricLabel}>Total Revenue</Text>
+            <Text style={[styles.metricValue, { color: '#059669' }]}>
+              ₱{stats.totalRevenue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </Text>
+            <Text style={styles.metricSubtext}>Collected payments</Text>
+          </View>
+
+          {/* Total Due Card */}
+          <View style={[styles.metricCardLarge, { backgroundColor: '#FEE2E2' }]}>
+            <View style={styles.metricHeader}>
+              <View style={[styles.metricIconContainer, { backgroundColor: '#DC2626' }]}>
+                <Ionicons name="alert-circle" size={24} color="#FFFFFF" />
+              </View>
+            </View>
+            <Text style={styles.metricLabel}>Amount Due</Text>
+            <Text style={[styles.metricValue, { color: '#DC2626' }]}>
+              ₱{stats.totalDue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </Text>
+            <Text style={styles.metricSubtext}>Outstanding balance</Text>
+          </View>
+        </View>
+
+        {/* Collection Rate Card */}
+        <View style={[styles.collectionRateCard, { 
+          backgroundColor: stats.collectionRate >= 75 ? '#D1FAE5' : stats.collectionRate >= 50 ? '#FEF3C7' : '#FEE2E2'
+        }]}>
+          <View style={styles.collectionRateContent}>
+            <View style={[styles.collectionRateIcon, { 
+              backgroundColor: stats.collectionRate >= 75 ? '#059669' : stats.collectionRate >= 50 ? '#F59E0B' : '#DC2626'
+            }]}>
+              <Ionicons 
+                name={stats.collectionRate >= 75 ? "checkmark-circle" : stats.collectionRate >= 50 ? "time" : "warning"} 
+                size={32} 
+                color="#FFFFFF" 
+              />
+            </View>
+            <View style={styles.collectionRateInfo}>
+              <Text style={styles.collectionRateLabel}>Collection Rate</Text>
+              <Text style={[styles.collectionRateValue, { 
+                color: stats.collectionRate >= 75 ? '#059669' : stats.collectionRate >= 50 ? '#F59E0B' : '#DC2626'
+              }]}>
+                {stats.collectionRate.toFixed(1)}%
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.collectionRateSubtext}>
+            {stats.paidResidents} of {stats.paidResidents + stats.unpaidResidents + stats.pendingPayments} bills paid
+          </Text>
+        </View>
+
+        {/* Quick Stats Grid */}
+        <View style={styles.statsContainer}>
+          <Text style={styles.statsTitle}>Overview</Text>
+          <View style={styles.statsGrid}>
+            <View style={styles.statCard}>
+              <View style={styles.statHeader}>
+                <View style={[styles.statIcon, { backgroundColor: '#E3F2FD' }]}>
+                  <Ionicons name="people" size={18} color="#1976D2" />
+                </View>
+              </View>
+              <Text style={styles.statLabel}>Residents</Text>
+              <Text style={styles.statValue}>{stats.totalResidents}</Text>
+              <Text style={styles.statSubtext}>Active users</Text>
+            </View>
+
+            <View style={styles.statCard}>
+              <View style={styles.statHeader}>
+                <View style={[styles.statIcon, { backgroundColor: '#E8F5E9' }]}>
+                  <Ionicons name="checkmark-done" size={18} color="#388E3C" />
+                </View>
+              </View>
+              <Text style={styles.statLabel}>Paid Bills</Text>
+              <Text style={[styles.statValue, { color: '#388E3C' }]}>{stats.paidResidents}</Text>
+              <Text style={styles.statSubtext}>Completed</Text>
+            </View>
+
+            <View style={styles.statCard}>
+              <View style={styles.statHeader}>
+                <View style={[styles.statIcon, { backgroundColor: '#FFF3E0' }]}>
+                  <Ionicons name="hourglass" size={18} color="#F57C00" />
+                </View>
+              </View>
+              <Text style={styles.statLabel}>Pending</Text>
+              <Text style={[styles.statValue, { color: '#F57C00' }]}>{stats.pendingPayments}</Text>
+              <Text style={styles.statSubtext}>Awaiting approval</Text>
+            </View>
+
+            <View style={styles.statCard}>
+              <View style={styles.statHeader}>
+                <View style={[styles.statIcon, { backgroundColor: '#FFEBEE' }]}>
+                  <Ionicons name="close-circle" size={18} color="#D32F2F" />
+                </View>
+              </View>
+              <Text style={styles.statLabel}>Unpaid</Text>
+              <Text style={[styles.statValue, { color: '#D32F2F' }]}>{stats.unpaidResidents}</Text>
+              <Text style={styles.statSubtext}>Overdue bills</Text>
+            </View>
+
+            <View style={[styles.statCard, styles.statCardFull]}>
+              <View style={styles.statHeader}>
+                <View style={[styles.statIcon, { backgroundColor: '#E0F7FA' }]}>
+                  <Ionicons name="water" size={18} color={Colors[colorScheme ?? 'light'].primary} />
+                </View>
+              </View>
+              <Text style={styles.statLabel}>Water Consumption</Text>
+              <Text style={styles.statValue}>{stats.totalWaterConsumption.toFixed(2)} m³</Text>
+              <Text style={styles.statSubtext}>Total usage this period</Text>
+            </View>
+          </View>
+        </View>
+
         {/* Charts Section */}
-        {stats.totalResidents > 0 && (
+        {(stats.paidResidents + stats.unpaidResidents + stats.pendingPayments) > 0 && (
           <View style={styles.chartsContainer}>
-            <Text style={styles.chartsTitle}>Payment Overview</Text>
+            <Text style={styles.chartsTitle}>Payment Analytics</Text>
             
             {/* Pie Chart */}
             <View style={styles.chartCard}>
-              <Text style={styles.chartLabel}>Payment Distribution</Text>
+              <Text style={styles.chartLabel}>Bill Status Distribution</Text>
               <PieChart
                 data={[
                   {
@@ -1299,17 +1566,24 @@ export default function DashboardScreen() {
                     population: stats.paidResidents,
                     color: '#059669',
                     legendFontColor: '#1F2937',
-                    legendFontSize: 14,
+                    legendFontSize: 13,
+                  },
+                  {
+                    name: 'Pending',
+                    population: stats.pendingPayments,
+                    color: '#F59E0B',
+                    legendFontColor: '#1F2937',
+                    legendFontSize: 13,
                   },
                   {
                     name: 'Unpaid',
                     population: stats.unpaidResidents,
                     color: '#DC2626',
                     legendFontColor: '#1F2937',
-                    legendFontSize: 14,
+                    legendFontSize: 13,
                   },
                 ]}
-                width={screenWidth - 80}
+                width={screenWidth - 64}
                 height={220}
                 chartConfig={{
                   backgroundColor: '#FFFFFF',
@@ -1328,17 +1602,26 @@ export default function DashboardScreen() {
 
             {/* Bar Chart */}
             <View style={styles.chartCard}>
-              <Text style={styles.chartLabel}>Payment Comparison</Text>
+              <Text style={styles.chartLabel}>Payment Status Comparison</Text>
               <BarChart
                 data={{
-                  labels: ['Paid', 'Unpaid'],
+                  labels: ['Paid', 'Pending', 'Unpaid'],
                   datasets: [
                     {
-                      data: [stats.paidResidents, stats.unpaidResidents],
+                      data: [
+                        stats.paidResidents || 0.1, 
+                        stats.pendingPayments || 0.1, 
+                        stats.unpaidResidents || 0.1
+                      ],
+                      colors: [
+                        () => '#059669',
+                        () => '#F59E0B',
+                        () => '#DC2626',
+                      ],
                     },
                   ],
                 }}
-                width={screenWidth - 80}
+                width={screenWidth - 64}
                 height={220}
                 yAxisLabel=""
                 yAxisSuffix=""
@@ -1354,8 +1637,10 @@ export default function DashboardScreen() {
                   style: {
                     borderRadius: 16,
                   },
-                  barPercentage: 0.6,
+                  barPercentage: 0.5,
                 }}
+                withCustomBarColorFromData
+                flatColor
                 style={{
                   marginVertical: 8,
                   borderRadius: 16,
@@ -1367,43 +1652,44 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {/* Statistics Cards */}
-        <View style={styles.statsContainer}>
-          <Text style={styles.statsTitle}>Statistics</Text>
-          <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
-              <View style={styles.statHeader}>
-                <View style={styles.statIcon}>
-                  <Ionicons
-                    name="people"
-                    size={16}
-                    color={Colors[colorScheme ?? 'light'].primary}
-                  />
-                </View>
-              </View>
-              <Text style={styles.statLabel}>Total Residents</Text>
-              <Text style={styles.statValue}>{stats.totalResidents}</Text>
-            </View>
+        {/* Quick Actions */}
+        <View style={styles.quickActionsContainer}>
+          <Text style={styles.statsTitle}>Quick Actions</Text>
+          <View style={styles.quickActionsGrid}>
+            <TouchableOpacity 
+              style={styles.quickActionButton}
+              onPress={() => router.push('/(tabs)/users')}
+            >
+              <Ionicons name="people-outline" size={28} color={Colors[colorScheme ?? 'light'].primary} />
+              <Text style={styles.quickActionText}>View Users</Text>
+            </TouchableOpacity>
 
-            <View style={[styles.statCard, styles.statCardFull]}>
-              <View style={styles.statHeader}>
-                <View style={[styles.statIcon, { backgroundColor: '#E0F7FA' }]}>
-                  <Ionicons
-                    name="water"
-                    size={16}
-                    color={Colors[colorScheme ?? 'light'].primary}
-                  />
-                </View>
-              </View>
-              <Text style={styles.statLabel}>Water Rate</Text>
-              <Text style={styles.statValue}>
-              ₱{WATER_RATE_PER_CUBIC_METER.toFixed(2)} per m³
-              </Text>
-            </View>
+            <TouchableOpacity 
+              style={styles.quickActionButton}
+              onPress={() => router.push('/(tabs)/payment-history')}
+            >
+              <Ionicons name="document-text-outline" size={28} color={Colors[colorScheme ?? 'light'].primary} />
+              <Text style={styles.quickActionText}>Payments</Text>
+            </TouchableOpacity>
 
-          
+            <TouchableOpacity 
+              style={styles.quickActionButton}
+              onPress={() => router.push('/(tabs)/notifications')}
+            >
+              <Ionicons name="notifications-outline" size={28} color={Colors[colorScheme ?? 'light'].primary} />
+              <Text style={styles.quickActionText}>Notifications</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.quickActionButton}
+              onPress={handleRefresh}
+            >
+              <Ionicons name="refresh-outline" size={28} color={Colors[colorScheme ?? 'light'].primary} />
+              <Text style={styles.quickActionText}>Refresh</Text>
+            </TouchableOpacity>
           </View>
         </View>
+
       </ScrollView>
     </SafeAreaView>
   );
