@@ -19,7 +19,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { collection, db, getDocs, query, where } from '../../firebase';
+import { addDoc, collection, db, getDocs, query, where } from '../../firebase';
 
 interface UserDetail {
   id: string;
@@ -54,12 +54,30 @@ export default function UserDetailScreen() {
   const [consumption, setConsumption] = useState('');
   const [totalAmount, setTotalAmount] = useState('');
   const [showDatePicker, setShowDatePicker] = useState<'from' | 'to' | 'due' | null>(null);
+  const [submittingBill, setSubmittingBill] = useState(false);
+
+  const WATER_RATE_PER_CUBIC_METER = 20; // 20 pesos per cubic meter
 
   useEffect(() => {
     if (userId || email) {
       fetchUserDetail();
     }
   }, [userId, email]);
+
+  // Auto-calculate total amount when consumption changes
+  useEffect(() => {
+    if (consumption) {
+      const consumptionValue = parseFloat(consumption);
+      if (!isNaN(consumptionValue) && consumptionValue > 0) {
+        const calculatedTotal = consumptionValue * WATER_RATE_PER_CUBIC_METER;
+        setTotalAmount(calculatedTotal.toFixed(2));
+      } else {
+        setTotalAmount('');
+      }
+    } else {
+      setTotalAmount('');
+    }
+  }, [consumption]);
 
   const fetchUserDetail = async () => {
     try {
@@ -186,34 +204,71 @@ export default function UserDetailScreen() {
     setFormModalVisible(true);
   };
 
-  const handleSubmitBill = () => {
+  const handleSubmitBill = async () => {
     // Validate form fields
     if (!coverageDateFrom || !coverageDateTo || !dueDate || !consumption || !totalAmount) {
       alert('Please fill in all fields');
       return;
     }
 
-    // TODO: Save bill to Firestore
-    console.log('Bill submitted:', {
-      month: selectedMonth,
-      coverageDateFrom: coverageDateFrom.toISOString(),
-      coverageDateTo: coverageDateTo.toISOString(),
-      dueDate: dueDate.toISOString(),
-      consumption: parseFloat(consumption),
-      totalAmount: parseFloat(totalAmount),
-      userId: userDetail?.id,
-      userEmail: userDetail?.email,
-    });
+    const consumptionValue = parseFloat(consumption);
+    const amountValueFloat = parseFloat(totalAmount);
 
-    // Close form and reset
-    setFormModalVisible(false);
-    setSelectedMonth('');
-    setCoverageDateFrom(null);
-    setCoverageDateTo(null);
-    setDueDate(null);
-    setConsumption('');
-    setTotalAmount('');
-    setShowDatePicker(null);
+    // Validate the calculation
+    const expectedAmount = consumptionValue * WATER_RATE_PER_CUBIC_METER;
+    if (Math.abs(amountValueFloat - expectedAmount) > 0.01) {
+      alert('Amount calculation mismatch. Please check the consumption value.');
+      return;
+    }
+
+    if (!userDetail) {
+      alert('User information not available');
+      return;
+    }
+
+    setSubmittingBill(true);
+
+    try {
+      // Prepare bill data
+      const billData = {
+        userId: userDetail.id,
+        userEmail: userDetail.email,
+        userName: userDetail.fullName,
+        meterNumber: userDetail.meterNumber || '',
+        month: selectedMonth,
+        coverageDateFrom: coverageDateFrom.toISOString(),
+        coverageDateTo: coverageDateTo.toISOString(),
+        dueDate: dueDate.toISOString(),
+        consumption: consumptionValue,
+        waterRatePerCubicMeter: WATER_RATE_PER_CUBIC_METER,
+        totalAmount: amountValueFloat,
+        status: 'unpaid', // Default status
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Save to Firestore billing collection
+      const billingRef = collection(db, 'billing');
+      await addDoc(billingRef, billData);
+
+      // Show success message
+      alert('Bill created successfully!');
+
+      // Close form and reset
+      setFormModalVisible(false);
+      setSelectedMonth('');
+      setCoverageDateFrom(null);
+      setCoverageDateTo(null);
+      setDueDate(null);
+      setConsumption('');
+      setTotalAmount('');
+      setShowDatePicker(null);
+    } catch (error) {
+      console.error('Error saving bill:', error);
+      alert('Failed to save bill. Please try again.');
+    } finally {
+      setSubmittingBill(false);
+    }
   };
 
   const handleCancelForm = () => {
@@ -516,6 +571,16 @@ export default function UserDetailScreen() {
       fontSize: 16,
       color: Colors[colorScheme ?? 'light'].text,
     },
+    readOnlyInput: {
+      opacity: 0.7,
+      backgroundColor: Colors[colorScheme ?? 'light'].border,
+    },
+    rateInfo: {
+      fontSize: 12,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+      marginTop: 6,
+      fontStyle: 'italic',
+    },
     dateInput: {
       backgroundColor: Colors[colorScheme ?? 'light'].accent,
       borderWidth: 1,
@@ -592,6 +657,17 @@ export default function UserDetailScreen() {
       color: '#FFFFFF',
       fontSize: 16,
       fontWeight: '600',
+    },
+    disabledButton: {
+      opacity: 0.6,
+    },
+    submitButtonContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    submitButtonSpinner: {
+      marginRight: 8,
     },
   });
 
@@ -1093,28 +1169,40 @@ export default function UserDetailScreen() {
               <View style={styles.formField}>
                 <Text style={styles.formLabel}>Total Amount (PHP)</Text>
                 <TextInput
-                  style={styles.formInput}
-                  placeholder="0.00"
+                  style={[styles.formInput, styles.readOnlyInput]}
+                  placeholder="Auto-calculated"
                   placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
-                  value={totalAmount}
-                  onChangeText={setTotalAmount}
+                  value={totalAmount ? `₱${totalAmount}` : ''}
+                  editable={false}
                   keyboardType="decimal-pad"
                 />
+                <Text style={styles.rateInfo}>
+                  Rate: ₱{WATER_RATE_PER_CUBIC_METER.toFixed(2)} per cubic meter
+                </Text>
               </View>
             </ScrollView>
             <View style={styles.formButtons}>
               <TouchableOpacity
-                style={styles.cancelButton}
+                style={[styles.cancelButton, submittingBill && styles.disabledButton]}
                 onPress={handleCancelForm}
+                disabled={submittingBill}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
               <View style={styles.formButtonSpacing} />
               <TouchableOpacity
-                style={styles.submitButton}
+                style={[styles.submitButton, submittingBill && styles.disabledButton]}
                 onPress={handleSubmitBill}
+                disabled={submittingBill}
               >
-                <Text style={styles.submitButtonText}>Submit</Text>
+                {submittingBill ? (
+                  <View style={styles.submitButtonContent}>
+                    <ActivityIndicator size="small" color="#FFFFFF" style={styles.submitButtonSpinner} />
+                    <Text style={styles.submitButtonText}>Submitting...</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.submitButtonText}>Submit</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
