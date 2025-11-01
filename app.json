@@ -14,7 +14,8 @@
         "googleMapsApiKey": "AIzaSyBtlOXvz1Cr11cC4ZhLhXc4U0hQ00D6V50"
       },
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "This app uses location to show your position on the map for structural monitoring purposes."
+        "NSLocationWhenInUseUsageDescription": "This app uses location to show your position on the map for structural monitoring purposes.",
+        "NSCameraUsageDescription": "This app uses the camera to scan QR codes for quick access to user information and billing details."
       }
     },
     "android": {
@@ -33,7 +34,8 @@
       },
       "permissions": [
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA"
       ],
       "package": "com.sowishi1738.Trackey"
     },
