@@ -352,17 +352,7 @@ export default function ScheduleScreen() {
           </View>
         </View>
 
-        {/* RFID Instruction */}
-        <View style={styles.instructionCard}>
-          <Ionicons 
-            name="card" 
-            size={24} 
-            color={Colors[colorScheme ?? 'light'].primary}
-          />
-          <ThemedText style={styles.instructionText}>
-            Please scan your RFID to device to get your key
-          </ThemedText>
-        </View>
+      
 
         {/* Schedule Content */}
         <ScrollView 

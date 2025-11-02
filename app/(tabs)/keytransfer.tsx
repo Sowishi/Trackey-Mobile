@@ -45,6 +45,7 @@ export default function KeyTransferScreen() {
   const [transferRequests, setTransferRequests] = useState<TransferRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedKeyFilter, setSelectedKeyFilter] = useState<number | 'all'>('all');
 
   const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -413,6 +414,18 @@ export default function KeyTransferScreen() {
     return filtered;
   };
 
+  const getUniqueKeyNumbers = (): number[] => {
+    const keyNumbers = schedules.map(s => s.key);
+    return Array.from(new Set(keyNumbers)).sort((a, b) => a - b);
+  };
+
+  const getFilteredSchedules = (): ScheduleItem[] => {
+    if (selectedKeyFilter === 'all') {
+      return schedules;
+    }
+    return schedules.filter(s => s.key === selectedKeyFilter);
+  };
+
   const logTransferActivity = (action: string, fromUser: string, toUser: string, details: string) => {
     if (!user) return;
 
@@ -674,10 +687,46 @@ export default function KeyTransferScreen() {
       textAlign: 'center',
       lineHeight: 24,
     },
+    filterContainer: {
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+    },
+    filterTitle: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+      marginBottom: 12,
+    },
+    filterChipsContainer: {
+      flexDirection: 'row',
+      gap: 8,
+      paddingRight: 20,
+    },
+    filterChip: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 20,
+      borderWidth: 2,
+      borderColor: Colors[colorScheme ?? 'light'].primary,
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+    },
+    filterChipActive: {
+      backgroundColor: Colors[colorScheme ?? 'light'].primary,
+    },
+    filterChipText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].primary,
+    },
+    filterChipTextActive: {
+      color: 'white',
+    },
   });
 
   const pendingRequests = getPendingRequestsForUser();
-
+  const uniqueKeyNumbers = getUniqueKeyNumbers();
+  const filteredSchedules = getFilteredSchedules();
 
   console.log(user.rfid);
 
@@ -689,6 +738,50 @@ export default function KeyTransferScreen() {
           <ThemedText style={styles.headerTitle}>Key Transfer</ThemedText>
           <ThemedText style={styles.headerSubtitle}>Request or manage schedule transfers</ThemedText>
         </View>
+
+        {/* Filter Section */}
+        {!loading && schedules.length > 0 && (
+          <View style={styles.filterContainer}>
+            <ThemedText style={styles.filterTitle}>Filter by Key Number:</ThemedText>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterChipsContainer}
+            >
+              <TouchableOpacity
+                style={[
+                  styles.filterChip,
+                  selectedKeyFilter === 'all' && styles.filterChipActive
+                ]}
+                onPress={() => setSelectedKeyFilter('all')}
+              >
+                <ThemedText style={[
+                  styles.filterChipText,
+                  selectedKeyFilter === 'all' && styles.filterChipTextActive
+                ]}>
+                  All Keys
+                </ThemedText>
+              </TouchableOpacity>
+              {uniqueKeyNumbers.map((keyNum) => (
+                <TouchableOpacity
+                  key={keyNum}
+                  style={[
+                    styles.filterChip,
+                    selectedKeyFilter === keyNum && styles.filterChipActive
+                  ]}
+                  onPress={() => setSelectedKeyFilter(keyNum)}
+                >
+                  <ThemedText style={[
+                    styles.filterChipText,
+                    selectedKeyFilter === keyNum && styles.filterChipTextActive
+                  ]}>
+                    Key #{keyNum}
+                  </ThemedText>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         {/* Content */}
         <ScrollView 
@@ -767,9 +860,22 @@ export default function KeyTransferScreen() {
                 No schedules are currently available for transfer.
               </ThemedText>
             </View>
+          ) : filteredSchedules.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons 
+                name="filter-outline" 
+                size={80} 
+                color={Colors[colorScheme ?? 'light'].tabIconDefault}
+                style={styles.emptyIcon}
+              />
+              <ThemedText style={styles.emptyTitle}>No Schedules Match Filter</ThemedText>
+              <ThemedText style={styles.emptyText}>
+                Try selecting a different key filter to see more schedules.
+              </ThemedText>
+            </View>
           ) : (
-            schedules.map((schedule, index) => (
-              <View key={schedule.key || index} style={styles.scheduleCard}>
+            filteredSchedules.map((schedule, index) => (
+              <View key={`${schedule.key}-${schedule.currentHolderRfid}`} style={styles.scheduleCard}>
                 {/* Schedule Header */}
                 <View style={styles.scheduleHeader}>
                   <View style={styles.scheduleKey}>
