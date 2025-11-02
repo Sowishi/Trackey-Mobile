@@ -444,6 +444,52 @@ export default function KeyTransferScreen() {
       });
   };
 
+  const handleReturnKey = () => {
+    if (!user) return;
+
+    Alert.alert(
+      'Return Key',
+      'Are you sure you want to return the key?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Return', 
+          onPress: () => {
+            // Update RFID data
+            const rfidRef = ref(database, 'CNSHS-TRACKEY/RFID');
+            const updates = {
+              return_rfid: user.rfid,
+              is_return: true,
+              is_enroll: false
+            };
+
+            update(rfidRef, updates)
+              .then(() => {
+                // Add log entry
+                const logEntry = {
+                  action: "Key Return",
+                  details: `${user.name} returned the key`,
+                  timestamp: new Date().toISOString(),
+                  type: "system",
+                  user: user.name
+                };
+
+                const logsRef = ref(database, 'CNSHS-TRACKEY/logs');
+                return push(logsRef, logEntry);
+              })
+              .then(() => {
+                Alert.alert('Success', 'Key returned successfully!');
+              })
+              .catch((error: any) => {
+                console.error('Error returning key:', error);
+                Alert.alert('Error', 'Failed to return key. Please try again.');
+              });
+          }
+        }
+      ]
+    );
+  };
+
   if (!user) {
     return null;
   }
@@ -722,6 +768,22 @@ export default function KeyTransferScreen() {
     filterChipTextActive: {
       color: 'white',
     },
+    fab: {
+      position: 'absolute',
+      bottom: 80,
+      right: 20,
+      backgroundColor: Colors[colorScheme ?? 'light'].primary,
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 8,
+    },
   });
 
   const pendingRequests = getPendingRequestsForUser();
@@ -950,6 +1012,15 @@ export default function KeyTransferScreen() {
             ))
           )}
         </ScrollView>
+
+        {/* FAB - Return Key Button */}
+        <TouchableOpacity 
+          style={styles.fab}
+          onPress={handleReturnKey}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="key" size={28} color="white" />
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
