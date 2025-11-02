@@ -483,7 +483,7 @@ export default function DashboardScreen() {
     },
     container: {
       flex: 1,
-      paddingBottom: 80,
+      paddingBottom: 200,
     },
     content: {
       padding: 20,
@@ -617,7 +617,7 @@ export default function DashboardScreen() {
       marginBottom: 8,
     },
     metricValue: {
-      fontSize: 28,
+      fontSize: 20,
       fontWeight: 'bold',
       marginBottom: 4,
     },
@@ -670,7 +670,7 @@ export default function DashboardScreen() {
     },
     quickActionsContainer: {
       marginTop: 8,
-      marginBottom: 20,
+      marginBottom: 200,
     },
     quickActionsGrid: {
       flexDirection: 'row',

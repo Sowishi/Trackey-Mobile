@@ -1,4 +1,3 @@
-import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -19,9 +18,11 @@ export function ScreenHeader({ title, onUserPress, profilePicUrl }: ScreenHeader
       justifyContent: 'space-between',
       paddingHorizontal: 20,
       paddingVertical: 16,
-      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      backgroundColor: '#0078b5',
       borderBottomWidth: 1,
-      borderBottomColor: Colors[colorScheme ?? 'light'].border,
+      borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+      borderBottomLeftRadius: 20,
+      borderBottomRightRadius: 20,
     },
     leftSection: {
       flexDirection: 'row',
@@ -37,7 +38,7 @@ export function ScreenHeader({ title, onUserPress, profilePicUrl }: ScreenHeader
     title: {
       fontSize: 20,
       fontWeight: 'bold',
-      color: Colors[colorScheme ?? 'light'].text,
+      color: '#FFFFFF',
     },
     userIcon: {
       padding: 8,
@@ -47,17 +48,17 @@ export function ScreenHeader({ title, onUserPress, profilePicUrl }: ScreenHeader
       height: 40,
       borderRadius: 20,
       borderWidth: 2,
-      borderColor: Colors[colorScheme ?? 'light'].primary,
+      borderColor: '#FFFFFF',
     },
     profilePicturePlaceholder: {
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
       justifyContent: 'center',
       alignItems: 'center',
       borderWidth: 2,
-      borderColor: Colors[colorScheme ?? 'light'].primary,
+      borderColor: '#FFFFFF',
     },
   });
 
@@ -84,7 +85,7 @@ export function ScreenHeader({ title, onUserPress, profilePicUrl }: ScreenHeader
             <Ionicons 
               name="person" 
               size={24} 
-              color={Colors[colorScheme ?? 'light'].primary}
+              color="#FFFFFF"
             />
           </View>
         )}
