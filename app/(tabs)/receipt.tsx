@@ -354,10 +354,22 @@ export default function ReceiptScreen() {
           {/* Bill Details */}
           <View style={styles.receiptSection}>
             <Text style={styles.sectionTitle}>Bill Details</Text>
+            {billData.previousConsumption !== undefined && (
+              <View style={styles.receiptRow}>
+                <Text style={styles.receiptLabel}>Previous Consumption:</Text>
+                <Text style={styles.receiptValue}>{billData.previousConsumption} cubic meters</Text>
+              </View>
+            )}
             <View style={styles.receiptRow}>
-              <Text style={styles.receiptLabel}>Consumption:</Text>
+              <Text style={styles.receiptLabel}>Present Consumption:</Text>
               <Text style={styles.receiptValue}>{billData.consumption} cubic meters</Text>
             </View>
+            {billData.consumptionUsed !== undefined && (
+              <View style={styles.receiptRow}>
+                <Text style={styles.receiptLabel}>Consumption Used:</Text>
+                <Text style={styles.receiptValue}>{billData.consumptionUsed.toFixed(2)} cubic meters</Text>
+              </View>
+            )}
             <View style={styles.receiptRow}>
               <Text style={styles.receiptLabel}>Rate per m³:</Text>
               <Text style={styles.receiptValue}>₱{billData.waterRatePerCubicMeter.toFixed(2)}</Text>

@@ -46,7 +46,9 @@ interface Bill {
   coverageDateFrom: string;
   coverageDateTo: string;
   dueDate: string;
+  previousConsumption?: number;
   consumption: number;
+  consumptionUsed?: number;
   totalAmount: number;
   status: string;
   createdAt: string;
@@ -424,10 +426,17 @@ export default function DashboardScreen() {
           </View>
         </View>
         <View style={styles.billDetails}>
-          <View style={styles.billDetailRow}>
-            <Text style={styles.billDetailLabel}>Consumption:</Text>
-            <Text style={styles.billDetailValue}>{item.consumption} m³</Text>
-          </View>
+          {item.consumptionUsed !== undefined ? (
+            <View style={styles.billDetailRow}>
+              <Text style={styles.billDetailLabel}>Consumption Used:</Text>
+              <Text style={styles.billDetailValue}>{item.consumptionUsed.toFixed(2)} m³</Text>
+            </View>
+          ) : (
+            <View style={styles.billDetailRow}>
+              <Text style={styles.billDetailLabel}>Consumption:</Text>
+              <Text style={styles.billDetailValue}>{item.consumption} m³</Text>
+            </View>
+          )}
           <View style={styles.billDetailRow}>
             <Text style={styles.billDetailLabel}>Amount:</Text>
             <Text style={styles.billAmount}>₱{item.totalAmount.toFixed(2)}</Text>

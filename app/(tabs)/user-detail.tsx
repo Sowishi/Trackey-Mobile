@@ -46,15 +46,14 @@ export default function UserDetailScreen() {
   const { userId, email } = params;
   const [userDetail, setUserDetail] = useState<UserDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [modalVisible, setModalVisible] = useState(false);
   const [formModalVisible, setFormModalVisible] = useState(false);
-  const [selectedMonth, setSelectedMonth] = useState<string>('');
-  const [coverageDateFrom, setCoverageDateFrom] = useState<Date | null>(null);
-  const [coverageDateTo, setCoverageDateTo] = useState<Date | null>(null);
+  const [previousCoverageDate, setPreviousCoverageDate] = useState<Date | null>(null);
+  const [previousConsumption, setPreviousConsumption] = useState('');
+  const [presentDate, setPresentDate] = useState<Date | null>(null);
+  const [presentConsumption, setPresentConsumption] = useState('');
   const [dueDate, setDueDate] = useState<Date | null>(null);
-  const [consumption, setConsumption] = useState('');
   const [totalAmount, setTotalAmount] = useState('');
-  const [showDatePicker, setShowDatePicker] = useState<'from' | 'to' | 'due' | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState<'present' | 'due' | null>(null);
   const [submittingBill, setSubmittingBill] = useState(false);
   const [billingModalVisible, setBillingModalVisible] = useState(false);
   const [billingData, setBillingData] = useState<any[]>([]);
@@ -68,12 +67,14 @@ export default function UserDetailScreen() {
     }
   }, [userId]);
 
-  // Auto-calculate total amount when consumption changes
+  // Auto-calculate total amount based on consumption difference
   useEffect(() => {
-    if (consumption) {
-      const consumptionValue = parseFloat(consumption);
-      if (!isNaN(consumptionValue) && consumptionValue > 0) {
-        const calculatedTotal = consumptionValue * WATER_RATE_PER_CUBIC_METER;
+    if (presentConsumption && previousConsumption) {
+      const presentValue = parseFloat(presentConsumption);
+      const previousValue = parseFloat(previousConsumption);
+      if (!isNaN(presentValue) && !isNaN(previousValue) && presentValue > previousValue) {
+        const consumptionDiff = presentValue - previousValue;
+        const calculatedTotal = consumptionDiff * WATER_RATE_PER_CUBIC_METER;
         setTotalAmount(calculatedTotal.toFixed(2));
       } else {
         setTotalAmount('');
@@ -81,7 +82,7 @@ export default function UserDetailScreen() {
     } else {
       setTotalAmount('');
     }
-  }, [consumption]);
+  }, [presentConsumption, previousConsumption]);
 
   const fetchUserDetail = async () => {
     try {
@@ -153,71 +154,78 @@ export default function UserDetailScreen() {
     return name.split(' ').map((n) => n[0]).join('').toUpperCase();
   };
 
-  const months = [
-    'January',
-    'February',
-    'March',
-    'April',
-    'May',
-    'June',
-    'July',
-    'August',
-    'September',
-    'October',
-    'November',
-    'December',
-  ];
-
-  const getMonthNumber = (monthName: string): number => {
-    const index = months.findIndex(m => m === monthName);
-    return index >= 0 ? index : new Date().getMonth();
-  };
-
-  const getDateInSelectedMonth = (monthName: string, day: number = 1): Date => {
-    const now = new Date();
-    const monthIndex = getMonthNumber(monthName);
-    return new Date(now.getFullYear(), monthIndex, day);
-  };
-
-  const getLastDayOfMonth = (monthName: string): number => {
-    const now = new Date();
-    const monthIndex = getMonthNumber(monthName);
-    return new Date(now.getFullYear(), monthIndex + 1, 0).getDate();
-  };
-
-  const handleMonthSelect = (month: string) => {
-    setSelectedMonth(month);
-    setModalVisible(false);
-    // Set default dates based on selected month
-    const monthStartDate = getDateInSelectedMonth(month, 1);
-    const lastDay = getLastDayOfMonth(month);
-    const monthEndDate = getDateInSelectedMonth(month, lastDay);
-    const monthMiddleDate = getDateInSelectedMonth(month, 15);
+  const handleAddBill = async () => {
+    if (!userDetail) return;
     
-    setCoverageDateFrom(monthStartDate);
-    setCoverageDateTo(monthEndDate);
-    setDueDate(monthMiddleDate);
-    setConsumption('');
-    setTotalAmount('');
-    setShowDatePicker(null);
-    // Open form modal
-    setFormModalVisible(true);
+    try {
+      // Fetch the last bill for this user
+      const billingRef = collection(db, 'billing');
+      const q = query(
+        billingRef, 
+        where('userId', '==', userDetail.id)
+      );
+      const querySnapshot = await getDocs(q);
+      
+      const bills: any[] = [];
+      querySnapshot.forEach((doc) => {
+        bills.push({
+          id: doc.id,
+          ...doc.data(),
+        });
+      });
+      
+      // Sort by createdAt to get the most recent bill
+      bills.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      
+      if (bills.length > 0) {
+        const lastBill = bills[0];
+        // Set previous data from the last bill's present data
+        setPreviousCoverageDate(new Date(lastBill.coverageDateTo));
+        setPreviousConsumption(lastBill.consumption.toString());
+      } else {
+        // First bill - set previous to null/empty
+        setPreviousCoverageDate(null);
+        setPreviousConsumption('0');
+      }
+      
+      // Set present date to today by default
+      setPresentDate(new Date());
+      setPresentConsumption('');
+      setDueDate(new Date());
+      setTotalAmount('');
+      setShowDatePicker(null);
+      
+      // Open form modal
+      setFormModalVisible(true);
+    } catch (error) {
+      console.error('Error fetching last bill:', error);
+      alert('Failed to load previous bill data');
+    }
   };
 
   const handleSubmitBill = async () => {
     // Validate form fields
-    if (!coverageDateFrom || !coverageDateTo || !dueDate || !consumption || !totalAmount) {
+    if (!previousCoverageDate || !presentDate || !dueDate || !previousConsumption || !presentConsumption || !totalAmount) {
       alert('Please fill in all fields');
       return;
     }
 
-    const consumptionValue = parseFloat(consumption);
+    const previousConsumptionValue = parseFloat(previousConsumption);
+    const presentConsumptionValue = parseFloat(presentConsumption);
     const amountValueFloat = parseFloat(totalAmount);
 
+    // Validate consumption values
+    if (presentConsumptionValue <= previousConsumptionValue) {
+      alert('Present consumption must be greater than previous consumption');
+      return;
+    }
+
+    const consumptionDiff = presentConsumptionValue - previousConsumptionValue;
+
     // Validate the calculation
-    const expectedAmount = consumptionValue * WATER_RATE_PER_CUBIC_METER;
+    const expectedAmount = consumptionDiff * WATER_RATE_PER_CUBIC_METER;
     if (Math.abs(amountValueFloat - expectedAmount) > 0.01) {
-      alert('Amount calculation mismatch. Please check the consumption value.');
+      alert('Amount calculation mismatch. Please check the consumption values.');
       return;
     }
 
@@ -229,17 +237,22 @@ export default function UserDetailScreen() {
     setSubmittingBill(true);
 
     try {
+      // Generate month string from present date
+      const monthString = presentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
       // Prepare bill data
       const billData = {
         userId: userDetail.id,
         userEmail: userDetail.email,
         userName: userDetail.fullName,
         meterNumber: userDetail.meterNumber || '',
-        month: selectedMonth,
-        coverageDateFrom: coverageDateFrom.toISOString(),
-        coverageDateTo: coverageDateTo.toISOString(),
+        month: monthString,
+        coverageDateFrom: previousCoverageDate.toISOString(),
+        coverageDateTo: presentDate.toISOString(),
         dueDate: dueDate.toISOString(),
-        consumption: consumptionValue,
+        previousConsumption: previousConsumptionValue,
+        consumption: presentConsumptionValue,
+        consumptionUsed: consumptionDiff,
         waterRatePerCubicMeter: WATER_RATE_PER_CUBIC_METER,
         totalAmount: amountValueFloat,
         status: 'unpaid', // Default status
@@ -265,7 +278,7 @@ export default function UserDetailScreen() {
           userName: userDetail.fullName,
           type: 'bill_created',
           title: 'New Bill Generated',
-          message: `A new water bill for ${selectedMonth} (₱${amountValueFloat.toFixed(2)}) has been generated. Please check your dashboard.`,
+          message: `A new water bill for ${monthString} (₱${amountValueFloat.toFixed(2)}) has been generated. Please check your dashboard.`,
           billId: docRef.id,
           status: 'unread',
           createdAt: new Date().toISOString(),
@@ -282,11 +295,11 @@ export default function UserDetailScreen() {
 
       // Close form and reset
       setFormModalVisible(false);
-      setSelectedMonth('');
-      setCoverageDateFrom(null);
-      setCoverageDateTo(null);
+      setPreviousCoverageDate(null);
+      setPreviousConsumption('');
+      setPresentDate(null);
+      setPresentConsumption('');
       setDueDate(null);
-      setConsumption('');
       setTotalAmount('');
       setShowDatePicker(null);
 
@@ -307,11 +320,11 @@ export default function UserDetailScreen() {
 
   const handleCancelForm = () => {
     setFormModalVisible(false);
-    setSelectedMonth('');
-    setCoverageDateFrom(null);
-    setCoverageDateTo(null);
+    setPreviousCoverageDate(null);
+    setPreviousConsumption('');
+    setPresentDate(null);
+    setPresentConsumption('');
     setDueDate(null);
-    setConsumption('');
     setTotalAmount('');
     setShowDatePicker(null);
   };
@@ -333,12 +346,8 @@ export default function UserDetailScreen() {
         });
       });
 
-      // Sort by month and then by createdAt (newest first)
-      bills.sort((a, b) => {
-        const monthOrder = months.indexOf(a.month) - months.indexOf(b.month);
-        if (monthOrder !== 0) return monthOrder;
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      });
+      // Sort by createdAt (newest first)
+      bills.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
       setBillingData(bills);
     } catch (error) {
@@ -399,10 +408,22 @@ export default function UserDetailScreen() {
           </View>
         </View>
         <View style={styles.billDetails}>
+          {item.previousConsumption !== undefined && (
+            <View style={styles.billDetailRow}>
+              <Text style={styles.billDetailLabel}>Previous Consumption:</Text>
+              <Text style={styles.billDetailValue}>{item.previousConsumption} m³</Text>
+            </View>
+          )}
           <View style={styles.billDetailRow}>
-            <Text style={styles.billDetailLabel}>Consumption:</Text>
+            <Text style={styles.billDetailLabel}>Present Consumption:</Text>
             <Text style={styles.billDetailValue}>{item.consumption} m³</Text>
           </View>
+          {item.consumptionUsed !== undefined && (
+            <View style={styles.billDetailRow}>
+              <Text style={styles.billDetailLabel}>Consumption Used:</Text>
+              <Text style={styles.billDetailValue}>{item.consumptionUsed.toFixed(2)} m³</Text>
+            </View>
+          )}
           <View style={styles.billDetailRow}>
             <Text style={styles.billDetailLabel}>Due Date:</Text>
             <Text style={styles.billDetailValue}>{formatDateForBill(item.dueDate)}</Text>
@@ -416,26 +437,22 @@ export default function UserDetailScreen() {
     );
   };
 
-  const handleDateChange = (event: any, selectedDate?: Date, field: 'from' | 'to' | 'due' = 'from') => {
+  const handleDateChange = (event: any, selectedDate?: Date, field: 'present' | 'due' = 'present') => {
     const currentDate = selectedDate || new Date();
 
     if (Platform.OS === 'android') {
       setShowDatePicker(null);
       if (event.type === 'set') {
-        if (field === 'from') {
-          setCoverageDateFrom(currentDate);
-        } else if (field === 'to') {
-          setCoverageDateTo(currentDate);
+        if (field === 'present') {
+          setPresentDate(currentDate);
         } else if (field === 'due') {
           setDueDate(currentDate);
         }
       }
     } else {
       // iOS
-      if (field === 'from') {
-        setCoverageDateFrom(currentDate);
-      } else if (field === 'to') {
-        setCoverageDateTo(currentDate);
+      if (field === 'present') {
+        setPresentDate(currentDate);
       } else if (field === 'due') {
         setDueDate(currentDate);
       }
@@ -672,23 +689,6 @@ export default function UserDetailScreen() {
     },
     closeButton: {
       padding: 4,
-    },
-    monthsContainer: {
-      paddingHorizontal: 20,
-    },
-    monthItem: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingVertical: 16,
-      paddingHorizontal: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: Colors[colorScheme ?? 'light'].border,
-    },
-    monthText: {
-      fontSize: 16,
-      color: Colors[colorScheme ?? 'light'].text,
-      fontWeight: '500',
     },
     formModalContent: {
       backgroundColor: Colors[colorScheme ?? 'light'].background,
@@ -1145,7 +1145,7 @@ export default function UserDetailScreen() {
           <View style={styles.buttonSpacing} />
           <TouchableOpacity
             style={styles.addBillButton}
-            onPress={() => setModalVisible(true)}
+            onPress={handleAddBill}
           >
             <Ionicons
               name="add-circle"
@@ -1157,51 +1157,6 @@ export default function UserDetailScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-
-      {/* Month Selection Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setModalVisible(false)}
-        >
-          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Month</Text>
-              <TouchableOpacity
-                onPress={() => setModalVisible(false)}
-                style={styles.closeButton}
-              >
-                <Ionicons
-                  name="close"
-                  size={24}
-                  color={Colors[colorScheme ?? 'light'].text}
-                />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={styles.monthsContainer}>
-              {months.map((month, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.monthItem}
-                  onPress={() => handleMonthSelect(month)}
-                >
-                  <Text style={styles.monthText}>{month}</Text>
-                  <Ionicons
-                    name="chevron-forward"
-                    size={20}
-                    color={Colors[colorScheme ?? 'light'].tabIconDefault}
-                  />
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </Pressable>
-      </Modal>
 
       {/* Bill Form Modal */}
       <Modal
@@ -1216,7 +1171,7 @@ export default function UserDetailScreen() {
         >
           <View style={styles.formModalContent} onStartShouldSetResponder={() => true}>
             <View style={styles.formHeader}>
-              <Text style={styles.formTitle}>Add Bill - {selectedMonth}</Text>
+              <Text style={styles.formTitle}>Add Bill</Text>
               <TouchableOpacity
                 onPress={handleCancelForm}
                 style={styles.closeButton}
@@ -1229,17 +1184,43 @@ export default function UserDetailScreen() {
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.formContent}>
+              {/* Previous Coverage Section */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Coverage Date From</Text>
+                <Text style={styles.formLabel}>Previous Coverage Date</Text>
+                <View style={[styles.dateInput, styles.readOnlyInput]}>
+                  <Text style={styles.dateInputText}>
+                    {previousCoverageDate ? formatDateForDisplay(previousCoverageDate) : 'No previous bill'}
+                  </Text>
+                  <Ionicons
+                    name="calendar-outline"
+                    size={20}
+                    color={Colors[colorScheme ?? 'light'].tabIconDefault}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Previous Consumption (cubic meters)</Text>
+                <TextInput
+                  style={[styles.formInput, styles.readOnlyInput]}
+                  value={previousConsumption}
+                  editable={false}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+
+              {/* Present Coverage Section */}
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Present Date</Text>
                 <TouchableOpacity
                   style={styles.dateInput}
-                  onPress={() => setShowDatePicker('from')}
+                  onPress={() => setShowDatePicker('present')}
                 >
                   <Text style={[
                     styles.dateInputText,
-                    !coverageDateFrom && styles.dateInputPlaceholder
+                    !presentDate && styles.dateInputPlaceholder
                   ]}>
-                    {formatDateForDisplay(coverageDateFrom)}
+                    {formatDateForDisplay(presentDate)}
                   </Text>
                   <Ionicons
                     name="calendar-outline"
@@ -1247,7 +1228,7 @@ export default function UserDetailScreen() {
                     color={Colors[colorScheme ?? 'light'].primary}
                   />
                 </TouchableOpacity>
-                {showDatePicker === 'from' && (
+                {showDatePicker === 'present' && (
                   <>
                     {Platform.OS === 'ios' && (
                       <View style={styles.iosPickerContainer}>
@@ -1266,21 +1247,21 @@ export default function UserDetailScreen() {
                           </TouchableOpacity>
                         </View>
                         <DateTimePicker
-                          value={coverageDateFrom || (selectedMonth ? getDateInSelectedMonth(selectedMonth, 1) : new Date())}
+                          value={presentDate || new Date()}
                           mode="date"
                           display="spinner"
-                          onChange={(event, date) => handleDateChange(event, date, 'from')}
+                          onChange={(event, date) => handleDateChange(event, date, 'present')}
                           textColor={Colors[colorScheme ?? 'light'].text}
                         />
                       </View>
                     )}
                     {Platform.OS === 'android' && (
                       <DateTimePicker
-                        value={coverageDateFrom || (selectedMonth ? getDateInSelectedMonth(selectedMonth, 1) : new Date())}
+                        value={presentDate || new Date()}
                         mode="date"
                         display="default"
                         onChange={(event, date) => {
-                          handleDateChange(event, date, 'from');
+                          handleDateChange(event, date, 'present');
                           setShowDatePicker(null);
                         }}
                       />
@@ -1290,65 +1271,18 @@ export default function UserDetailScreen() {
               </View>
 
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Coverage Date To</Text>
-                <TouchableOpacity
-                  style={styles.dateInput}
-                  onPress={() => setShowDatePicker('to')}
-                >
-                  <Text style={[
-                    styles.dateInputText,
-                    !coverageDateTo && styles.dateInputPlaceholder
-                  ]}>
-                    {formatDateForDisplay(coverageDateTo)}
-                  </Text>
-                  <Ionicons
-                    name="calendar-outline"
-                    size={20}
-                    color={Colors[colorScheme ?? 'light'].primary}
-                  />
-                </TouchableOpacity>
-                {showDatePicker === 'to' && (
-                  <>
-                    {Platform.OS === 'ios' && (
-                      <View style={styles.iosPickerContainer}>
-                        <View style={styles.iosPickerButtons}>
-                          <TouchableOpacity
-                            onPress={() => setShowDatePicker(null)}
-                            style={styles.iosPickerButton}
-                          >
-                            <Text style={styles.iosPickerButtonText}>Cancel</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            onPress={() => setShowDatePicker(null)}
-                            style={styles.iosPickerButton}
-                          >
-                            <Text style={[styles.iosPickerButtonText, styles.iosPickerButtonConfirm]}>Done</Text>
-                          </TouchableOpacity>
-                        </View>
-                        <DateTimePicker
-                          value={coverageDateTo || (selectedMonth ? getDateInSelectedMonth(selectedMonth, getLastDayOfMonth(selectedMonth)) : new Date())}
-                          mode="date"
-                          display="spinner"
-                          onChange={(event, date) => handleDateChange(event, date, 'to')}
-                          textColor={Colors[colorScheme ?? 'light'].text}
-                        />
-                      </View>
-                    )}
-                    {Platform.OS === 'android' && (
-                      <DateTimePicker
-                        value={coverageDateTo || (selectedMonth ? getDateInSelectedMonth(selectedMonth, getLastDayOfMonth(selectedMonth)) : new Date())}
-                        mode="date"
-                        display="default"
-                        onChange={(event, date) => {
-                          handleDateChange(event, date, 'to');
-                          setShowDatePicker(null);
-                        }}
-                      />
-                    )}
-                  </>
-                )}
+                <Text style={styles.formLabel}>Present Consumption (cubic meters)</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="0.00"
+                  placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
+                  value={presentConsumption}
+                  onChangeText={setPresentConsumption}
+                  keyboardType="decimal-pad"
+                />
               </View>
 
+              {/* Due Date */}
               <View style={styles.formField}>
                 <Text style={styles.formLabel}>Due Date</Text>
                 <TouchableOpacity
@@ -1386,7 +1320,7 @@ export default function UserDetailScreen() {
                           </TouchableOpacity>
                         </View>
                         <DateTimePicker
-                          value={dueDate || (selectedMonth ? getDateInSelectedMonth(selectedMonth, 15) : new Date())}
+                          value={dueDate || new Date()}
                           mode="date"
                           display="spinner"
                           onChange={(event, date) => handleDateChange(event, date, 'due')}
@@ -1396,7 +1330,7 @@ export default function UserDetailScreen() {
                     )}
                     {Platform.OS === 'android' && (
                       <DateTimePicker
-                        value={dueDate || (selectedMonth ? getDateInSelectedMonth(selectedMonth, 15) : new Date())}
+                        value={dueDate || new Date()}
                         mode="date"
                         display="default"
                         onChange={(event, date) => {
@@ -1409,18 +1343,7 @@ export default function UserDetailScreen() {
                 )}
               </View>
 
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>Consumption (cubic meters)</Text>
-                <TextInput
-                  style={styles.formInput}
-                  placeholder="0.00"
-                  placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
-                  value={consumption}
-                  onChangeText={setConsumption}
-                  keyboardType="decimal-pad"
-                />
-              </View>
-
+              {/* Total Amount */}
               <View style={styles.formField}>
                 <Text style={styles.formLabel}>Total Amount (PHP)</Text>
                 <TextInput
