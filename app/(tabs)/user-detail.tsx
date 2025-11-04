@@ -3,13 +3,13 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as ImageManipulator from 'expo-image-manipulator';
+import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Dimensions,
   FlatList,
   Image,
   Modal,
@@ -24,8 +24,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { addDoc, collection, db, doc, getDoc, getDocs, query, where } from '../../firebase';
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface UserDetail {
   id: string;
@@ -63,10 +61,7 @@ export default function UserDetailScreen() {
   const [billingModalVisible, setBillingModalVisible] = useState(false);
   const [billingData, setBillingData] = useState<any[]>([]);
   const [loadingBilling, setLoadingBilling] = useState(false);
-  const [cameraVisible, setCameraVisible] = useState(false);
-  const [permission, requestPermission] = useCameraPermissions();
   const [processingOCR, setProcessingOCR] = useState(false);
-  const cameraRef = useRef<CameraView>(null);
 
   const WATER_RATE_PER_CUBIC_METER = 20; // 20 pesos per cubic meter
 
@@ -469,23 +464,51 @@ export default function UserDetailScreen() {
   };
 
   const handleOpenScanner = async () => {
-    if (!permission) {
-      const result = await requestPermission();
-      if (!result.granted) {
+    try {
+      // Request camera permissions
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
         Alert.alert('Permission Denied', 'Camera permission is required to scan meter readings.');
         return;
       }
-    }
-    
-    if (!permission?.granted) {
-      const result = await requestPermission();
-      if (!result.granted) {
-        Alert.alert('Permission Denied', 'Camera permission is required to scan meter readings.');
-        return;
+
+      // Launch camera with built-in editing (cropping) enabled
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true, // This enables the built-in crop UI
+        aspect: [16, 9], // Suggested aspect ratio for meter readings
+        quality: 0.5,
+        base64: false,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        setProcessingOCR(true);
+        const imageUri = result.assets[0].uri;
+        
+        // Process the cropped image for OCR
+        const finalImage = await ImageManipulator.manipulateAsync(
+          imageUri,
+          [{ resize: { width: 800 } }],
+          { compress: 0.3, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+        );
+
+        if (finalImage.base64) {
+          const sizeInKB = (finalImage.base64.length * 3) / 4 / 1024;
+          console.log(`Final image size: ${sizeInKB.toFixed(2)} KB`);
+          
+          if (sizeInKB > 1024) {
+            Alert.alert('Image Too Large', 'The image is still too large. Please try again.');
+            setProcessingOCR(false);
+            return;
+          }
+          
+          await performOCR(finalImage.base64);
+        }
       }
+    } catch (error) {
+      console.error('Scanner error:', error);
+      Alert.alert('Error', 'Failed to open camera. Please try again.');
     }
-    
-    setCameraVisible(true);
   };
 
   const extractNumbersFromText = (text: string): string => {
@@ -549,37 +572,6 @@ export default function UserDetailScreen() {
     }
   };
 
-  const handleTakePicture = async () => {
-    if (cameraRef.current) {
-      try {
-        setProcessingOCR(true);
-        const photo = await cameraRef.current.takePictureAsync({
-          base64: true,
-          quality: 0.3,
-          exif: false,
-        });
-        
-        if (photo && photo.base64) {
-          // Check base64 size
-          const sizeInKB = (photo.base64.length * 3) / 4 / 1024;
-          console.log(`Image size: ${sizeInKB.toFixed(2)} KB`);
-          
-          if (sizeInKB > 1024) {
-            Alert.alert('Image Too Large', 'The captured image is too large. Please try again with better lighting or from a closer distance.');
-            setProcessingOCR(false);
-            return;
-          }
-          
-          setCameraVisible(false);
-          await performOCR(photo.base64);
-        }
-      } catch (error) {
-        console.error('Camera error:', error);
-        Alert.alert('Error', 'Failed to capture image. Please try again.');
-        setProcessingOCR(false);
-      }
-    }
-  };
 
   const styles = StyleSheet.create({
     safeArea: {
@@ -1084,111 +1076,6 @@ export default function UserDetailScreen() {
       shadowOpacity: 0.2,
       shadowRadius: 4,
       elevation: 4,
-    },
-    cameraContainer: {
-      flex: 1,
-      backgroundColor: '#000000',
-    },
-    camera: {
-      flex: 1,
-    },
-    cameraOverlay: {
-      flex: 1,
-      backgroundColor: 'transparent',
-    },
-    cameraHeader: {
-      paddingTop: 50,
-      paddingHorizontal: 20,
-      flexDirection: 'row',
-      justifyContent: 'flex-end',
-    },
-    cameraCloseButton: {
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      borderRadius: 25,
-      padding: 8,
-    },
-    cameraInstructions: {
-      alignItems: 'center',
-      marginTop: 20,
-      paddingHorizontal: 40,
-    },
-    cameraInstructionsText: {
-      color: '#FFFFFF',
-      fontSize: 16,
-      fontWeight: '600',
-      textAlign: 'center',
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      padding: 12,
-      borderRadius: 8,
-    },
-    cameraScanArea: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingHorizontal: 40,
-    },
-    scanFrame: {
-      width: '100%',
-      height: 200,
-      borderWidth: 3,
-      borderColor: '#FFFFFF',
-      borderRadius: 12,
-      backgroundColor: 'transparent',
-    },
-    cameraControls: {
-      paddingBottom: 50,
-      alignItems: 'center',
-    },
-    captureButton: {
-      width: 80,
-      height: 80,
-      borderRadius: 40,
-      backgroundColor: 'rgba(255, 255, 255, 0.3)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      borderWidth: 4,
-      borderColor: '#FFFFFF',
-    },
-    captureButtonInner: {
-      width: 60,
-      height: 60,
-      borderRadius: 30,
-      backgroundColor: '#FFFFFF',
-    },
-    processingContainer: {
-      alignItems: 'center',
-    },
-    processingText: {
-      color: '#FFFFFF',
-      fontSize: 16,
-      fontWeight: '600',
-      marginTop: 12,
-    },
-    permissionContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 40,
-      backgroundColor: Colors[colorScheme ?? 'light'].background,
-    },
-    permissionText: {
-      fontSize: 18,
-      fontWeight: '600',
-      color: Colors[colorScheme ?? 'light'].text,
-      marginTop: 20,
-      marginBottom: 30,
-      textAlign: 'center',
-    },
-    permissionButton: {
-      backgroundColor: Colors[colorScheme ?? 'light'].primary,
-      paddingVertical: 14,
-      paddingHorizontal: 30,
-      borderRadius: 12,
-    },
-    permissionButtonText: {
-      color: '#FFFFFF',
-      fontSize: 16,
-      fontWeight: '600',
     },
   });
 
@@ -1704,74 +1591,6 @@ export default function UserDetailScreen() {
             )}
           </View>
         </Pressable>
-      </Modal>
-
-      {/* Camera Modal for OCR */}
-      <Modal
-        animationType="slide"
-        transparent={false}
-        visible={cameraVisible}
-        onRequestClose={() => setCameraVisible(false)}
-      >
-        <View style={styles.cameraContainer}>
-          {permission?.granted ? (
-            <>
-              <CameraView
-                ref={cameraRef}
-                style={styles.camera}
-                facing="back"
-              >
-                <View style={styles.cameraOverlay}>
-                  <View style={styles.cameraHeader}>
-                    <TouchableOpacity
-                      style={styles.cameraCloseButton}
-                      onPress={() => setCameraVisible(false)}
-                    >
-                      <Ionicons name="close" size={32} color="#FFFFFF" />
-                    </TouchableOpacity>
-                  </View>
-                  
-                  <View style={styles.cameraInstructions}>
-                    <Text style={styles.cameraInstructionsText}>
-                      Position the meter reading in the frame
-                    </Text>
-                  </View>
-
-                  <View style={styles.cameraScanArea}>
-                    <View style={styles.scanFrame} />
-                  </View>
-
-                  <View style={styles.cameraControls}>
-                    {processingOCR ? (
-                      <View style={styles.processingContainer}>
-                        <ActivityIndicator size="large" color="#FFFFFF" />
-                        <Text style={styles.processingText}>Processing...</Text>
-                      </View>
-                    ) : (
-                      <TouchableOpacity
-                        style={styles.captureButton}
-                        onPress={handleTakePicture}
-                      >
-                        <View style={styles.captureButtonInner} />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </View>
-              </CameraView>
-            </>
-          ) : (
-            <View style={styles.permissionContainer}>
-              <Ionicons name="camera-outline" size={80} color={Colors[colorScheme ?? 'light'].icon} />
-              <Text style={styles.permissionText}>Camera permission is required</Text>
-              <TouchableOpacity
-                style={styles.permissionButton}
-                onPress={requestPermission}
-              >
-                <Text style={styles.permissionButtonText}>Grant Permission</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
       </Modal>
 
     </SafeAreaView>
