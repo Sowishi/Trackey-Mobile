@@ -35,6 +35,7 @@ interface Resident {
   profilePicUrl?: string;
   role: string;
   status: string;
+  hasUnpaidBills?: boolean;
 }
 
 export default function UsersScreen() {
@@ -65,11 +66,36 @@ export default function UsersScreen() {
         } as Resident);
       });
 
-      // Sort by fullName alphabetically
-      residentsList.sort((a, b) => a.fullName.localeCompare(b.fullName));
+      // Fetch billing status for each resident
+      const billingRef = collection(db, 'billing');
+      const residentsWithStatus = await Promise.all(
+        residentsList.map(async (resident) => {
+          try {
+            const billQuery = query(
+              billingRef,
+              where('userId', '==', resident.id),
+              where('status', '==', 'unpaid')
+            );
+            const billSnapshot = await getDocs(billQuery);
+            return {
+              ...resident,
+              hasUnpaidBills: !billSnapshot.empty,
+            };
+          } catch (error) {
+            console.error(`Error fetching bills for ${resident.fullName}:`, error);
+            return {
+              ...resident,
+              hasUnpaidBills: false,
+            };
+          }
+        })
+      );
 
-      setResidents(residentsList);
-      setFilteredResidents(residentsList);
+      // Sort by fullName alphabetically
+      residentsWithStatus.sort((a, b) => a.fullName.localeCompare(b.fullName));
+
+      setResidents(residentsWithStatus);
+      setFilteredResidents(residentsWithStatus);
     } catch (error) {
       console.error('Error fetching residents:', error);
     } finally {
@@ -139,6 +165,14 @@ export default function UsersScreen() {
         )}
         <View style={styles.cardInfo}>
           <Text style={styles.fullName}>{item.fullName}</Text>
+          <View style={[
+            styles.paymentBadge,
+            item.hasUnpaidBills ? styles.unpaidBadge : styles.paidBadge
+          ]}>
+            <Text style={styles.badgeText}>
+              {item.hasUnpaidBills ? 'Unpaid' : 'Paid'}
+            </Text>
+          </View>
         </View>
         <Ionicons
           name="chevron-forward"
@@ -282,6 +316,24 @@ export default function UsersScreen() {
       color: Colors[colorScheme ?? 'light'].text,
       marginLeft: 6,
       opacity: 0.7,
+    },
+    paymentBadge: {
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 12,
+      alignSelf: 'flex-start',
+      marginTop: 4,
+    },
+    paidBadge: {
+      backgroundColor: '#D1FAE5',
+    },
+    unpaidBadge: {
+      backgroundColor: '#FEE2E2',
+    },
+    badgeText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
     },
   });
 
