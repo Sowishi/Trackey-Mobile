@@ -3,10 +3,13 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  Dimensions,
   FlatList,
   Image,
   Modal,
@@ -21,6 +24,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { addDoc, collection, db, doc, getDoc, getDocs, query, where } from '../../firebase';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface UserDetail {
   id: string;
@@ -58,6 +63,10 @@ export default function UserDetailScreen() {
   const [billingModalVisible, setBillingModalVisible] = useState(false);
   const [billingData, setBillingData] = useState<any[]>([]);
   const [loadingBilling, setLoadingBilling] = useState(false);
+  const [cameraVisible, setCameraVisible] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
+  const [processingOCR, setProcessingOCR] = useState(false);
+  const cameraRef = useRef<CameraView>(null);
 
   const WATER_RATE_PER_CUBIC_METER = 20; // 20 pesos per cubic meter
 
@@ -455,6 +464,119 @@ export default function UserDetailScreen() {
         setPresentDate(currentDate);
       } else if (field === 'due') {
         setDueDate(currentDate);
+      }
+    }
+  };
+
+  const handleOpenScanner = async () => {
+    if (!permission) {
+      const result = await requestPermission();
+      if (!result.granted) {
+        Alert.alert('Permission Denied', 'Camera permission is required to scan meter readings.');
+        return;
+      }
+    }
+    
+    if (!permission?.granted) {
+      const result = await requestPermission();
+      if (!result.granted) {
+        Alert.alert('Permission Denied', 'Camera permission is required to scan meter readings.');
+        return;
+      }
+    }
+    
+    setCameraVisible(true);
+  };
+
+  const extractNumbersFromText = (text: string): string => {
+    // Extract all numbers from the text
+    const numbers = text.match(/\d+\.?\d*/g);
+    if (!numbers || numbers.length === 0) return '';
+    
+    // Find the longest number (most likely to be the meter reading)
+    const longestNumber = numbers.reduce((a, b) => a.length > b.length ? a : b);
+    return longestNumber;
+  };
+
+  const performOCR = async (base64Image: string) => {
+    setProcessingOCR(true);
+    try {
+      // Using OCR.space API with API key for better performance
+      const formData = new FormData();
+      formData.append('base64Image', `data:image/jpeg;base64,${base64Image}`);
+      formData.append('language', 'eng');
+      formData.append('isOverlayRequired', 'false');
+      formData.append('detectOrientation', 'true');
+      formData.append('scale', 'true');
+      formData.append('OCREngine', '2');
+      formData.append('apikey', 'K83043314988957');
+
+      const response = await fetch('https://api.ocr.space/parse/image', {
+        method: 'POST',
+        headers: {
+          'apikey': 'K83043314988957',
+        },
+        body: formData,
+      });
+
+      const result = await response.json();
+ 
+      console.log(result);
+      
+      if (result.ParsedResults && result.ParsedResults.length > 0) {
+        const parsedText = result.ParsedResults[0].ParsedText;
+        const extractedNumber = extractNumbersFromText(parsedText);
+        
+        if (extractedNumber) {
+          setPresentConsumption(extractedNumber);
+          Alert.alert('Success', `Detected reading: ${extractedNumber}`, [
+            { text: 'OK' }
+          ]);
+        } else {
+          Alert.alert('No Number Found', 'Could not detect a number from the image. Please try again or enter manually.');
+        }
+      } else {
+        const errorMessage = result.ErrorMessage || result.OCRExitCode 
+          ? `OCR Error: ${result.ErrorMessage?.[0] || 'Unknown error'}` 
+          : 'Could not read text from the image. Please try again or enter manually.';
+        Alert.alert('OCR Failed', errorMessage);
+      }
+    } catch (error) {
+      console.error('OCR Error:', error);
+      Alert.alert('Error', 'Failed to process the image. Please try again or enter manually.');
+    } finally {
+      setProcessingOCR(false);
+    }
+  };
+
+  const handleTakePicture = async () => {
+    if (cameraRef.current) {
+      try {
+        setProcessingOCR(true);
+        const photo = await cameraRef.current.takePictureAsync({
+          base64: true,
+          quality: 0.3,
+          exif: false,
+        });
+        
+        if (photo && photo.base64) {
+          // Check base64 size
+          const sizeInKB = (photo.base64.length * 3) / 4 / 1024;
+          console.log(`Image size: ${sizeInKB.toFixed(2)} KB`);
+          
+          if (sizeInKB > 1024) {
+            Alert.alert('Image Too Large', 'The captured image is too large. Please try again with better lighting or from a closer distance.');
+            setProcessingOCR(false);
+            return;
+          }
+          
+          setCameraVisible(false);
+          await performOCR(photo.base64);
+        }
+      } catch (error) {
+        console.error('Camera error:', error);
+        Alert.alert('Error', 'Failed to capture image. Please try again.');
+        setProcessingOCR(false);
       }
     }
   };
@@ -936,6 +1058,138 @@ export default function UserDetailScreen() {
       marginTop: 8,
       textAlign: 'center',
     },
+    inputWithButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    formInputWithIcon: {
+      flex: 1,
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+      borderRadius: 12,
+      padding: 14,
+      fontSize: 16,
+      color: Colors[colorScheme ?? 'light'].text,
+    },
+    scanButton: {
+      backgroundColor: Colors[colorScheme ?? 'light'].primary,
+      padding: 14,
+      borderRadius: 12,
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      elevation: 4,
+    },
+    cameraContainer: {
+      flex: 1,
+      backgroundColor: '#000000',
+    },
+    camera: {
+      flex: 1,
+    },
+    cameraOverlay: {
+      flex: 1,
+      backgroundColor: 'transparent',
+    },
+    cameraHeader: {
+      paddingTop: 50,
+      paddingHorizontal: 20,
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+    },
+    cameraCloseButton: {
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      borderRadius: 25,
+      padding: 8,
+    },
+    cameraInstructions: {
+      alignItems: 'center',
+      marginTop: 20,
+      paddingHorizontal: 40,
+    },
+    cameraInstructionsText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '600',
+      textAlign: 'center',
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      padding: 12,
+      borderRadius: 8,
+    },
+    cameraScanArea: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 40,
+    },
+    scanFrame: {
+      width: '100%',
+      height: 200,
+      borderWidth: 3,
+      borderColor: '#FFFFFF',
+      borderRadius: 12,
+      backgroundColor: 'transparent',
+    },
+    cameraControls: {
+      paddingBottom: 50,
+      alignItems: 'center',
+    },
+    captureButton: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: 'rgba(255, 255, 255, 0.3)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 4,
+      borderColor: '#FFFFFF',
+    },
+    captureButtonInner: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: '#FFFFFF',
+    },
+    processingContainer: {
+      alignItems: 'center',
+    },
+    processingText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '600',
+      marginTop: 12,
+    },
+    permissionContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 40,
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+    },
+    permissionText: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+      marginTop: 20,
+      marginBottom: 30,
+      textAlign: 'center',
+    },
+    permissionButton: {
+      backgroundColor: Colors[colorScheme ?? 'light'].primary,
+      paddingVertical: 14,
+      paddingHorizontal: 30,
+      borderRadius: 12,
+    },
+    permissionButtonText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '600',
+    },
   });
 
   if (loading) {
@@ -1272,14 +1526,26 @@ export default function UserDetailScreen() {
 
               <View style={styles.formField}>
                 <Text style={styles.formLabel}>Present Consumption (cubic meters)</Text>
-                <TextInput
-                  style={styles.formInput}
-                  placeholder="0.00"
-                  placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
-                  value={presentConsumption}
-                  onChangeText={setPresentConsumption}
-                  keyboardType="decimal-pad"
-                />
+                <View style={styles.inputWithButton}>
+                  <TextInput
+                    style={styles.formInputWithIcon}
+                    placeholder="0.00"
+                    placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
+                    value={presentConsumption}
+                    onChangeText={setPresentConsumption}
+                    keyboardType="decimal-pad"
+                  />
+                  <TouchableOpacity
+                    style={styles.scanButton}
+                    onPress={handleOpenScanner}
+                  >
+                    <Ionicons
+                      name="scan"
+                      size={24}
+                      color="#FFFFFF"
+                    />
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {/* Due Date */}
@@ -1439,6 +1705,75 @@ export default function UserDetailScreen() {
           </View>
         </Pressable>
       </Modal>
+
+      {/* Camera Modal for OCR */}
+      <Modal
+        animationType="slide"
+        transparent={false}
+        visible={cameraVisible}
+        onRequestClose={() => setCameraVisible(false)}
+      >
+        <View style={styles.cameraContainer}>
+          {permission?.granted ? (
+            <>
+              <CameraView
+                ref={cameraRef}
+                style={styles.camera}
+                facing="back"
+              >
+                <View style={styles.cameraOverlay}>
+                  <View style={styles.cameraHeader}>
+                    <TouchableOpacity
+                      style={styles.cameraCloseButton}
+                      onPress={() => setCameraVisible(false)}
+                    >
+                      <Ionicons name="close" size={32} color="#FFFFFF" />
+                    </TouchableOpacity>
+                  </View>
+                  
+                  <View style={styles.cameraInstructions}>
+                    <Text style={styles.cameraInstructionsText}>
+                      Position the meter reading in the frame
+                    </Text>
+                  </View>
+
+                  <View style={styles.cameraScanArea}>
+                    <View style={styles.scanFrame} />
+                  </View>
+
+                  <View style={styles.cameraControls}>
+                    {processingOCR ? (
+                      <View style={styles.processingContainer}>
+                        <ActivityIndicator size="large" color="#FFFFFF" />
+                        <Text style={styles.processingText}>Processing...</Text>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={styles.captureButton}
+                        onPress={handleTakePicture}
+                      >
+                        <View style={styles.captureButtonInner} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              </CameraView>
+            </>
+          ) : (
+            <View style={styles.permissionContainer}>
+              <Ionicons name="camera-outline" size={80} color={Colors[colorScheme ?? 'light'].icon} />
+              <Text style={styles.permissionText}>Camera permission is required</Text>
+              <TouchableOpacity
+                style={styles.permissionButton}
+                onPress={requestPermission}
+              >
+                <Text style={styles.permissionButtonText}>Grant Permission</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
