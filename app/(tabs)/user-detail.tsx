@@ -204,13 +204,13 @@ export default function UserDetailScreen() {
   };
 
   const handleSubmitBill = async () => {
-    // Validate form fields
-    if (!previousCoverageDate || !presentDate || !dueDate || !previousConsumption || !presentConsumption || !totalAmount) {
-      alert('Please fill in all fields');
+    // Validate form fields (previousCoverageDate can be null for first bill)
+    if (!presentDate || !dueDate || !presentConsumption || !totalAmount) {
+      alert('Please fill in all required fields');
       return;
     }
 
-    const previousConsumptionValue = parseFloat(previousConsumption);
+    const previousConsumptionValue = previousConsumption ? parseFloat(previousConsumption) : 0;
     const presentConsumptionValue = parseFloat(presentConsumption);
     const amountValueFloat = parseFloat(totalAmount);
 
@@ -247,7 +247,7 @@ export default function UserDetailScreen() {
         userName: userDetail.fullName,
         meterNumber: userDetail.meterNumber || '',
         month: monthString,
-        coverageDateFrom: previousCoverageDate.toISOString(),
+        coverageDateFrom: previousCoverageDate ? previousCoverageDate.toISOString() : presentDate.toISOString(),
         coverageDateTo: presentDate.toISOString(),
         dueDate: dueDate.toISOString(),
         previousConsumption: previousConsumptionValue,
