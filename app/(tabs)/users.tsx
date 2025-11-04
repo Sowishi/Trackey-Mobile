@@ -139,7 +139,6 @@ export default function UsersScreen() {
         )}
         <View style={styles.cardInfo}>
           <Text style={styles.fullName}>{item.fullName}</Text>
-          <Text style={styles.email}>{item.email}</Text>
         </View>
         <Ionicons
           name="chevron-forward"
@@ -147,28 +146,7 @@ export default function UsersScreen() {
           color={Colors[colorScheme ?? 'light'].icon}
         />
       </View>
-      <View style={styles.cardDetails}>
-        {item.contactNumber && (
-          <View style={styles.detailRow}>
-            <Ionicons
-              name="call-outline"
-              size={16}
-              color={Colors[colorScheme ?? 'light'].icon}
-            />
-            <Text style={styles.detailText}>{item.contactNumber}</Text>
-          </View>
-        )}
-        {item.meterNumber && (
-          <View style={styles.detailRow}>
-            <Ionicons
-              name="flash-outline"
-              size={16}
-              color={Colors[colorScheme ?? 'light'].icon}
-            />
-            <Text style={styles.detailText}>Meter: {item.meterNumber}</Text>
-          </View>
-        )}
-      </View>
+      
     </TouchableOpacity>
   );
 
@@ -193,8 +171,8 @@ export default function UsersScreen() {
       borderRadius: 12,
       borderWidth: 1,
       borderColor: Colors[colorScheme ?? 'light'].border,
-      paddingHorizontal: 16,
-      paddingVertical: 12,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
       marginBottom: 12,
     },
     searchIcon: {
@@ -246,8 +224,8 @@ export default function UsersScreen() {
     card: {
       backgroundColor: Colors[colorScheme ?? 'light'].background,
       borderRadius: 12,
-      padding: 16,
-      marginBottom: 12,
+      padding: 10,
+      marginBottom: 5,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.1,
@@ -259,7 +237,6 @@ export default function UsersScreen() {
     cardHeader: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: 12,
     },
     avatar: {
       width: 50,
