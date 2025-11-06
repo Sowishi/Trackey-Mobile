@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "Trackey",
+    "name": "Aquabill",
     "slug": "Struxis",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/aquabill-logo.png",
     "scheme": "trackey",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -14,15 +14,16 @@
         "googleMapsApiKey": "AIzaSyBtlOXvz1Cr11cC4ZhLhXc4U0hQ00D6V50"
       },
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "This app uses location to show your position on the map for structural monitoring purposes."
+        "NSLocationWhenInUseUsageDescription": "This app uses location to show your position on the map for structural monitoring purposes.",
+        "NSCameraUsageDescription": "This app uses the camera to scan QR codes for quick access to user information and billing details."
       }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#0077b6",
+        "foregroundImage": "./assets/images/aquabill-logo.png",
+        "backgroundImage": "./assets/images/aquabill-logo.png",
+        "monochromeImage": "./assets/images/aquabill-logo.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -33,7 +34,8 @@
       },
       "permissions": [
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA"
       ],
       "package": "com.sowishi1738.Trackey"
     },

@@ -3,103 +3,126 @@ import React from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HapticTab } from '@/components/haptic-tab';
-import { Colors } from '@/constants/theme';
+import { useUser } from '@/contexts/UserContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const insets = useSafeAreaInsets();
+  const { user } = useUser();
+
+  // Check if user is a resident
+  const isResident = user?.position?.toLowerCase() === 'resident' || user?.position?.toLowerCase() === 'residents';
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        tabBarInactiveTintColor: Colors[colorScheme ?? 'light'].tabIconDefault,
+        tabBarActiveTintColor: '#FFFFFF',
+        tabBarInactiveTintColor: 'rgba(255, 255, 255, 0.6)',
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarShowLabel: false,
         tabBarStyle: {
-          backgroundColor: Colors[colorScheme ?? 'light'].background,
-          borderTopColor: Colors[colorScheme ?? 'light'].tabIconDefault + '20',
+          backgroundColor: '#0078b5',
+          borderTopColor: 'rgba(255, 255, 255, 0.1)',
           borderTopWidth: 1,
-          height: 60 + insets.bottom,
+          height: 60,
           paddingBottom: Math.max(insets.bottom, 8),
           paddingTop: 8,
           position: 'absolute',
-          bottom: 0,
+          bottom: 20,
           left: 0,
           right: 0,
+          marginHorizontal: 15,
+          borderRadius: 50,
         },
       }}>
-    
-         <Tabs.Screen
+      <Tabs.Screen
         name="index"
         options={{
-          title: 'Tracking',
+          title: 'Dashboard',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               size={focused ? 32 : 28} 
-              name={focused ? "map" : "map-outline"} 
+              name={focused ? "home" : "home-outline"} 
               color={color} 
             />
           ),
         }}
       />
       <Tabs.Screen
-        name="schedule"
+        name="users"
         options={{
-          title: 'Schedule',
+          title: 'Users',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               size={focused ? 32 : 28} 
-              name={focused ? "calendar" : "calendar-outline"} 
+              name={focused ? "people" : "people-outline"} 
               color={color} 
             />
           ),
+          href: isResident ? null : undefined, // Hide from navigation if resident
         }}
       />
-     
       <Tabs.Screen
-        name="keyswitch"
+        name="qrcode"
         options={{
-          title: 'Key Switch',
+          title: 'QR Code',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               size={focused ? 32 : 28} 
-              name={focused ? "toggle" : "toggle-outline"} 
+              name={focused ? "qr-code" : "qr-code-outline"} 
               color={color} 
             />
           ),
+          href: isResident ? null : undefined, // Hide from navigation if resident
         }}
       />
-    
       <Tabs.Screen
-        name="logs"
+        name="payment-history"
         options={{
-          title: 'Logs',
+          title: 'Payment History',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               size={focused ? 32 : 28} 
-              name={focused ? "document-text" : "document-text-outline"} 
+              name={focused ? "receipt" : "time"} 
               color={color} 
             />
           ),
         }}
       />
-        <Tabs.Screen
-        name="profile"
+      <Tabs.Screen
+        name="notifications"
         options={{
-          title: 'Profile',
+          title: 'Notifications',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               size={focused ? 32 : 28} 
-              name={focused ? "person" : "person-outline"} 
+              name={focused ? "notifications" : "notifications-outline"} 
               color={color} 
             />
           ),
         }}
       />
+    <Tabs.Screen
+      name="profile"
+      options={{
+        href: null, // 👈 this removes it from the bottom tab bar
+      }}
+    />
+    <Tabs.Screen
+      name="user-detail"
+      options={{
+        href: null, // 👈 this removes it from the bottom tab bar
+      }}
+    />
+    <Tabs.Screen
+      name="receipt"
+      options={{
+        href: null, // 👈 this removes it from the bottom tab bar
+      }}
+    />
     </Tabs>
   );
 }

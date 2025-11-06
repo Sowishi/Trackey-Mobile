@@ -1,28 +1,28 @@
-import { Colors } from '@/constants/theme';
 import { User, useUser } from '@/contexts/UserContext';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  ImageBackground,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { database, off, onValue, ref } from '../firebase';
+import { collection, db, getDocs, query, where } from '../firebase';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const colorScheme = useColorScheme();
+  const [showPassword, setShowPassword] = useState(false);
   const { setUser } = useUser();
 
   const handleLogin = async () => {
@@ -42,57 +42,56 @@ export default function LoginScreen() {
     setLoading(true);
 
     try {
-      // Reference to the users in the database
-      const usersRef = ref(database, 'trackey/users');
+      // Query users collection in Firestore
+      const usersRef = collection(db, 'users');
+      const q = query(
+        usersRef,
+        where('email', '==', email.toLowerCase().trim()),
+        where('password', '==', password.trim()),
+        where('status', '==', 'active')
+      );
       
-      // Listen for users data
-      onValue(usersRef, (snapshot) => {
-        const users = snapshot.val();
-        let userFound = false;
-        let authenticatedUser: User | null = null;
+      const querySnapshot = await getDocs(q);
+      let authenticatedUser: User | null = null;
 
-        if (users) {
-          // Search through all users to find matching email and password
-          Object.keys(users).forEach((userId) => {
-            const userData = users[userId];
-            if (userData.email === email.trim() && userData.password === password.trim()) {
-              userFound = true;
-              authenticatedUser = {
-                email: userData.email,
-                gender: userData.gender,
-                name: userData.name,
-                password: userData.password,
-                position: userData.position,
-                rfid: userData.rfid
-              };
-            }
-          });
+      if (!querySnapshot.empty) {
+        // Get the first matching user document
+        const userDoc = querySnapshot.docs[0];
+        const userData = userDoc.data();
+        
+        // Check if user is not archived
+        if (userData.isArchived !== true) {
+          // Map database fields to User interface
+          authenticatedUser = {
+            email: userData.email || '',
+            gender: userData.gender || '',
+            name: userData.fullName || userData.name || '', // Support both fullName and name
+            password: userData.password || '',
+            position: userData.role || userData.position || '', // Support both role and position
+            rfid: userData.meterNumber || userData.rfid || '', // Support both meterNumber and rfid
+            profilePicUrl: userData.profilePicUrl || '' // Include profile picture URL
+          };
         }
+      }
 
-        setLoading(false);
+      setLoading(false);
 
-        if (userFound && authenticatedUser) {
-          // Set user in context
-          setUser(authenticatedUser);
-          
-          Alert.alert('Success', `Welcome back, ${authenticatedUser.name}!`, [
-            {
-              text: 'OK',
-              onPress: () => router.replace('/(tabs)'),
-            },
-          ]);
-        } else {
-          Alert.alert('Error', 'Invalid email or password. Please try again.');
-        }
-
-        // Clean up the listener
-        off(usersRef);
-      }, (error) => {
-        setLoading(false);
-        console.error('Database error:', error);
-        Alert.alert('Error', 'Unable to connect to the database. Please try again.');
-        off(usersRef);
-      });
+      if (authenticatedUser) {
+        // Set user in context
+        setUser(authenticatedUser);
+        
+        // Enhanced welcome message
+        const welcomeMessage = `Welcome, ${authenticatedUser.name}! 🎉\n\nYou've successfully logged in.`;
+        
+        Alert.alert('Login Successful', welcomeMessage, [
+          {
+            text: 'OK',
+            onPress: () => router.replace('/(tabs)'),
+          },
+        ]);
+      } else {
+        Alert.alert('Error', 'Invalid email or password. Please check your credentials and try again.');
+      }
 
     } catch (error) {
       setLoading(false);
@@ -101,10 +100,24 @@ export default function LoginScreen() {
     }
   };
 
+  // Aquabill blue and white theme colors
+  const aquabillBlue = '#007AFF';
+  const white = '#FFFFFF';
+  const textDark = '#1F2937';
+  const textLight = '#FFFFFF';
+
   const styles = StyleSheet.create({
     safeArea: {
       flex: 1,
-      backgroundColor: Colors[colorScheme ?? 'light'].background,
+    },
+    backgroundImage: {
+      flex: 1,
+      width: '100%',
+      height: '100%',
+    },
+    overlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.4)', // Dark overlay for better text readability
     },
     container: {
       flex: 1,
@@ -120,20 +133,28 @@ export default function LoginScreen() {
       marginBottom: 40,
     },
     logo: {
-      marginBottom: 20,
+      width: 200,
+      height: 200,
+      resizeMode: 'contain',
     },
     title: {
-      fontSize: 32,
+      fontSize: 36,
       fontWeight: 'bold',
       textAlign: 'center',
       marginBottom: 8,
-      color: Colors[colorScheme ?? 'light'].text,
+      color: white,
+      textShadowColor: 'rgba(0, 0, 0, 0.5)',
+      textShadowOffset: { width: 0, height: 2 },
+      textShadowRadius: 4,
     },
     subtitle: {
       fontSize: 16,
       textAlign: 'center',
-      color: Colors[colorScheme ?? 'light'].text,
-      opacity: 0.7,
+      color: white,
+      opacity: 0.9,
+      textShadowColor: 'rgba(0, 0, 0, 0.5)',
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 3,
     },
     form: {
       width: '100%',
@@ -145,20 +166,23 @@ export default function LoginScreen() {
       fontSize: 16,
       fontWeight: '600',
       marginBottom: 8,
-      color: Colors[colorScheme ?? 'light'].primary,
+      color: white,
+      textShadowColor: 'rgba(0, 0, 0, 0.5)',
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 2,
     },
     inputWrapper: {
       flexDirection: 'row',
       alignItems: 'center',
       borderWidth: 2,
-      borderColor: Colors[colorScheme ?? 'light'].border,
+      borderColor: white,
       borderRadius: 12,
-      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      backgroundColor: 'rgba(255, 255, 255, 0.95)',
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.05,
-      shadowRadius: 2,
-      elevation: 2,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 4,
+      elevation: 5,
     },
     inputIcon: {
       marginLeft: 16,
@@ -167,12 +191,16 @@ export default function LoginScreen() {
     input: {
       flex: 1,
       paddingVertical: 14,
-      paddingRight: 16,
+      paddingRight: 8,
       fontSize: 16,
-      color: Colors[colorScheme ?? 'light'].text,
+      color: textDark,
+    },
+    eyeIcon: {
+      marginRight: 16,
+      padding: 4,
     },
     loginButton: {
-      backgroundColor: Colors[colorScheme ?? 'light'].primary,
+      backgroundColor: aquabillBlue,
       borderRadius: 12,
       paddingVertical: 16,
       flexDirection: 'row',
@@ -181,15 +209,15 @@ export default function LoginScreen() {
       marginTop: 20,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.2,
+      shadowOpacity: 0.3,
       shadowRadius: 8,
-      elevation: 4,
+      elevation: 6,
     },
     buttonIcon: {
       marginRight: 8,
     },
     loginButtonText: {
-      color: 'white',
+      color: white,
       fontSize: 18,
       fontWeight: '600',
     },
@@ -199,96 +227,112 @@ export default function LoginScreen() {
     demoText: {
       textAlign: 'center',
       marginTop: 20,
-      color: Colors[colorScheme ?? 'light'].text,
-      opacity: 0.6,
+      color: white,
+      opacity: 0.9,
       fontSize: 14,
+      textShadowColor: 'rgba(0, 0, 0, 0.5)',
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 2,
     },
   });
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      <ImageBackground
+        source={require('../assets/images/lupet.jpg')}
+        style={styles.backgroundImage}
+        resizeMode="cover"
       >
-        <View style={styles.content}>
-          <View style={styles.header}>
-            <Ionicons 
-              name="location" 
-              size={60} 
-              color={Colors[colorScheme ?? 'light'].primary} 
-              style={styles.logo}
-            />
-            <Text style={styles.title}>Welcome to Trackey</Text>
-            <Text style={styles.subtitle}>Your tracking solution awaits</Text>
-          </View>
+        <View style={styles.overlay}>
+          <KeyboardAvoidingView
+            style={styles.container}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          >
+            <View style={styles.content}>
+              <View style={styles.header}>
+                <Image 
+                  source={require('../assets/images/aquabill-logo.png')}
+                  style={styles.logo}
+                />
+               
+              </View>
 
-          <View style={styles.form}>
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Email</Text>
-              <View style={styles.inputWrapper}>
-                <Ionicons 
-                  name="mail-outline" 
-                  size={20} 
-                  color={Colors[colorScheme ?? 'light'].primary}
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter your email"
-                  placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
+              <View style={styles.form}>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Email</Text>
+                  <View style={styles.inputWrapper}>
+                    <Ionicons 
+                      name="mail-outline" 
+                      size={20} 
+                      color={aquabillBlue}
+                      style={styles.inputIcon}
+                    />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Enter your email"
+                      placeholderTextColor="#9CA3AF"
+                      value={email}
+                      onChangeText={setEmail}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Password</Text>
+                  <View style={styles.inputWrapper}>
+                    <Ionicons 
+                      name="lock-closed-outline" 
+                      size={20} 
+                      color={aquabillBlue}
+                      style={styles.inputIcon}
+                    />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Enter your password"
+                      placeholderTextColor="#9CA3AF"
+                      value={password}
+                      onChangeText={setPassword}
+                      secureTextEntry={!showPassword}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                    <TouchableOpacity
+                      onPress={() => setShowPassword(!showPassword)}
+                      style={styles.eyeIcon}
+                    >
+                      <Ionicons
+                        name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                        size={20}
+                        color={aquabillBlue}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <TouchableOpacity 
+                  style={[styles.loginButton, loading && styles.loginButtonDisabled]} 
+                  onPress={handleLogin}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator size="small" color="white" style={styles.buttonIcon} />
+                  ) : (
+                    <Ionicons name="log-in-outline" size={20} color="white" style={styles.buttonIcon} />
+                  )}
+                  <Text style={styles.loginButtonText}>
+                    {loading ? 'Signing In...' : 'Log in'}
+                  </Text>
+                </TouchableOpacity>
+
+              
               </View>
             </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Password</Text>
-              <View style={styles.inputWrapper}>
-                <Ionicons 
-                  name="lock-closed-outline" 
-                  size={20} 
-                  color={Colors[colorScheme ?? 'light'].primary}
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter your password"
-                  placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </View>
-            </View>
-
-            <TouchableOpacity 
-              style={[styles.loginButton, loading && styles.loginButtonDisabled]} 
-              onPress={handleLogin}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator size="small" color="white" style={styles.buttonIcon} />
-              ) : (
-                <Ionicons name="log-in-outline" size={20} color="white" style={styles.buttonIcon} />
-              )}
-              <Text style={styles.loginButtonText}>
-                {loading ? 'Signing In...' : 'Sign In to Trackey'}
-              </Text>
-            </TouchableOpacity>
-
-            <Text style={styles.demoText}>
-              Enter your registered email and password to access Trackey
-            </Text>
-          </View>
+          </KeyboardAvoidingView>
         </View>
-      </KeyboardAvoidingView>
+      </ImageBackground>
     </SafeAreaView>
   );
 }
