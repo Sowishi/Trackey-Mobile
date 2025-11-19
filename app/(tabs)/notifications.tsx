@@ -109,13 +109,23 @@ export default function NotificationsScreen() {
         } as Notification);
       });
 
+      // Filter out bill_created notifications and bill reminders for collectors
+      let filteredNotifications = allNotifications;
+      if (isCollector) {
+        filteredNotifications = allNotifications.filter(
+          notification => 
+            notification.type !== 'bill_created' && 
+            notification.title !== 'Bill Reminder'
+        );
+      }
+
       // Sort by date (newest first)
-      allNotifications.sort(
+      filteredNotifications.sort(
         (a, b) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
 
-      setNotifications(allNotifications);
+      setNotifications(filteredNotifications);
     } catch (error) {
       console.error('Error fetching notifications:', error);
       Alert.alert('Error', 'Failed to load notifications. Please try again.');
