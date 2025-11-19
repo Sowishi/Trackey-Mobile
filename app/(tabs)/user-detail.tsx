@@ -83,7 +83,9 @@ export default function UserDetailScreen() {
       if (!isNaN(presentValue) && !isNaN(previousValue) && presentValue > previousValue) {
         const consumptionDiff = presentValue - previousValue;
         const calculatedTotal = consumptionDiff * WATER_RATE_PER_CUBIC_METER;
-        setTotalAmount(calculatedTotal.toFixed(2));
+        // Apply minimum payment of 150 if consumption is less than 10
+        const finalTotal = consumptionDiff < 10 ? 150 : calculatedTotal;
+        setTotalAmount(finalTotal.toFixed(2));
       } else {
         setTotalAmount('');
       }
@@ -251,8 +253,9 @@ export default function UserDetailScreen() {
 
     const consumptionDiff = presentConsumptionValue - previousConsumptionValue;
 
-    // Validate the calculation
-    const expectedAmount = consumptionDiff * WATER_RATE_PER_CUBIC_METER;
+    // Validate the calculation (with minimum payment of 150 if consumption < 10)
+    const calculatedAmount = consumptionDiff * WATER_RATE_PER_CUBIC_METER;
+    const expectedAmount = consumptionDiff < 10 ? 150 : calculatedAmount;
     if (Math.abs(amountValueFloat - expectedAmount) > 0.01) {
       alert('Amount calculation mismatch. Please check the consumption values.');
       return;
