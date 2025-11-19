@@ -286,6 +286,7 @@ export default function UserDetailScreen() {
         userId: userDetail.id,
         userEmail: userDetail.email,
         userName: userDetail.fullName,
+        accountNumber: userDetail.accountNumber,
         meterNumber: userDetail.meterNumber || '',
         month: monthString,
         coverageDateFrom: previousCoverageDate ? previousCoverageDate.toISOString() : presentDate.toISOString(),
@@ -1948,6 +1949,12 @@ Please pay on or before due date. Thank you.`;
                   {/* User Info Section */}
                   <View style={styles.confirmationSection}>
                     <Text style={styles.confirmationSectionTitle}>User Information</Text>
+                    {billToSubmit.accountNumber && (
+                      <View style={styles.confirmationRow}>
+                        <Text style={styles.confirmationLabel}>Account Number:</Text>
+                        <Text style={styles.confirmationValue}>{billToSubmit.accountNumber}</Text>
+                      </View>
+                    )}
                     <View style={styles.confirmationRow}>
                       <Text style={styles.confirmationLabel}>Name:</Text>
                       <Text style={styles.confirmationValue}>{billToSubmit.userName}</Text>

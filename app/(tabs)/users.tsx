@@ -571,7 +571,7 @@ export default function UsersScreen() {
             />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search by account number, name, email, contact, or meter..."
+              placeholder="Search..."
               placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
               value={searchText}
               onChangeText={setSearchText}
