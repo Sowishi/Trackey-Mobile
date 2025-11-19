@@ -252,14 +252,19 @@ export default function UsersScreen() {
         <View style={styles.cardInfo}>
           <Text style={styles.fullName}>{item.fullName}</Text>
           <View style={styles.badgeContainer}>
-            <View style={[
-              styles.paymentBadge,
-              item.hasUnpaidBills ? styles.unpaidBadge : styles.paidBadge
-            ]}>
-              <Text style={styles.badgeText}>
-                {item.hasUnpaidBills ? 'Unpaid' : 'Paid'}
-              </Text>
-            </View>
+            {/* Payment Status Badge */}
+            {item.hasBilling && (
+              <View style={[
+                styles.paymentBadge,
+                item.hasUnpaidBills ? styles.unpaidBadge : styles.paidBadge
+              ]}>
+                <Text style={styles.badgeText}>
+                  {item.hasUnpaidBills ? 'Unpaid' : 'Paid'}
+                </Text>
+              </View>
+            )}
+            
+            {/* Meter Read Badge */}
             <View style={[
               styles.meterBadge,
               item.hasBilling ? styles.meterReadBadge : styles.meterNotReadBadge
@@ -274,6 +279,21 @@ export default function UsersScreen() {
                 {item.hasBilling ? 'Meter Read' : 'Not Read'}
               </Text>
             </View>
+
+            {/* No Billing Badge */}
+            {!item.hasBilling && (
+              <View style={styles.noBillingBadge}>
+                <Ionicons
+                  name="document-text-outline"
+                  size={10}
+                  color={Colors[colorScheme ?? 'light'].text}
+                  style={styles.meterIcon}
+                />
+                <Text style={styles.noBillingBadgeText}>
+                  No Billing
+                </Text>
+              </View>
+            )}
           </View>
         </View>
         <Ionicons
@@ -439,6 +459,7 @@ export default function UsersScreen() {
     badgeContainer: {
       flexDirection: 'row',
       alignItems: 'center',
+      flexWrap: 'wrap',
       gap: 6,
       marginTop: 4,
     },
@@ -493,6 +514,20 @@ export default function UsersScreen() {
       marginRight: 3,
     },
     meterBadgeText: {
+      fontSize: 10,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+    },
+    noBillingBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 10,
+      alignSelf: 'flex-start',
+      backgroundColor: '#FFE4E6',
+    },
+    noBillingBadgeText: {
       fontSize: 10,
       fontWeight: '600',
       color: Colors[colorScheme ?? 'light'].text,
