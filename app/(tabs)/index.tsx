@@ -781,6 +781,134 @@ export default function DashboardScreen() {
       textAlign: 'center',
     },
     // Resident Dashboard Styles
+    residentContainer: {
+      flex: 1,
+    },
+    residentTopSection: {
+      flex: 1.2,
+      width: '100%',
+      overflow: 'hidden',
+    },
+    residentTopBackground: {
+      width: '100%',
+      height: '100%',
+      position: 'absolute',
+    },
+    residentGreetingContainer: {
+      flex: 1,
+      justifyContent: 'flex-end',
+      padding: 20,
+      paddingBottom: 100,
+    },
+    residentGreetingText: {
+      fontSize: 16,
+      color: '#FFFFFF',
+      opacity: 0.9,
+      marginBottom: 4,
+    },
+    residentGreetingName: {
+      fontSize: 28,
+      fontWeight: 'bold',
+      color: '#FFFFFF',
+    },
+    residentBottomSection: {
+      flex: 2.3,
+      backgroundColor: '#FFFFFF',
+      paddingTop: 20,
+    },
+    debitCard: {
+      backgroundColor: '#000000',
+      borderRadius: 16,
+      padding: 16,
+      marginHorizontal: 20,
+      marginTop: -80,
+      marginBottom: 20,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.25,
+      shadowRadius: 10,
+      elevation: 6,
+      minHeight: 140,
+    },
+    debitCardHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    debitCardWaterIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    debitCardActiveLabel: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 12,
+    },
+    debitCardActiveDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: '#10B981',
+      marginRight: 6,
+    },
+    debitCardActiveText: {
+      color: '#FFFFFF',
+      fontSize: 11,
+      fontWeight: '600',
+    },
+    debitCardStatusBadge: {
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 10,
+    },
+    debitCardStatusPaid: {
+      backgroundColor: '#10B981',
+    },
+    debitCardStatusUnpaid: {
+      backgroundColor: '#EF4444',
+    },
+    debitCardStatusText: {
+      color: '#FFFFFF',
+      fontSize: 11,
+      fontWeight: '600',
+    },
+    debitCardContent: {
+      marginBottom: 16,
+    },
+    debitCardLabel: {
+      fontSize: 11,
+      color: 'rgba(255, 255, 255, 0.8)',
+      marginBottom: 4,
+      fontWeight: '500',
+    },
+    debitCardDueDate: {
+      fontSize: 16,
+      color: '#FFFFFF',
+      fontWeight: '600',
+    },
+    debitCardFooter: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-end',
+    },
+    debitCardAmount: {
+      fontSize: 22,
+      color: '#FFFFFF',
+      fontWeight: 'bold',
+    },
+    residentBillsList: {
+      padding: 20,
+      paddingTop: 40,
+      paddingBottom: 100,
+    },
     residentContent: {
       padding: 20,
       paddingBottom: 100,
@@ -1197,93 +1325,101 @@ export default function DashboardScreen() {
 
   // Resident Dashboard View
   if (isResident) {
+    // Get the latest bill
+    const latestBill = residentBills.length > 0 ? residentBills[0] : null;
+
+    const formatDueDate = (dateString?: string) => {
+      if (!dateString) return 'N/A';
+      try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        });
+      } catch {
+        return dateString;
+      }
+    };
+
     return (
       <SafeAreaView style={styles.safeArea}>
-        <ScreenHeader 
-          title="My Bills" 
-          onUserPress={() => router.push('/(tabs)/profile')}
-          profilePicUrl={user?.profilePicUrl}
-        />
-        <FlatList
-          data={residentBills}
-          renderItem={renderBillCard}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.residentContent}
-          ListHeaderComponent={() => (
-            <View style={styles.residentHeader}>
-              <View style={styles.greetingContainer}>
-                <Text style={styles.greetingText}>{getGreeting()}</Text>
-                <Text style={styles.greetingName}>{userName}</Text>
-              </View>
+            <View style={styles.residentContainer}>
+          {/* Top 1/3 Section with lupet.jpg background */}
+          <View style={styles.residentTopSection}>
+            <Image
+              source={require('../../assets/images/lupet.jpg')}
+              style={styles.residentTopBackground}
+              resizeMode="cover"
+            />
+            <View style={styles.residentGreetingContainer}>
+              <Text style={styles.residentGreetingText}>{getGreeting()}</Text>
+              <Text style={styles.residentGreetingName}>{userName}</Text>
+            </View>
+          </View>
 
-              {/* Resident Stats */}
-              <View style={styles.residentStats}>
-                <View style={styles.residentStatCard}>
-                  <View style={styles.residentStatHeader}>
-                    <Ionicons
-                      name="document-text"
-                      size={20}
-                      color={Colors[colorScheme ?? 'light'].primary}
-                    />
+          {/* Bottom 2/3 Section with white background */}
+          <View style={styles.residentBottomSection}>
+            {/* Water Billing Card Design with negative marginTop */}
+            {latestBill && (
+              <View style={styles.debitCard}>
+                <View style={styles.debitCardHeader}>
+                  <View style={styles.debitCardWaterIcon}>
+                    <Ionicons name="water" size={24} color="#06B6D4" />
                   </View>
-                  <Text style={styles.residentStatLabel}>Total Bills</Text>
-                  <Text style={styles.residentStatValue}>{totalBills}</Text>
+                  <View style={styles.debitCardActiveLabel}>
+                    <View style={styles.debitCardActiveDot} />
+                    <Text style={styles.debitCardActiveText}>Active</Text>
+                  </View>
                 </View>
-                <View style={styles.residentStatCardSpacing} />
-                <View style={styles.residentStatCard}>
-                  <View style={[styles.residentStatHeader, { backgroundColor: '#D1FAE5' }]}>
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={20}
-                      color={Colors[colorScheme ?? 'light'].primary}
-                    />
-                  </View>
-                  <Text style={styles.residentStatLabel}>Paid</Text>
-                  <Text style={styles.residentStatValue}>{paidBills}</Text>
+                <View style={styles.debitCardContent}>
+                  <Text style={styles.debitCardLabel}>Due Date</Text>
+                  <Text style={styles.debitCardDueDate}>{formatDueDate(latestBill.dueDate)}</Text>
                 </View>
-                <View style={styles.residentStatCardSpacing} />
-                <View style={styles.residentStatCard}>
-                  <View style={[styles.residentStatHeader, { backgroundColor: '#FEE2E2' }]}>
-                    <Ionicons
-                      name="alert-circle"
-                      size={20}
-                      color={Colors[colorScheme ?? 'light'].primary}
-                    />
+                <View style={styles.debitCardFooter}>
+                  <View>
+                    <Text style={styles.debitCardLabel}>Total Amount</Text>
+                    <Text style={styles.debitCardAmount}>₱{latestBill.totalAmount.toFixed(2)}</Text>
                   </View>
-                  <Text style={styles.residentStatLabel}>Unpaid</Text>
-                  <Text style={styles.residentStatValue}>{unpaidBills}</Text>
+                  <View style={[
+                    styles.debitCardStatusBadge,
+                    latestBill.status === 'paid' ? styles.debitCardStatusPaid : styles.debitCardStatusUnpaid
+                  ]}>
+                    <Text style={styles.debitCardStatusText}>
+                      {latestBill.status === 'paid' ? 'Paid' : 'Unpaid'}
+                    </Text>
+                  </View>
                 </View>
               </View>
+            )}
 
-              {totalAmountDue > 0 && (
-                <View style={styles.amountDueCard}>
-                  <Text style={styles.amountDueLabel}>Total Amount Due</Text>
-                  <Text style={styles.amountDueValue}>₱{totalAmountDue.toFixed(2)}</Text>
+            {/* Bills List */}
+            <FlatList
+              data={residentBills}
+              renderItem={renderBillCard}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.residentBillsList}
+              ListEmptyComponent={() => (
+                <View style={styles.emptyContainer}>
+                  <Ionicons
+                    name="document-text-outline"
+                    size={80}
+                    color={Colors[colorScheme ?? 'light'].icon}
+                  />
+                  <Text style={styles.emptyText}>No bills found</Text>
+                  <Text style={styles.emptySubtext}>Your billing records will appear here</Text>
                 </View>
               )}
-
-              <Text style={styles.billsTitle}>My Bills</Text>
-            </View>
-          )}
-          ListEmptyComponent={() => (
-            <View style={styles.emptyContainer}>
-              <Ionicons
-                name="document-text-outline"
-                size={80}
-                color={Colors[colorScheme ?? 'light'].icon}
-              />
-              <Text style={styles.emptyText}>No bills found</Text>
-              <Text style={styles.emptySubtext}>Your billing records will appear here</Text>
-            </View>
-          )}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              colors={[Colors[colorScheme ?? 'light'].primary]}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={handleRefresh}
+                  colors={[Colors[colorScheme ?? 'light'].primary]}
+                />
+              }
             />
-          }
-        />
+          </View>
+        </View>
 
         {/* Payment Modal */}
         <Modal
