@@ -178,33 +178,53 @@ export default function UserDetailScreen() {
         });
       });
       
-      // Sort by createdAt to get the most recent bill
-      bills.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      // Check if a bill for the current month already exists
+      const currentMonthString = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      const currentMonthBill = bills.find(bill => bill.month === currentMonthString);
       
-      if (bills.length > 0) {
-        const lastBill = bills[0];
-        // Set previous data from the last bill's present data
-        setPreviousCoverageDate(new Date(lastBill.coverageDateTo));
-        setPreviousConsumption(lastBill.consumption.toString());
-      } else {
-        // First bill - set previous to null/empty
-        setPreviousCoverageDate(null);
-        setPreviousConsumption('0');
+      if (currentMonthBill) {
+        Alert.alert(
+          'Warning',
+          `A bill for ${currentMonthString} already exists for this user. You can still create a bill for a different month by changing the present date.`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Continue', onPress: () => proceedToAddBill(bills) }
+          ]
+        );
+        return;
       }
       
-      // Set present date to today by default
-      setPresentDate(new Date());
-      setPresentConsumption('');
-      setDueDate(new Date());
-      setTotalAmount('');
-      setShowDatePicker(null);
-      
-      // Open form modal
-      setFormModalVisible(true);
+      proceedToAddBill(bills);
     } catch (error) {
       console.error('Error fetching last bill:', error);
       alert('Failed to load previous bill data');
     }
+  };
+
+  const proceedToAddBill = (bills: any[]) => {
+    // Sort by createdAt to get the most recent bill
+    bills.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    
+    if (bills.length > 0) {
+      const lastBill = bills[0];
+      // Set previous data from the last bill's present data
+      setPreviousCoverageDate(new Date(lastBill.coverageDateTo));
+      setPreviousConsumption(lastBill.consumption.toString());
+    } else {
+      // First bill - set previous to null/empty
+      setPreviousCoverageDate(null);
+      setPreviousConsumption('0');
+    }
+    
+    // Set present date to today by default
+    setPresentDate(new Date());
+    setPresentConsumption('');
+    setDueDate(new Date());
+    setTotalAmount('');
+    setShowDatePicker(null);
+    
+    // Open form modal
+    setFormModalVisible(true);
   };
 
   const handleSubmitBill = async () => {
@@ -244,6 +264,21 @@ export default function UserDetailScreen() {
       // Generate month string from present date
       const monthString = presentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
+      // Check if a bill for this month already exists
+      const billingRef = collection(db, 'billing');
+      const monthCheckQuery = query(
+        billingRef,
+        where('userId', '==', userDetail.id),
+        where('month', '==', monthString)
+      );
+      const existingBillsSnapshot = await getDocs(monthCheckQuery);
+
+      if (!existingBillsSnapshot.empty) {
+        alert(`A bill for ${monthString} already exists for this user. Cannot create duplicate billing for the same month.`);
+        setSubmittingBill(false);
+        return;
+      }
+
       // Prepare bill data
       const billData = {
         userId: userDetail.id,
@@ -264,8 +299,7 @@ export default function UserDetailScreen() {
         updatedAt: new Date().toISOString(),
       };
 
-      // Save to Firestore billing collection
-      const billingRef = collection(db, 'billing');
+      // Save to Firestore billing collection (reuse billingRef from above)
       const docRef = await addDoc(billingRef, billData);
       
       // Add document ID to bill data for receipt
@@ -353,7 +387,19 @@ export default function UserDetailScreen() {
       // Sort by createdAt (newest first)
       bills.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-      setBillingData(bills);
+      // Filter out duplicate months, keeping only the most recent bill for each month
+      const uniqueMonthBills: any[] = [];
+      const seenMonths = new Set<string>();
+
+      bills.forEach((bill) => {
+        const month = bill.month || 'Unknown';
+        if (!seenMonths.has(month)) {
+          seenMonths.add(month);
+          uniqueMonthBills.push(bill);
+        }
+      });
+
+      setBillingData(uniqueMonthBills);
     } catch (error) {
       console.error('Error fetching billing:', error);
       alert('Failed to fetch billing data');
@@ -378,18 +424,6 @@ export default function UserDetailScreen() {
     } catch {
       return dateString;
     }
-  };
-
-  const groupBillsByMonth = (bills: any[]) => {
-    const grouped: { [key: string]: any[] } = {};
-    bills.forEach((bill) => {
-      const month = bill.month || 'Unknown';
-      if (!grouped[month]) {
-        grouped[month] = [];
-      }
-      grouped[month].push(bill);
-    });
-    return grouped;
   };
 
   const renderBillItem = ({ item }: { item: any }) => {
