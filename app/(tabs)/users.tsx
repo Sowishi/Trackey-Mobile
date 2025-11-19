@@ -366,6 +366,42 @@ export default function UsersScreen() {
     filterBadgeTextSelected: {
       color: '#FFFFFF',
     },
+    monthLabelContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      borderRadius: 8,
+      marginTop: 8,
+      marginBottom: 4,
+    },
+    monthIcon: {
+      marginRight: 6,
+    },
+    monthLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].primary,
+    },
+    noteContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 6,
+      marginTop: 4,
+      marginBottom: 8,
+    },
+    noteIcon: {
+      marginRight: 6,
+    },
+    noteText: {
+      fontSize: 12,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+      fontStyle: 'italic',
+      flex: 1,
+    },
     searchIcon: {
       marginRight: 12,
     },
@@ -598,6 +634,32 @@ export default function UsersScreen() {
             >
               {filters.map(renderFilterBadge)}
             </ScrollView>
+          </View>
+
+          {/* Current Month Label */}
+          <View style={styles.monthLabelContainer}>
+            <Ionicons
+              name="calendar-outline"
+              size={16}
+              color={Colors[colorScheme ?? 'light'].primary}
+              style={styles.monthIcon}
+            />
+            <Text style={styles.monthLabel}>
+              {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+            </Text>
+          </View>
+
+          {/* Note */}
+          <View style={styles.noteContainer}>
+            <Ionicons
+              name="information-circle-outline"
+              size={14}
+              color={Colors[colorScheme ?? 'light'].tabIconDefault}
+              style={styles.noteIcon}
+            />
+            <Text style={styles.noteText}>
+              Note: Next month will reset and turn paid to unpaid
+            </Text>
           </View>
         </View>
 
