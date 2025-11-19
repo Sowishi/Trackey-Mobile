@@ -22,7 +22,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { BarChart, PieChart } from 'react-native-chart-kit';
+import { PieChart } from 'react-native-chart-kit';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { addDoc, collection, db, doc, getDocs, query, updateDoc, uploadImageToStorage, where } from '../../firebase';
 
@@ -1667,55 +1667,7 @@ export default function DashboardScreen() {
               />
             </View>
 
-            {/* Bar Chart */}
-            <View style={styles.chartCard}>
-              <Text style={styles.chartLabel}>Payment Status Comparison</Text>
-              <BarChart
-                data={{
-                  labels: ['Paid', 'Pending', 'Unpaid'],
-                  datasets: [
-                    {
-                      data: [
-                        stats.paidResidents || 0.1, 
-                        stats.pendingPayments || 0.1, 
-                        stats.unpaidResidents || 0.1
-                      ],
-                      colors: [
-                        () => '#059669',
-                        () => '#F59E0B',
-                        () => '#DC2626',
-                      ],
-                    },
-                  ],
-                }}
-                width={screenWidth - 64}
-                height={220}
-                yAxisLabel=""
-                yAxisSuffix=""
-                chartConfig={{
-                  backgroundColor: '#FFFFFF',
-                  backgroundGradientFrom: '#FFFFFF',
-                  backgroundGradientTo: '#FFFFFF',
-                  decimalPlaces: 0,
-                  color: (opacity) => `rgba(0, 119, 182, ${opacity})`,
-                  labelColor: (opacity) => `rgba(31, 41, 55, ${opacity})`,
-                  fillShadowGradient: '#0077b6',
-                  fillShadowGradientOpacity: 1,
-                  style: {
-                    borderRadius: 16,
-                  },
-                  barPercentage: 0.5,
-                }}
-                withCustomBarColorFromData
-                flatColor
-                style={{
-                  marginVertical: 8,
-                  borderRadius: 16,
-                }}
-                fromZero
-                showValuesOnTopOfBars
-              />
-            </View>
+        
           </View>
         )}
 
