@@ -23,6 +23,7 @@ import { collection, db, getDocs, query, where } from '../../firebase';
 interface Resident {
   id: string;
   age?: number;
+  accountNumber?: string;
   contactNumber?: string;
   createdAt?: string;
   email: string;
@@ -166,6 +167,7 @@ export default function UsersScreen() {
       filtered = filtered.filter(
         (resident) =>
           resident.fullName.toLowerCase().includes(searchLower) ||
+          resident.accountNumber?.toLowerCase().includes(searchLower) ||
           resident.email.toLowerCase().includes(searchLower) ||
           resident.contactNumber?.toLowerCase().includes(searchLower) ||
           resident.meterNumber?.toLowerCase().includes(searchLower)
@@ -250,7 +252,7 @@ export default function UsersScreen() {
           </View>
         )}
         <View style={styles.cardInfo}>
-          <Text style={styles.fullName}>{item.fullName}</Text>
+          <Text style={styles.fullName}>{item.accountNumber || item.fullName}</Text>
           <View style={styles.badgeContainer}>
             {/* Payment Status Badge */}
             {item.hasBilling && (
@@ -569,7 +571,7 @@ export default function UsersScreen() {
             />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search by name, email, contact, or meter..."
+              placeholder="Search by account number, name, email, contact, or meter..."
               placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
               value={searchText}
               onChangeText={setSearchText}

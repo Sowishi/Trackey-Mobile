@@ -28,6 +28,7 @@ import { addDoc, collection, db, doc, getDoc, getDocs, query, where } from '../.
 interface UserDetail {
   id: string;
   age?: number;
+  accountNumber?: string;
   contactNumber?: string;
   createdAt?: string;
   email: string;
@@ -110,6 +111,7 @@ export default function UserDetailScreen() {
         setUserDetail({
           id: userDocSnap.id,
           age: userData.age,
+          accountNumber: userData.accountNumber,
           contactNumber: userData.contactNumber,
           createdAt: userData.createdAt,
           email: userData.email,
@@ -1449,12 +1451,28 @@ Please pay on or before due date. Thank you.`;
                 </Text>
               </View>
             )}
-            <Text style={styles.nameText}>{userDetail.fullName}</Text>
+            <Text style={styles.nameText}>{userDetail.accountNumber || userDetail.fullName}</Text>
             <Text style={styles.roleText}>{userDetail.role}</Text>
           </View>
 
           {/* User Information */}
           <View style={styles.infoSection}>
+            {userDetail.accountNumber && (
+              <View style={styles.infoItem}>
+                <View style={styles.infoIcon}>
+                  <Ionicons
+                    name="card"
+                    size={20}
+                    color={Colors[colorScheme ?? 'light'].primary}
+                  />
+                </View>
+                <View style={styles.infoContent}>
+                  <Text style={styles.infoLabel}>Account Number</Text>
+                  <Text style={styles.infoValue}>{userDetail.accountNumber}</Text>
+                </View>
+              </View>
+            )}
+
             <View style={styles.infoItem}>
               <View style={styles.infoIcon}>
                 <Ionicons
