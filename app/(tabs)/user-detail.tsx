@@ -354,6 +354,89 @@ export default function UserDetailScreen() {
         console.error('Error creating notification:', notificationError);
       }
 
+      // Send SMS notification to user
+      try {
+        console.log('=== SMS NOTIFICATION START ===');
+        
+        if (!userDetail?.contactNumber) {
+          console.log('❌ No contact number available for SMS notification');
+          console.log('User Detail:', userDetail);
+          console.log('=== SMS NOTIFICATION END ===');
+          return;
+        }
+
+        const phoneNumber = userDetail.contactNumber.replace(/[^0-9]/g, '');
+        console.log('📱 Original Contact Number:', userDetail.contactNumber);
+        console.log('📱 Cleaned Phone Number:', phoneNumber);
+        
+        const smsMessage = `WATER BILLING ALERT
+Name: ${billToSubmit.userName}
+Month: ${billToSubmit.month}
+Previous Reading: ${billToSubmit.previousConsumption}m³
+Present Reading: ${billToSubmit.consumption}m³
+Consumption: ${billToSubmit.consumptionUsed.toFixed(2)}m³
+Rate: ₱${billToSubmit.waterRatePerCubicMeter}/m³
+Total Amount: ₱${billToSubmit.totalAmount.toFixed(2)}
+Due Date: ${formatDateForBill(billToSubmit.dueDate)}
+Please pay on or before the due date.`;
+
+        console.log('📄 SMS Message:', smsMessage);
+
+        const smsApiUrl = 'https://sms.iprogtech.com/api/v1/sms_messages';
+        const requestBody = {
+          api_token: '22db33496bbfdb9e6557cf841d80f9ef0c809ccd',
+          phone_number: phoneNumber,
+          message: smsMessage,
+        };
+
+        console.log('🌐 SMS API URL:', smsApiUrl);
+        console.log('📦 Request Body:', JSON.stringify(requestBody, null, 2));
+        
+        const smsResponse = await fetch(smsApiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
+        });
+
+        console.log('📊 Response Status:', smsResponse.status);
+        console.log('📊 Response Status Text:', smsResponse.statusText);
+        console.log('📊 Response Headers:', JSON.stringify(Object.fromEntries(smsResponse.headers.entries()), null, 2));
+
+        if (smsResponse.ok) {
+          try {
+            const responseData = await smsResponse.json();
+            console.log('✅ SMS sent successfully!');
+            console.log('📥 Response Data:', JSON.stringify(responseData, null, 2));
+          } catch (jsonError) {
+            const responseText = await smsResponse.text();
+            console.log('✅ SMS sent successfully (non-JSON response)');
+            console.log('📥 Response Text:', responseText);
+          }
+        } else {
+          try {
+            const errorData = await smsResponse.json();
+            console.error('❌ SMS sending failed (JSON error):');
+            console.error('Error Data:', JSON.stringify(errorData, null, 2));
+          } catch (jsonError) {
+            const errorText = await smsResponse.text();
+            console.error('❌ SMS sending failed (Text error):');
+            console.error('Error Text:', errorText);
+          }
+        }
+        
+        console.log('=== SMS NOTIFICATION END ===');
+      } catch (smsError: any) {
+        console.error('❌ SMS Exception occurred:');
+        console.error('Error Name:', smsError?.name);
+        console.error('Error Message:', smsError?.message);
+        console.error('Error Stack:', smsError?.stack);
+        console.error('Full Error:', smsError);
+        console.log('=== SMS NOTIFICATION END (WITH ERROR) ===');
+        // Don't fail the billing creation if SMS fails
+      }
+
       // Close modals and reset
       setConfirmationModalVisible(false);
       setFormModalVisible(false);
