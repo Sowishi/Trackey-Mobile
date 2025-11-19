@@ -79,6 +79,7 @@ export default function DashboardScreen() {
   const [otherMethod, setOtherMethod] = useState('');
   const [paymentProof, setPaymentProof] = useState<string | null>(null);
   const [submittingPayment, setSubmittingPayment] = useState(false);
+  const [currentMonthLabel, setCurrentMonthLabel] = useState<string>('');
   
   const WATER_RATE_PER_CUBIC_METER = 20; // 20 pesos per cubic meter
 
@@ -167,6 +168,13 @@ export default function DashboardScreen() {
       let totalConsumption = 0;
       let totalRevenue = 0;
       let totalDue = 0;
+      let mostRecentMonth = '';
+
+      // Find the most recent billing month
+      const months = ['January', 'February', 'March', 'April', 'May', 'June', 
+                      'July', 'August', 'September', 'October', 'November', 'December'];
+      let latestMonthIndex = -1;
+      let latestCreatedAt = '';
 
       billingSnapshot.forEach((doc) => {
         const data = doc.data();
@@ -185,10 +193,30 @@ export default function DashboardScreen() {
           unpaidCount++;
           totalDue += amount;
         }
+
+        // Track most recent month
+        if (data.month) {
+          const monthIndex = months.indexOf(data.month);
+          const createdAt = data.createdAt || '';
+          
+          if (monthIndex > latestMonthIndex || 
+              (monthIndex === latestMonthIndex && createdAt > latestCreatedAt)) {
+            latestMonthIndex = monthIndex;
+            latestCreatedAt = createdAt;
+            mostRecentMonth = data.month;
+          }
+        }
       });
 
       const totalBills = paidCount + unpaidCount + pendingCount;
       const collectionRate = totalBills > 0 ? (paidCount / totalBills) * 100 : 0;
+
+      // Set current month label (use most recent billing month or current calendar month)
+      if (!mostRecentMonth) {
+        const currentDate = new Date();
+        mostRecentMonth = months[currentDate.getMonth()];
+      }
+      setCurrentMonthLabel(mostRecentMonth);
 
       setStats({
         totalResidents: totalResidents,
@@ -623,6 +651,13 @@ export default function DashboardScreen() {
       fontWeight: '600',
       color: Colors[colorScheme ?? 'light'].text,
       opacity: 0.7,
+      marginBottom: 4,
+    },
+    metricMonth: {
+      fontSize: 11,
+      fontWeight: '500',
+      color: Colors[colorScheme ?? 'light'].text,
+      opacity: 0.5,
       marginBottom: 8,
     },
     metricValue: {
@@ -665,6 +700,13 @@ export default function DashboardScreen() {
       fontSize: 16,
       fontWeight: '600',
       color: Colors[colorScheme ?? 'light'].text,
+      marginBottom: 2,
+    },
+    collectionRateMonth: {
+      fontSize: 11,
+      fontWeight: '500',
+      color: Colors[colorScheme ?? 'light'].text,
+      opacity: 0.5,
       marginBottom: 4,
     },
     collectionRateValue: {
@@ -1453,25 +1495,35 @@ export default function DashboardScreen() {
               </View>
             </View>
             <Text style={styles.metricLabel}>Total Revenue</Text>
+            {currentMonthLabel && (
+              <Text style={styles.metricMonth}>{currentMonthLabel}</Text>
+            )}
             <Text style={[styles.metricValue, { color: '#059669' }]}>
               ₱{stats.totalRevenue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </Text>
             <Text style={styles.metricSubtext}>Collected payments</Text>
           </View>
 
-          {/* Total Due Card */}
-          <View style={[styles.metricCardLarge, { backgroundColor: '#FEE2E2' }]}>
+          {/* Total Due Card - Clickable */}
+          <TouchableOpacity 
+            style={[styles.metricCardLarge, { backgroundColor: '#FEE2E2' }]}
+            onPress={() => router.push('/(tabs)/users')}
+            activeOpacity={0.7}
+          >
             <View style={styles.metricHeader}>
               <View style={[styles.metricIconContainer, { backgroundColor: '#DC2626' }]}>
                 <Ionicons name="alert-circle" size={24} color="#FFFFFF" />
               </View>
             </View>
             <Text style={styles.metricLabel}>Amount Due</Text>
+            {currentMonthLabel && (
+              <Text style={styles.metricMonth}>{currentMonthLabel}</Text>
+            )}
             <Text style={[styles.metricValue, { color: '#DC2626' }]}>
               ₱{stats.totalDue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </Text>
-            <Text style={styles.metricSubtext}>Outstanding balance</Text>
-          </View>
+            <Text style={styles.metricSubtext}>Outstanding balance • Tap to view users</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Collection Rate Card */}
@@ -1490,6 +1542,9 @@ export default function DashboardScreen() {
             </View>
             <View style={styles.collectionRateInfo}>
               <Text style={styles.collectionRateLabel}>Collection Rate</Text>
+              {currentMonthLabel && (
+                <Text style={styles.collectionRateMonth}>{currentMonthLabel}</Text>
+              )}
               <Text style={[styles.collectionRateValue, { 
                 color: stats.collectionRate >= 75 ? '#059669' : stats.collectionRate >= 50 ? '#F59E0B' : '#DC2626'
               }]}>
