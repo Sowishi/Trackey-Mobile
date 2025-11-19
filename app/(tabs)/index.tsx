@@ -899,6 +899,14 @@ export default function DashboardScreen() {
       justifyContent: 'space-between',
       alignItems: 'flex-end',
     },
+    debitCardFooterRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    debitCardArrow: {
+      marginLeft: 4,
+    },
     debitCardAmount: {
       fontSize: 22,
       color: '#FFFFFF',
@@ -1362,7 +1370,11 @@ export default function DashboardScreen() {
           <View style={styles.residentBottomSection}>
             {/* Water Billing Card Design with negative marginTop */}
             {latestBill && (
-              <View style={styles.debitCard}>
+              <TouchableOpacity 
+                style={styles.debitCard}
+                onPress={() => handlePayBill(latestBill)}
+                activeOpacity={0.8}
+              >
                 <View style={styles.debitCardHeader}>
                   <View style={styles.debitCardWaterIcon}>
                     <Ionicons name="water" size={24} color="#06B6D4" />
@@ -1381,16 +1393,19 @@ export default function DashboardScreen() {
                     <Text style={styles.debitCardLabel}>Total Amount</Text>
                     <Text style={styles.debitCardAmount}>₱{latestBill.totalAmount.toFixed(2)}</Text>
                   </View>
-                  <View style={[
-                    styles.debitCardStatusBadge,
-                    latestBill.status === 'paid' ? styles.debitCardStatusPaid : styles.debitCardStatusUnpaid
-                  ]}>
-                    <Text style={styles.debitCardStatusText}>
-                      {latestBill.status === 'paid' ? 'Paid' : 'Unpaid'}
-                    </Text>
+                  <View style={styles.debitCardFooterRight}>
+                    <View style={[
+                      styles.debitCardStatusBadge,
+                      latestBill.status === 'paid' ? styles.debitCardStatusPaid : styles.debitCardStatusUnpaid
+                    ]}>
+                      <Text style={styles.debitCardStatusText}>
+                        {latestBill.status === 'paid' ? 'Paid' : 'Unpaid'}
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color="#FFFFFF" style={styles.debitCardArrow} />
                   </View>
                 </View>
-              </View>
+              </TouchableOpacity>
             )}
 
             {/* Bills List */}
