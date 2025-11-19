@@ -109,13 +109,15 @@ export default function NotificationsScreen() {
         } as Notification);
       });
 
-      // Filter out bill_created notifications and bill reminders for collectors
+      // Filter out bill_created notifications, bill reminders, and payment approval/rejection notifications for collectors
       let filteredNotifications = allNotifications;
       if (isCollector) {
         filteredNotifications = allNotifications.filter(
           notification => 
             notification.type !== 'bill_created' && 
-            notification.title !== 'Bill Reminder'
+            notification.title !== 'Bill Reminder' &&
+            notification.title !== 'Payment Approved' &&
+            notification.title !== 'Payment Rejected'
         );
       }
 
