@@ -995,6 +995,9 @@ export default function DashboardScreen() {
     debitCardStatusUnpaid: {
       backgroundColor: '#EF4444',
     },
+    debitCardStatusNoBilling: {
+      backgroundColor: '#6B7280',
+    },
     debitCardStatusText: {
       color: '#FFFFFF',
       fontSize: 11,
@@ -1631,44 +1634,57 @@ export default function DashboardScreen() {
           {/* Bottom Section with white background */}
           <View style={styles.residentBottomSection}>
             {/* Water Billing Card Design with negative marginTop */}
-            {latestBill && (
-              <TouchableOpacity 
-                style={styles.debitCard}
-                onPress={() => handlePayBill(latestBill)}
-                activeOpacity={0.8}
-              >
-                <View style={styles.debitCardHeader}>
-                  <View style={styles.debitCardWaterIcon}>
-                    <Ionicons name="water" size={24} color="#06B6D4" />
-                  </View>
-                  <View style={styles.debitCardActiveLabel}>
-                    <View style={styles.debitCardActiveDot} />
-                    <Text style={styles.debitCardActiveText}>Active</Text>
-                  </View>
+            <TouchableOpacity 
+              style={styles.debitCard}
+              onPress={() => {
+                if (latestBill) {
+                  handlePayBill(latestBill);
+                } else {
+                  router.push('/(tabs)/billing-information');
+                }
+              }}
+              activeOpacity={0.8}
+            >
+              <View style={styles.debitCardHeader}>
+                <View style={styles.debitCardWaterIcon}>
+                  <Ionicons name="water" size={24} color="#06B6D4" />
                 </View>
-                <View style={styles.debitCardContent}>
-                  <Text style={styles.debitCardLabel}>Due Date</Text>
-                  <Text style={styles.debitCardDueDate}>{formatDueDate(latestBill.dueDate)}</Text>
+                <View style={styles.debitCardActiveLabel}>
+                  <View style={styles.debitCardActiveDot} />
+                  <Text style={styles.debitCardActiveText}>Active</Text>
                 </View>
-                <View style={styles.debitCardFooter}>
-                  <View>
-                    <Text style={styles.debitCardLabel}>Total Amount</Text>
-                    <Text style={styles.debitCardAmount}>₱{latestBill.totalAmount.toFixed(2)}</Text>
-                  </View>
-                  <View style={styles.debitCardFooterRight}>
-                    <View style={[
-                      styles.debitCardStatusBadge,
-                      latestBill.status === 'paid' ? styles.debitCardStatusPaid : styles.debitCardStatusUnpaid
-                    ]}>
-                      <Text style={styles.debitCardStatusText}>
-                        {latestBill.status === 'paid' ? 'Paid' : 'Unpaid'}
-                      </Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={20} color="#FFFFFF" style={styles.debitCardArrow} />
-                  </View>
+              </View>
+              <View style={styles.debitCardContent}>
+                <Text style={styles.debitCardLabel}>Due Date</Text>
+                <Text style={styles.debitCardDueDate}>
+                  {latestBill ? formatDueDate(latestBill.dueDate) : 'N/A'}
+                </Text>
+              </View>
+              <View style={styles.debitCardFooter}>
+                <View>
+                  <Text style={styles.debitCardLabel}>Total Amount</Text>
+                  <Text style={styles.debitCardAmount}>
+                    {latestBill ? `₱${latestBill.totalAmount.toFixed(2)}` : '₱0.00'}
+                  </Text>
                 </View>
-              </TouchableOpacity>
-            )}
+                <View style={styles.debitCardFooterRight}>
+                  <View style={[
+                    styles.debitCardStatusBadge,
+                    latestBill 
+                      ? (latestBill.status === 'paid' ? styles.debitCardStatusPaid : styles.debitCardStatusUnpaid)
+                      : styles.debitCardStatusNoBilling
+                  ]}>
+                    <Text style={styles.debitCardStatusText}>
+                      {latestBill 
+                        ? (latestBill.status === 'paid' ? 'Paid' : 'Unpaid')
+                        : 'Meter Not Read'
+                      }
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#FFFFFF" style={styles.debitCardArrow} />
+                </View>
+              </View>
+            </TouchableOpacity>
 
             {/* Current Water Rate Display */}
             <View style={styles.waterRateContainer}>
