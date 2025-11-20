@@ -24,7 +24,7 @@ import {
 } from 'react-native';
 import { BarChart, PieChart } from 'react-native-chart-kit';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { addDoc, collection, db, doc, getDocs, query, updateDoc, uploadImageToStorage, where } from '../../firebase';
+import { addDoc, collection, db, doc, getDoc, getDocs, query, updateDoc, uploadImageToStorage, where } from '../../firebase';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -81,8 +81,27 @@ export default function DashboardScreen() {
   const [paymentProof, setPaymentProof] = useState<string | null>(null);
   const [submittingPayment, setSubmittingPayment] = useState(false);
   const [currentMonthLabel, setCurrentMonthLabel] = useState<string>('');
+  const [waterRate, setWaterRate] = useState<number>(20.00);
   
-  const WATER_RATE_PER_CUBIC_METER = 20; // 20 pesos per cubic meter
+  const WATER_RATE_PER_CUBIC_METER = 20; // 20 pesos per cubic meter (fallback)
+
+  // Fetch water rate from Firestore settings
+  const fetchWaterRate = async (): Promise<number> => {
+    try {
+      const settingsRef = doc(db, 'settings', 'kRaw13WFzXqfemqvdGPx');
+      const settingsSnap = await getDoc(settingsRef);
+      
+      if (settingsSnap.exists()) {
+        const data = settingsSnap.data();
+        const rate = parseFloat(data.currentWaterRate || data.waterRate || '20.00');
+        return isNaN(rate) ? 20.00 : rate;
+      }
+      return 20.00; // Default fallback
+    } catch (error) {
+      console.error('Error fetching water rate:', error);
+      return 20.00; // Default fallback
+    }
+  };
 
   // Check if user is resident
   const isResident = user?.position?.toLowerCase() === 'resident' || user?.position?.toLowerCase() === 'residents';
@@ -253,8 +272,22 @@ export default function DashboardScreen() {
     }
   }, [userId]);
 
+  // Fetch water rate on component mount
+  useEffect(() => {
+    const loadWaterRate = async () => {
+      const rate = await fetchWaterRate();
+      setWaterRate(rate);
+    };
+    loadWaterRate();
+  }, []);
+
   const handleRefresh = () => {
     setRefreshing(true);
+    const refreshWaterRate = async () => {
+      const rate = await fetchWaterRate();
+      setWaterRate(rate);
+    };
+    refreshWaterRate();
     if (isResident) {
       fetchResidentBills().finally(() => setRefreshing(false));
     } else {
@@ -1006,6 +1039,40 @@ export default function DashboardScreen() {
       paddingTop: 40,
       paddingBottom: 100,
     },
+    waterRateContainer: {
+      padding: 20,
+      paddingTop: 0,
+      paddingBottom: 0,
+    },
+    waterRateCard: {
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      borderRadius: 12,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    waterRateHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 8,
+      gap: 8,
+    },
+    waterRateLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+      opacity: 0.7,
+    },
+    waterRateValue: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: Colors[colorScheme ?? 'light'].primary,
+    },
     servicesContainer: {
       padding: 20,
       paddingTop: 20,
@@ -1605,6 +1672,23 @@ export default function DashboardScreen() {
               </TouchableOpacity>
             )}
 
+            {/* Current Water Rate Display */}
+            <View style={styles.waterRateContainer}>
+              <View style={styles.waterRateCard}>
+                <View style={styles.waterRateHeader}>
+                  <Ionicons 
+                    name="water" 
+                    size={24} 
+                    color={Colors[colorScheme ?? 'light'].primary} 
+                  />
+                  <Text style={styles.waterRateLabel}>Current Water Rate</Text>
+                </View>
+                <Text style={styles.waterRateValue}>
+                  ₱{waterRate.toFixed(2)} per cubic meter
+                </Text>
+              </View>
+            </View>
+
             {/* Services Section */}
             <View style={styles.servicesContainer}>
               <Text style={styles.servicesTitle}>Services</Text>
@@ -1667,20 +1751,6 @@ export default function DashboardScreen() {
                     />
                   </View>
                   <Text style={styles.serviceLabel}>Notifications</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                  style={styles.serviceItem}
-                  onPress={() => router.push('/(tabs)/qrcode')}
-                >
-                  <View style={styles.serviceIconContainer}>
-                    <Ionicons 
-                      name="qr-code" 
-                      size={28} 
-                      color={Colors[colorScheme ?? 'light'].primary} 
-                    />
-                  </View>
-                  <Text style={styles.serviceLabel}>QR Code</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity 
