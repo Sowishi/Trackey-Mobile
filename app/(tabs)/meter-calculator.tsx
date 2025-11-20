@@ -16,9 +16,25 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { collection, db, getDocs, query, where } from '../../firebase';
+import { collection, db, doc, getDoc, getDocs, query, where } from '../../firebase';
 
-const WATER_RATE_PER_CUBIC_METER = 20; // 20 pesos per cubic meter
+// Fetch water rate from Firestore settings
+const fetchWaterRate = async (): Promise<number> => {
+  try {
+    const settingsRef = doc(db, 'settings', 'kRaw13WFzXqfemqvdGPx');
+    const settingsSnap = await getDoc(settingsRef);
+    
+    if (settingsSnap.exists()) {
+      const data = settingsSnap.data();
+      const rate = parseFloat(data.currentWaterRate || data.waterRate || '20.00');
+      return isNaN(rate) ? 20.00 : rate;
+    }
+    return 20.00; // Default fallback
+  } catch (error) {
+    console.error('Error fetching water rate:', error);
+    return 20.00; // Default fallback
+  }
+};
 
 interface Bill {
   id: string;
@@ -37,6 +53,7 @@ export default function MeterCalculatorScreen() {
   const [lastReading, setLastReading] = useState<number | null>(null);
   const [latestBill, setLatestBill] = useState<Bill | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [waterRate, setWaterRate] = useState<number>(20.00);
 
   // Fetch user ID from users collection
   const fetchUserId = async () => {
@@ -110,6 +127,11 @@ export default function MeterCalculatorScreen() {
   };
 
   useEffect(() => {
+    // Fetch water rate on component mount
+    fetchWaterRate().then(rate => {
+      setWaterRate(rate);
+    });
+    
     fetchUserId().then(() => {
       fetchLatestBill();
     });
@@ -131,7 +153,7 @@ export default function MeterCalculatorScreen() {
 
   const calculatePrice = (): number => {
     const consumption = calculateConsumption();
-    return consumption * WATER_RATE_PER_CUBIC_METER;
+    return consumption * waterRate;
   };
 
   const handleCalculate = () => {
@@ -412,7 +434,7 @@ export default function MeterCalculatorScreen() {
             </View>
 
             <Text style={styles.infoText}>
-              Rate: ₱{WATER_RATE_PER_CUBIC_METER} per cubic meter
+              Rate: ₱{waterRate.toFixed(2)} per cubic meter
             </Text>
           </View>
         )}

@@ -111,6 +111,12 @@ export default function TabLayout() {
         href: null, // 👈 this removes it from the bottom tab bar
       }}
     />
+      <Tabs.Screen
+      name="meter-calulator"
+      options={{
+        href: null, // 👈 this removes it from the bottom tab bar
+      }}
+    />
     <Tabs.Screen
       name="user-detail"
       options={{

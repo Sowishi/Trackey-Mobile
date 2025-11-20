@@ -66,10 +66,32 @@ export default function UserDetailScreen() {
   const [confirmationModalVisible, setConfirmationModalVisible] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [billToSubmit, setBillToSubmit] = useState<any>(null);
+  const [waterRate, setWaterRate] = useState<number>(20.00);
 
-  const WATER_RATE_PER_CUBIC_METER = 20; // 20 pesos per cubic meter
+  // Fetch water rate from Firestore settings
+  const fetchWaterRate = async (): Promise<number> => {
+    try {
+      const settingsRef = doc(db, 'settings', 'kRaw13WFzXqfemqvdGPx');
+      const settingsSnap = await getDoc(settingsRef);
+      
+      if (settingsSnap.exists()) {
+        const data = settingsSnap.data();
+        const rate = parseFloat(data.currentWaterRate || data.waterRate || '20.00');
+        return isNaN(rate) ? 20.00 : rate;
+      }
+      return 20.00; // Default fallback
+    } catch (error) {
+      console.error('Error fetching water rate:', error);
+      return 20.00; // Default fallback
+    }
+  };
 
   useEffect(() => {
+    // Fetch water rate on component mount
+    fetchWaterRate().then(rate => {
+      setWaterRate(rate);
+    });
+    
     if (userId) {
       fetchUserDetail();
     }
@@ -82,7 +104,7 @@ export default function UserDetailScreen() {
       const previousValue = parseFloat(previousConsumption);
       if (!isNaN(presentValue) && !isNaN(previousValue) && presentValue > previousValue) {
         const consumptionDiff = presentValue - previousValue;
-        const calculatedTotal = consumptionDiff * WATER_RATE_PER_CUBIC_METER;
+        const calculatedTotal = consumptionDiff * waterRate;
         // Apply minimum payment of 150 if consumption is less than 10
         const finalTotal = consumptionDiff < 10 ? 150 : calculatedTotal;
         setTotalAmount(finalTotal.toFixed(2));
@@ -92,7 +114,7 @@ export default function UserDetailScreen() {
     } else {
       setTotalAmount('');
     }
-  }, [presentConsumption, previousConsumption]);
+  }, [presentConsumption, previousConsumption, waterRate]);
 
   const fetchUserDetail = async () => {
     try {
@@ -254,7 +276,7 @@ export default function UserDetailScreen() {
     const consumptionDiff = presentConsumptionValue - previousConsumptionValue;
 
     // Validate the calculation (with minimum payment of 150 if consumption < 10)
-    const calculatedAmount = consumptionDiff * WATER_RATE_PER_CUBIC_METER;
+    const calculatedAmount = consumptionDiff * waterRate;
     const expectedAmount = consumptionDiff < 10 ? 150 : calculatedAmount;
     if (Math.abs(amountValueFloat - expectedAmount) > 0.01) {
       alert('Amount calculation mismatch. Please check the consumption values.');
@@ -298,7 +320,7 @@ export default function UserDetailScreen() {
         previousConsumption: previousConsumptionValue,
         consumption: presentConsumptionValue,
         consumptionUsed: consumptionDiff,
-        waterRatePerCubicMeter: WATER_RATE_PER_CUBIC_METER,
+        waterRatePerCubicMeter: waterRate,
         totalAmount: amountValueFloat,
         status: 'unpaid',
         createdAt: new Date().toISOString(),
@@ -1842,7 +1864,7 @@ Please pay on or before due date. Thank you.`;
                   keyboardType="decimal-pad"
                 />
                 <Text style={styles.rateInfo}>
-                  Rate: ₱{WATER_RATE_PER_CUBIC_METER.toFixed(2)} per cubic meter
+                  Rate: ₱{waterRate.toFixed(2)} per cubic meter
                 </Text>
               </View>
             </ScrollView>
