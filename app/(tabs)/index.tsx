@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
-  FlatList,
   Image,
   Modal,
   Pressable,
@@ -20,7 +19,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import { BarChart, PieChart } from 'react-native-chart-kit';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -74,7 +73,6 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
-  const [billingListModalVisible, setBillingListModalVisible] = useState(false);
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'gcash' | 'other' | null>(null);
   const [otherMethod, setOtherMethod] = useState('');
@@ -1699,7 +1697,7 @@ export default function DashboardScreen() {
               >
                 <TouchableOpacity 
                   style={styles.serviceItem}
-                  onPress={() => setBillingListModalVisible(true)}
+                  onPress={() => router.push('/(tabs)/billing-information')}
                 >
                   <View style={styles.serviceIconContainer}>
                     <Ionicons 
@@ -1987,81 +1985,6 @@ export default function DashboardScreen() {
           </Pressable>
         </Modal>
 
-        {/* Billing List Modal */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={billingListModalVisible}
-          onRequestClose={() => setBillingListModalVisible(false)}
-        >
-          <Pressable
-            style={styles.paymentModalOverlay}
-            onPress={() => setBillingListModalVisible(false)}
-          >
-            <View style={styles.paymentModalContent} onStartShouldSetResponder={() => true}>
-              <View style={styles.paymentModalHeader}>
-                <Text style={styles.paymentModalTitle}>Billing Information</Text>
-                <TouchableOpacity
-                  onPress={() => setBillingListModalVisible(false)}
-                  style={styles.closeButton}
-                >
-                  <Ionicons
-                    name="close"
-                    size={24}
-                    color={Colors[colorScheme ?? 'light'].text}
-                  />
-                </TouchableOpacity>
-              </View>
-
-              {/* Outstanding Balance Section */}
-              {totalAmountDue > 0 && (
-                <View style={styles.outstandingBalanceContainer}>
-                  <View style={styles.outstandingBalanceContent}>
-                    <View style={styles.outstandingBalanceHeader}>
-                      <Ionicons 
-                        name="alert-circle" 
-                        size={24} 
-                        color="#DC2626" 
-                      />
-                      <Text style={styles.outstandingBalanceLabel}>Outstanding Balance</Text>
-                    </View>
-                    <Text style={styles.outstandingBalanceAmount}>
-                      ₱{totalAmountDue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </Text>
-                    <Text style={styles.outstandingBalanceSubtext}>
-                      {unpaidBills} {unpaidBills === 1 ? 'bill' : 'bills'} unpaid
-                    </Text>
-                  </View>
-                </View>
-              )}
-
-              <FlatList
-                data={residentBills}
-                renderItem={renderBillCard}
-                keyExtractor={(item) => item.id}
-                contentContainerStyle={styles.billingListContent}
-                ListEmptyComponent={() => (
-                  <View style={styles.emptyContainer}>
-                    <Ionicons
-                      name="document-text-outline"
-                      size={80}
-                      color={Colors[colorScheme ?? 'light'].icon}
-                    />
-                    <Text style={styles.emptyText}>No bills found</Text>
-                    <Text style={styles.emptySubtext}>Your billing records will appear here</Text>
-                  </View>
-                )}
-                refreshControl={
-                  <RefreshControl
-                    refreshing={refreshing}
-                    onRefresh={handleRefresh}
-                    colors={[Colors[colorScheme ?? 'light'].primary]}
-                  />
-                }
-              />
-            </View>
-          </Pressable>
-        </Modal>
       </SafeAreaView>
     );
   }

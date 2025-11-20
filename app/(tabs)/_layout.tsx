@@ -289,6 +289,12 @@ export default function TabLayout() {
         href: null, // 👈 this removes it from the bottom tab bar
       }}
     />
+    <Tabs.Screen
+      name="billing-information"
+      options={{
+        href: null, // 👈 this removes it from the bottom tab bar
+      }}
+    />
     </Tabs>
   );
 }
