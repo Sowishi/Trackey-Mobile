@@ -368,7 +368,7 @@ export default function UserDetailScreen() {
           userEmail: billToSubmit.userEmail,
           userName: billToSubmit.userName,
           type: 'bill_created',
-          title: 'New Bill Generated',
+          title: 'Bill Noticed',
           message: `A new water bill for ${billToSubmit.month} (₱${billToSubmit.totalAmount.toFixed(2)}) has been generated. Please check your dashboard.`,
           billId: docRef.id,
           status: 'unread',

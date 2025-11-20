@@ -2214,16 +2214,6 @@ export default function DashboardScreen() {
               <Text style={styles.statSubtext}>Overdue bills</Text>
             </View>
 
-            <View style={[styles.statCard, styles.statCardFull]}>
-              <View style={styles.statHeader}>
-                <View style={[styles.statIcon, { backgroundColor: '#E0F7FA' }]}>
-                  <Ionicons name="water" size={18} color={Colors[colorScheme ?? 'light'].primary} />
-                </View>
-              </View>
-              <Text style={styles.statLabel}>Water Consumption</Text>
-              <Text style={styles.statValue}>{stats.totalWaterConsumption.toFixed(2)} m³</Text>
-              <Text style={styles.statSubtext}>Total usage this period</Text>
-            </View>
           </View>
         </View>
 

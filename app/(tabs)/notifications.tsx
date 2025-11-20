@@ -3,8 +3,8 @@ import { Colors } from '@/constants/theme';
 import { useUser } from '@/contexts/UserContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -19,7 +19,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { collection, db, getDocs, query, where } from '../../firebase';
+import { collection, db, doc, getDocs, query, updateDoc, where } from '../../firebase';
 
 interface Notification {
   id: string;
@@ -140,6 +140,62 @@ export default function NotificationsScreen() {
   useEffect(() => {
     fetchNotifications();
   }, [user, isCollector]);
+
+  // Mark all unread notifications as read when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      const markNotificationsAsRead = async () => {
+        if (!user?.email) return;
+
+        try {
+          // Get all unread notifications for the user
+          let notificationsQuery;
+          
+          if (isCollector) {
+            notificationsQuery = query(collection(db, 'notifications'));
+          } else {
+            notificationsQuery = query(
+              collection(db, 'notifications'),
+              where('userEmail', '==', user.email)
+            );
+          }
+          
+          const notificationsSnapshot = await getDocs(notificationsQuery);
+          const updatePromises: Promise<void>[] = [];
+
+          notificationsSnapshot.forEach((docSnapshot) => {
+            const data = docSnapshot.data();
+            // Only mark non-announcement notifications as read
+            if (data.status === 'unread' && !data.isAnnouncement) {
+              // Filter out bill_created, bill reminders, and payment approval/rejection for collectors
+              if (isCollector) {
+                if (
+                  data.type !== 'bill_created' &&
+                  data.title !== 'Bill Reminder' &&
+                  data.title !== 'Payment Approved' &&
+                  data.title !== 'Payment Rejected'
+                ) {
+                  const notificationRef = doc(db, 'notifications', docSnapshot.id);
+                  updatePromises.push(updateDoc(notificationRef, { status: 'read' }));
+                }
+              } else {
+                const notificationRef = doc(db, 'notifications', docSnapshot.id);
+                updatePromises.push(updateDoc(notificationRef, { status: 'read' }));
+              }
+            }
+          });
+
+          await Promise.all(updatePromises);
+          // Refresh notifications after marking as read
+          fetchNotifications();
+        } catch (error) {
+          console.error('Error marking notifications as read:', error);
+        }
+      };
+
+      markNotificationsAsRead();
+    }, [user, isCollector])
+  );
 
   const handleRefresh = () => {
     setRefreshing(true);
