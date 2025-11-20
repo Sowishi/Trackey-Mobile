@@ -785,9 +785,13 @@ export default function DashboardScreen() {
     residentContainer: {
       flex: 1,
     },
+    residentScrollContent: {
+      flexGrow: 1,
+      paddingBottom: 100,
+    },
     residentTopSection: {
-      flex: 1.2,
       width: '100%',
+      height: 200,
       overflow: 'hidden',
     },
     residentTopBackground: {
@@ -799,7 +803,7 @@ export default function DashboardScreen() {
       flex: 1,
       justifyContent: 'flex-end',
       padding: 20,
-      paddingBottom: 100,
+      paddingBottom: 80,
     },
     residentGreetingText: {
       fontSize: 16,
@@ -813,9 +817,9 @@ export default function DashboardScreen() {
       color: '#FFFFFF',
     },
     residentBottomSection: {
-      flex: 2.3,
       backgroundColor: '#FFFFFF',
       paddingTop: 20,
+      minHeight: 400,
     },
     debitCard: {
       backgroundColor: '#000000',
@@ -921,7 +925,7 @@ export default function DashboardScreen() {
     servicesContainer: {
       padding: 20,
       paddingTop: 20,
-      paddingBottom: 100,
+      paddingBottom: 40,
     },
     servicesTitle: {
       fontSize: 20,
@@ -1394,8 +1398,19 @@ export default function DashboardScreen() {
 
     return (
       <SafeAreaView style={styles.safeArea}>
-            <View style={styles.residentContainer}>
-          {/* Top 1/3 Section with lupet.jpg background */}
+        <ScrollView
+          style={styles.residentContainer}
+          contentContainerStyle={styles.residentScrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={[Colors[colorScheme ?? 'light'].primary]}
+            />
+          }
+        >
+          {/* Top Section with lupet.jpg background */}
           <View style={styles.residentTopSection}>
             <Image
               source={require('../../assets/images/lupet.jpg')}
@@ -1408,7 +1423,7 @@ export default function DashboardScreen() {
             </View>
           </View>
 
-          {/* Bottom 2/3 Section with white background */}
+          {/* Bottom Section with white background */}
           <View style={styles.residentBottomSection}>
             {/* Water Billing Card Design with negative marginTop */}
             {latestBill && (
@@ -1544,7 +1559,7 @@ export default function DashboardScreen() {
               </ScrollView>
             </View>
           </View>
-        </View>
+        </ScrollView>
 
         {/* Payment Modal */}
         <Modal
