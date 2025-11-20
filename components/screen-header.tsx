@@ -6,9 +6,10 @@ interface ScreenHeaderProps {
   title: string;
   onUserPress?: () => void;
   profilePicUrl?: string;
+  onBackPress?: () => void;
 }
 
-export function ScreenHeader({ title, onUserPress, profilePicUrl }: ScreenHeaderProps) {
+export function ScreenHeader({ title, onUserPress, profilePicUrl, onBackPress }: ScreenHeaderProps) {
   const colorScheme = useColorScheme();
 
   const styles = StyleSheet.create({
@@ -65,31 +66,45 @@ export function ScreenHeader({ title, onUserPress, profilePicUrl }: ScreenHeader
   return (
     <View style={styles.header}>
       <View style={styles.leftSection}>
+        {onBackPress && (
+          <TouchableOpacity 
+            onPress={onBackPress}
+            style={{ marginRight: 12, padding: 4 }}
+          >
+            <Ionicons 
+              name="arrow-back" 
+              size={24} 
+              color="#FFFFFF"
+            />
+          </TouchableOpacity>
+        )}
         <Image 
           source={require('../assets/images/aquabill-logo.png')}
           style={styles.logo}
         />
         <Text style={styles.title}>{title}</Text>
       </View>
-      <TouchableOpacity 
-        style={styles.userIcon}
-        onPress={onUserPress}
-      >
-        {profilePicUrl ? (
-          <Image
-            source={{ uri: profilePicUrl }}
-            style={styles.profilePicture}
-          />
-        ) : (
-          <View style={styles.profilePicturePlaceholder}>
-            <Ionicons 
-              name="person" 
-              size={24} 
-              color="#FFFFFF"
+      {onUserPress && (
+        <TouchableOpacity 
+          style={styles.userIcon}
+          onPress={onUserPress}
+        >
+          {profilePicUrl ? (
+            <Image
+              source={{ uri: profilePicUrl }}
+              style={styles.profilePicture}
             />
-          </View>
-        )}
-      </TouchableOpacity>
+          ) : (
+            <View style={styles.profilePicturePlaceholder}>
+              <Ionicons 
+                name="person" 
+                size={24} 
+                color="#FFFFFF"
+              />
+            </View>
+          )}
+        </TouchableOpacity>
+      )}
     </View>
   );
 }

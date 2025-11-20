@@ -1685,6 +1685,20 @@ export default function DashboardScreen() {
 
                 <TouchableOpacity 
                   style={styles.serviceItem}
+                  onPress={() => router.push('/(tabs)/meter-calculator')}
+                >
+                  <View style={styles.serviceIconContainer}>
+                    <Ionicons 
+                      name="calculator" 
+                      size={28} 
+                      color={Colors[colorScheme ?? 'light'].primary} 
+                    />
+                  </View>
+                  <Text style={styles.serviceLabel}>Meter Calculator</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.serviceItem}
                   onPress={handleRefresh}
                 >
                   <View style={styles.serviceIconContainer}>
