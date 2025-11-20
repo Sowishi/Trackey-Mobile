@@ -507,9 +507,9 @@ export default function DashboardScreen() {
   // Calculate resident stats
   const totalBills = residentBills.length;
   const paidBills = residentBills.filter(bill => bill.status === 'paid').length;
-  const unpaidBills = residentBills.filter(bill => bill.status === 'unpaid').length;
+  const unpaidBills = residentBills.filter(bill => bill.status === 'unpaid' || bill.status === 'Unpaid' || bill.status === 'pending').length;
   const totalAmountDue = residentBills
-    .filter(bill => bill.status === 'unpaid')
+    .filter(bill => bill.status === 'unpaid' || bill.status === 'Unpaid' || bill.status === 'pending')
     .reduce((sum, bill) => sum + bill.totalAmount, 0);
 
   const styles = StyleSheet.create({
@@ -1347,6 +1347,38 @@ export default function DashboardScreen() {
       padding: 20,
       paddingBottom: 20,
     },
+    outstandingBalanceContainer: {
+      backgroundColor: '#FEE2E2',
+      borderBottomWidth: 1,
+      borderBottomColor: Colors[colorScheme ?? 'light'].border,
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+    },
+    outstandingBalanceContent: {
+      alignItems: 'center',
+    },
+    outstandingBalanceHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 8,
+      gap: 8,
+    },
+    outstandingBalanceLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: '#DC2626',
+    },
+    outstandingBalanceAmount: {
+      fontSize: 28,
+      fontWeight: 'bold',
+      color: '#DC2626',
+      marginBottom: 4,
+    },
+    outstandingBalanceSubtext: {
+      fontSize: 12,
+      color: Colors[colorScheme ?? 'light'].text,
+      opacity: 0.7,
+    },
   });
 
   if (isResident && loadingBills) {
@@ -1484,7 +1516,7 @@ export default function DashboardScreen() {
                       color={Colors[colorScheme ?? 'light'].primary} 
                     />
                   </View>
-                  <Text style={styles.serviceLabel}>List of Billing</Text>
+                  <Text style={styles.serviceLabel}>Billing Information</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity 
@@ -1742,7 +1774,7 @@ export default function DashboardScreen() {
           >
             <View style={styles.paymentModalContent} onStartShouldSetResponder={() => true}>
               <View style={styles.paymentModalHeader}>
-                <Text style={styles.paymentModalTitle}>List of Billing</Text>
+                <Text style={styles.paymentModalTitle}>Billing Information</Text>
                 <TouchableOpacity
                   onPress={() => setBillingListModalVisible(false)}
                   style={styles.closeButton}
@@ -1754,6 +1786,28 @@ export default function DashboardScreen() {
                   />
                 </TouchableOpacity>
               </View>
+
+              {/* Outstanding Balance Section */}
+              {totalAmountDue > 0 && (
+                <View style={styles.outstandingBalanceContainer}>
+                  <View style={styles.outstandingBalanceContent}>
+                    <View style={styles.outstandingBalanceHeader}>
+                      <Ionicons 
+                        name="alert-circle" 
+                        size={24} 
+                        color="#DC2626" 
+                      />
+                      <Text style={styles.outstandingBalanceLabel}>Outstanding Balance</Text>
+                    </View>
+                    <Text style={styles.outstandingBalanceAmount}>
+                      ₱{totalAmountDue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </Text>
+                    <Text style={styles.outstandingBalanceSubtext}>
+                      {unpaidBills} {unpaidBills === 1 ? 'bill' : 'bills'} unpaid
+                    </Text>
+                  </View>
+                </View>
+              )}
 
               <FlatList
                 data={residentBills}
