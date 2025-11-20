@@ -22,7 +22,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { PieChart } from 'react-native-chart-kit';
+import { BarChart, PieChart } from 'react-native-chart-kit';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { addDoc, collection, db, doc, getDocs, query, updateDoc, uploadImageToStorage, where } from '../../firebase';
 
@@ -512,6 +512,90 @@ export default function DashboardScreen() {
     .filter(bill => bill.status === 'unpaid' || bill.status === 'Unpaid' || bill.status === 'pending')
     .reduce((sum, bill) => sum + bill.totalAmount, 0);
 
+  // Calculate water consumption per month for bar graph
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 
+                  'July', 'August', 'September', 'October', 'November', 'December'];
+  
+  // Extract month name from "Month Year" format (e.g., "November 2025" -> "November")
+  const extractMonthName = (monthString: string): string | null => {
+    if (!monthString) return null;
+    // Check if it's in "Month Year" format
+    const parts = monthString.split(' ');
+    if (parts.length >= 1) {
+      const monthName = parts[0];
+      // Check if it matches one of our month names
+      if (months.includes(monthName)) {
+        return monthName;
+      }
+    }
+    // If it's already just a month name, return it
+    if (months.includes(monthString)) {
+      return monthString;
+    }
+    return null;
+  };
+
+  const monthlyConsumption = residentBills.reduce((acc, bill) => {
+    const monthName = extractMonthName(bill.month);
+    if (monthName) {
+      const consumption = bill.consumptionUsed !== undefined ? bill.consumptionUsed : bill.consumption || 0;
+      acc[monthName] = (acc[monthName] || 0) + consumption;
+    }
+    return acc;
+  }, {} as Record<string, number>);
+
+  // Prepare data for bar chart (show all months with data, up to 6 most recent)
+  // Get all months with consumption data, sorted by creation date (most recent first)
+  const billsWithMonth = residentBills
+    .map(bill => {
+      const monthName = extractMonthName(bill.month);
+      if (!monthName) return null;
+      const consumption = bill.consumptionUsed !== undefined ? bill.consumptionUsed : bill.consumption || 0;
+      return {
+        month: monthName,
+        consumption,
+        createdAt: bill.createdAt,
+        monthIndex: months.indexOf(monthName),
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null && item.consumption > 0);
+
+  // Group by month and sum consumption, keeping the most recent date for sorting
+  const monthlyData = billsWithMonth.reduce((acc, item) => {
+    if (!acc[item.month]) {
+      acc[item.month] = {
+        month: item.month,
+        monthIndex: item.monthIndex,
+        consumption: 0,
+        latestDate: item.createdAt,
+      };
+    }
+    acc[item.month].consumption += item.consumption;
+    // Keep the most recent date for sorting
+    if (new Date(item.createdAt) > new Date(acc[item.month].latestDate)) {
+      acc[item.month].latestDate = item.createdAt;
+    }
+    return acc;
+  }, {} as Record<string, { month: string; monthIndex: number; consumption: number; latestDate: string }>);
+
+  // Convert to array, sort by date (most recent first), then take last 6 and reverse for chronological display
+  const monthsWithData = Object.values(monthlyData)
+    .sort((a, b) => new Date(b.latestDate).getTime() - new Date(a.latestDate).getTime())
+    .slice(0, 6)
+    .sort((a, b) => a.monthIndex - b.monthIndex); // Sort chronologically for display
+
+  const chartData = monthsWithData.map(item => ({
+    month: item.month.substring(0, 3), // Short month name (Jan, Feb, etc.)
+    consumption: item.consumption,
+  }));
+
+  const barChartData = {
+    labels: chartData.map(d => d.month),
+    datasets: [{
+      data: chartData.map(d => d.consumption),
+    }],
+  };
+
   const styles = StyleSheet.create({
     safeArea: {
       flex: 1,
@@ -958,6 +1042,30 @@ export default function DashboardScreen() {
       color: Colors[colorScheme ?? 'light'].text,
       textAlign: 'center',
       maxWidth: 80,
+    },
+    consumptionChartContainer: {
+      padding: 20,
+      paddingTop: 0,
+      paddingBottom: 40,
+    },
+    consumptionChartTitle: {
+      fontSize: 20,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+      marginBottom: 16,
+    },
+    consumptionChartCard: {
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      borderRadius: 12,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+      alignItems: 'center',
     },
     residentContent: {
       padding: 20,
@@ -1590,6 +1698,40 @@ export default function DashboardScreen() {
                 </TouchableOpacity>
               </ScrollView>
             </View>
+
+            {/* Water Consumption Bar Graph */}
+            {chartData.length > 0 && (
+              <View style={styles.consumptionChartContainer}>
+                <Text style={styles.consumptionChartTitle}>Water Consumption</Text>
+                <View style={styles.consumptionChartCard}>
+                  <BarChart
+                    data={barChartData}
+                    width={screenWidth - 80}
+                    height={220}
+                    chartConfig={{
+                      backgroundColor: '#FFFFFF',
+                      backgroundGradientFrom: '#FFFFFF',
+                      backgroundGradientTo: '#FFFFFF',
+                      decimalPlaces: 2,
+                      color: (opacity = 1) => `rgba(6, 182, 212, ${opacity})`, // Cyan color for water theme
+                      labelColor: (opacity = 1) => `rgba(31, 41, 55, ${opacity})`,
+                      style: {
+                        borderRadius: 16,
+                      },
+                      barPercentage: 0.7,
+                    }}
+                    style={{
+                      marginVertical: 8,
+                      borderRadius: 16,
+                    }}
+                    yAxisLabel=""
+                    yAxisSuffix=" m³"
+                    showValuesOnTopOfBars
+                    fromZero
+                  />
+                </View>
+              </View>
+            )}
           </View>
         </ScrollView>
 
