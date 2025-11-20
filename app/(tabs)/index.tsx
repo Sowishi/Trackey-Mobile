@@ -74,6 +74,7 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [billingListModalVisible, setBillingListModalVisible] = useState(false);
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'gcash' | 'other' | null>(null);
   const [otherMethod, setOtherMethod] = useState('');
@@ -917,6 +918,43 @@ export default function DashboardScreen() {
       paddingTop: 40,
       paddingBottom: 100,
     },
+    servicesContainer: {
+      padding: 20,
+      paddingTop: 20,
+      paddingBottom: 100,
+    },
+    servicesTitle: {
+      fontSize: 20,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+      marginBottom: 16,
+    },
+    servicesScrollContent: {
+      paddingRight: 20,
+    },
+    serviceItem: {
+      alignItems: 'center',
+      marginRight: 20,
+      minWidth: 80,
+    },
+    serviceIconContainer: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 8,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+    },
+    serviceLabel: {
+      fontSize: 12,
+      fontWeight: '500',
+      color: Colors[colorScheme ?? 'light'].text,
+      textAlign: 'center',
+      maxWidth: 80,
+    },
     residentContent: {
       padding: 20,
       paddingBottom: 100,
@@ -1301,6 +1339,10 @@ export default function DashboardScreen() {
     disabledButton: {
       opacity: 0.6,
     },
+    billingListContent: {
+      padding: 20,
+      paddingBottom: 20,
+    },
   });
 
   if (isResident && loadingBills) {
@@ -1408,31 +1450,99 @@ export default function DashboardScreen() {
               </TouchableOpacity>
             )}
 
-            {/* Bills List */}
-            <FlatList
-              data={residentBills}
-              renderItem={renderBillCard}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.residentBillsList}
-              ListEmptyComponent={() => (
-                <View style={styles.emptyContainer}>
-                  <Ionicons
-                    name="document-text-outline"
-                    size={80}
-                    color={Colors[colorScheme ?? 'light'].icon}
-                  />
-                  <Text style={styles.emptyText}>No bills found</Text>
-                  <Text style={styles.emptySubtext}>Your billing records will appear here</Text>
-                </View>
-              )}
-              refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={handleRefresh}
-                  colors={[Colors[colorScheme ?? 'light'].primary]}
-                />
-              }
-            />
+            {/* Services Section */}
+            <View style={styles.servicesContainer}>
+              <Text style={styles.servicesTitle}>Services</Text>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.servicesScrollContent}
+              >
+                <TouchableOpacity 
+                  style={styles.serviceItem}
+                  onPress={() => setBillingListModalVisible(true)}
+                >
+                  <View style={styles.serviceIconContainer}>
+                    <Ionicons 
+                      name="document-text" 
+                      size={28} 
+                      color={Colors[colorScheme ?? 'light'].primary} 
+                    />
+                  </View>
+                  <Text style={styles.serviceLabel}>List of Billing</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.serviceItem}
+                  onPress={() => router.push('/(tabs)/payment-history')}
+                >
+                  <View style={styles.serviceIconContainer}>
+                    <Ionicons 
+                      name="receipt" 
+                      size={28} 
+                      color={Colors[colorScheme ?? 'light'].primary} 
+                    />
+                  </View>
+                  <Text style={styles.serviceLabel}>Payment History</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.serviceItem}
+                  onPress={() => router.push('/(tabs)/profile')}
+                >
+                  <View style={styles.serviceIconContainer}>
+                    <Ionicons 
+                      name="person" 
+                      size={28} 
+                      color={Colors[colorScheme ?? 'light'].primary} 
+                    />
+                  </View>
+                  <Text style={styles.serviceLabel}>Profile</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.serviceItem}
+                  onPress={() => router.push('/(tabs)/notifications')}
+                >
+                  <View style={styles.serviceIconContainer}>
+                    <Ionicons 
+                      name="notifications" 
+                      size={28} 
+                      color={Colors[colorScheme ?? 'light'].primary} 
+                    />
+                  </View>
+                  <Text style={styles.serviceLabel}>Notifications</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.serviceItem}
+                  onPress={() => router.push('/(tabs)/qrcode')}
+                >
+                  <View style={styles.serviceIconContainer}>
+                    <Ionicons 
+                      name="qr-code" 
+                      size={28} 
+                      color={Colors[colorScheme ?? 'light'].primary} 
+                    />
+                  </View>
+                  <Text style={styles.serviceLabel}>QR Code</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.serviceItem}
+                  onPress={handleRefresh}
+                >
+                  <View style={styles.serviceIconContainer}>
+                    <Ionicons 
+                      name="refresh" 
+                      size={28} 
+                      color={Colors[colorScheme ?? 'light'].primary} 
+                    />
+                  </View>
+                  <Text style={styles.serviceLabel}>Refresh</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
           </View>
         </View>
 
@@ -1600,6 +1710,60 @@ export default function DashboardScreen() {
                   )}
                 </TouchableOpacity>
               </View>
+            </View>
+          </Pressable>
+        </Modal>
+
+        {/* Billing List Modal */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={billingListModalVisible}
+          onRequestClose={() => setBillingListModalVisible(false)}
+        >
+          <Pressable
+            style={styles.paymentModalOverlay}
+            onPress={() => setBillingListModalVisible(false)}
+          >
+            <View style={styles.paymentModalContent} onStartShouldSetResponder={() => true}>
+              <View style={styles.paymentModalHeader}>
+                <Text style={styles.paymentModalTitle}>List of Billing</Text>
+                <TouchableOpacity
+                  onPress={() => setBillingListModalVisible(false)}
+                  style={styles.closeButton}
+                >
+                  <Ionicons
+                    name="close"
+                    size={24}
+                    color={Colors[colorScheme ?? 'light'].text}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              <FlatList
+                data={residentBills}
+                renderItem={renderBillCard}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={styles.billingListContent}
+                ListEmptyComponent={() => (
+                  <View style={styles.emptyContainer}>
+                    <Ionicons
+                      name="document-text-outline"
+                      size={80}
+                      color={Colors[colorScheme ?? 'light'].icon}
+                    />
+                    <Text style={styles.emptyText}>No bills found</Text>
+                    <Text style={styles.emptySubtext}>Your billing records will appear here</Text>
+                  </View>
+                )}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={handleRefresh}
+                    colors={[Colors[colorScheme ?? 'light'].primary]}
+                  />
+                }
+              />
             </View>
           </Pressable>
         </Modal>
