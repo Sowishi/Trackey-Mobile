@@ -698,6 +698,38 @@ export default function DashboardScreen() {
     content: {
       padding: 20,
     },
+    dashboardHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 20,
+      paddingHorizontal: 4,
+    },
+    dashboardLogo: {
+      width: 50,
+      height: 50,
+      resizeMode: 'contain',
+    },
+    dashboardUserIcon: {
+      padding: 4,
+    },
+    dashboardProfilePic: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      borderWidth: 2,
+      borderColor: Colors[colorScheme ?? 'light'].primary,
+    },
+    dashboardUserIconPlaceholder: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: Colors[colorScheme ?? 'light'].primary,
+    },
     greetingContainer: {
       marginBottom: 24,
     },
@@ -964,13 +996,46 @@ export default function DashboardScreen() {
     },
     residentTopSection: {
       width: '100%',
-      height: 200,
+      height: 230,
       overflow: 'hidden',
     },
     residentTopBackground: {
       width: '100%',
       height: '100%',
       position: 'absolute',
+    },
+    residentDashboardHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: 20,
+      paddingTop: 20,
+      paddingBottom: 10,
+    },
+    residentDashboardLogo: {
+      width: 50,
+      height: 50,
+      resizeMode: 'contain',
+    },
+    residentDashboardUserIcon: {
+      padding: 4,
+    },
+    residentDashboardProfilePic: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      borderWidth: 2,
+      borderColor: '#FFFFFF',
+    },
+    residentDashboardUserIconPlaceholder: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: '#FFFFFF',
     },
     residentGreetingContainer: {
       flex: 1,
@@ -1703,6 +1768,32 @@ export default function DashboardScreen() {
               style={styles.residentTopBackground}
               resizeMode="cover"
             />
+            {/* Header with Logo and User Icon */}
+            <View style={styles.residentDashboardHeader}>
+              <Image 
+                source={require('../../assets/images/aquabill-logo.png')}
+                style={styles.residentDashboardLogo}
+              />
+              <TouchableOpacity
+                onPress={() => router.push('/(tabs)/profile')}
+                style={styles.residentDashboardUserIcon}
+              >
+                {user?.profilePicUrl ? (
+                  <Image
+                    source={{ uri: user.profilePicUrl }}
+                    style={styles.residentDashboardProfilePic}
+                  />
+                ) : (
+                  <View style={styles.residentDashboardUserIconPlaceholder}>
+                    <Ionicons 
+                      name="person" 
+                      size={24} 
+                      color="#FFFFFF" 
+                    />
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
             <View style={styles.residentGreetingContainer}>
               <Text style={styles.residentGreetingText}>{getGreeting()}</Text>
               <Text style={styles.residentGreetingName}>{userName}</Text>
@@ -2189,7 +2280,34 @@ export default function DashboardScreen() {
             colors={[Colors[colorScheme ?? 'light'].primary]}
           />
         }
-      >
+        >
+        {/* Header with Logo and User Icon */}
+        <View style={styles.dashboardHeader}>
+          <Image 
+            source={require('../../assets/images/aquabill-logo.png')}
+            style={styles.dashboardLogo}
+          />
+          <TouchableOpacity
+            onPress={() => router.push('/(tabs)/profile')}
+            style={styles.dashboardUserIcon}
+          >
+            {user?.profilePicUrl ? (
+              <Image
+                source={{ uri: user.profilePicUrl }}
+                style={styles.dashboardProfilePic}
+              />
+            ) : (
+              <View style={styles.dashboardUserIconPlaceholder}>
+                <Ionicons 
+                  name="person" 
+                  size={24} 
+                  color={Colors[colorScheme ?? 'light'].primary} 
+                />
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+
         {/* Greeting */}
         <View style={styles.greetingContainer}>
           <Text style={styles.greetingText}>
