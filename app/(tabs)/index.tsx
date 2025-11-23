@@ -80,6 +80,9 @@ export default function DashboardScreen() {
   const [submittingPayment, setSubmittingPayment] = useState(false);
   const [currentMonthLabel, setCurrentMonthLabel] = useState<string>('');
   const [waterRate, setWaterRate] = useState<number>(20.00);
+  const [complaintModalVisible, setComplaintModalVisible] = useState(false);
+  const [complaintDescription, setComplaintDescription] = useState('');
+  const [submittingComplaint, setSubmittingComplaint] = useState(false);
   
   const WATER_RATE_PER_CUBIC_METER = 20; // 20 pesos per cubic meter (fallback)
 
@@ -450,6 +453,61 @@ export default function DashboardScreen() {
     setPaymentMethod(null);
     setOtherMethod('');
     setPaymentProof(null);
+  };
+
+  const handleSubmitComplaint = async () => {
+    if (!complaintDescription.trim()) {
+      Alert.alert('Validation Error', 'Please describe your problem');
+      return;
+    }
+
+    if (!user?.email) {
+      Alert.alert('Error', 'User information not available');
+      return;
+    }
+
+    setSubmittingComplaint(true);
+
+    try {
+      const currentUserId = userId || await fetchUserId();
+      
+      const complaintData = {
+        userId: currentUserId || '',
+        userEmail: user.email,
+        userName: user.name || '',
+        description: complaintDescription.trim(),
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+      };
+
+      // Save to Firestore complaints collection
+      const complaintsRef = collection(db, 'complaints');
+      await addDoc(complaintsRef, complaintData);
+
+      Alert.alert(
+        'Success',
+        'Your complaint has been submitted successfully. We will review it and get back to you soon.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setComplaintModalVisible(false);
+              setComplaintDescription('');
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error submitting complaint:', error);
+      Alert.alert('Error', 'Failed to submit complaint. Please try again.');
+    } finally {
+      setSubmittingComplaint(false);
+    }
+  };
+
+  const handleCancelComplaint = () => {
+    setComplaintModalVisible(false);
+    setComplaintDescription('');
   };
 
   const formatDate = (dateString: string) => {
@@ -1519,6 +1577,26 @@ export default function DashboardScreen() {
     disabledButton: {
       opacity: 0.6,
     },
+    complaintSection: {
+      marginBottom: 24,
+    },
+    complaintInput: {
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+      borderRadius: 12,
+      padding: 14,
+      fontSize: 16,
+      color: Colors[colorScheme ?? 'light'].text,
+      minHeight: 150,
+      textAlignVertical: 'top',
+    },
+    complaintHint: {
+      fontSize: 12,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+      marginTop: 8,
+      fontStyle: 'italic',
+    },
     billingListContent: {
       padding: 20,
       paddingBottom: 20,
@@ -1794,6 +1872,20 @@ export default function DashboardScreen() {
                   </View>
                   <Text style={styles.serviceLabel}>Refresh</Text>
                 </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.serviceItem}
+                  onPress={() => setComplaintModalVisible(true)}
+                >
+                  <View style={styles.serviceIconContainer}>
+                    <Ionicons 
+                      name="alert-circle" 
+                      size={28} 
+                      color={Colors[colorScheme ?? 'light'].primary} 
+                    />
+                  </View>
+                  <Text style={styles.serviceLabel}>Report a problem</Text>
+                </TouchableOpacity>
               </ScrollView>
             </View>
 
@@ -1992,6 +2084,79 @@ export default function DashboardScreen() {
                   ) : (
                     <>
                       <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+                      <Text style={styles.paymentSubmitText}>Submit</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Pressable>
+        </Modal>
+
+        {/* Complaint Modal */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={complaintModalVisible}
+          onRequestClose={handleCancelComplaint}
+        >
+          <Pressable
+            style={styles.paymentModalOverlay}
+            onPress={handleCancelComplaint}
+          >
+            <View style={styles.paymentModalContent} onStartShouldSetResponder={() => true}>
+              <View style={styles.paymentModalHeader}>
+                <Text style={styles.paymentModalTitle}>Report a Problem</Text>
+                <TouchableOpacity
+                  onPress={handleCancelComplaint}
+                  style={styles.closeButton}
+                >
+                  <Ionicons
+                    name="close"
+                    size={24}
+                    color={Colors[colorScheme ?? 'light'].text}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={styles.paymentModalBody}>
+                <View style={styles.complaintSection}>
+                  <Text style={styles.paymentSectionLabel}>Describe your problem</Text>
+                  <TextInput
+                    style={styles.complaintInput}
+                    placeholder="Please provide details about the problem you're experiencing..."
+                    placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
+                    value={complaintDescription}
+                    onChangeText={setComplaintDescription}
+                    multiline
+                    numberOfLines={8}
+                    textAlignVertical="top"
+                  />
+                  <Text style={styles.complaintHint}>
+                    Please be as detailed as possible so we can help you better.
+                  </Text>
+                </View>
+              </ScrollView>
+
+              <View style={styles.paymentModalFooter}>
+                <TouchableOpacity
+                  style={[styles.paymentCancelButton, submittingComplaint && styles.disabledButton]}
+                  onPress={handleCancelComplaint}
+                  disabled={submittingComplaint}
+                >
+                  <Text style={styles.paymentCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <View style={styles.paymentButtonSpacing} />
+                <TouchableOpacity
+                  style={[styles.paymentSubmitButton, submittingComplaint && styles.disabledButton]}
+                  onPress={handleSubmitComplaint}
+                  disabled={submittingComplaint}
+                >
+                  {submittingComplaint ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Ionicons name="send" size={20} color="#FFFFFF" />
                       <Text style={styles.paymentSubmitText}>Submit</Text>
                     </>
                   )}
