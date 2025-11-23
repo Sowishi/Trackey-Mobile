@@ -2281,33 +2281,6 @@ export default function DashboardScreen() {
           />
         }
         >
-        {/* Header with Logo and User Icon */}
-        <View style={styles.dashboardHeader}>
-          <Image 
-            source={require('../../assets/images/aquabill-logo.png')}
-            style={styles.dashboardLogo}
-          />
-          <TouchableOpacity
-            onPress={() => router.push('/(tabs)/profile')}
-            style={styles.dashboardUserIcon}
-          >
-            {user?.profilePicUrl ? (
-              <Image
-                source={{ uri: user.profilePicUrl }}
-                style={styles.dashboardProfilePic}
-              />
-            ) : (
-              <View style={styles.dashboardUserIconPlaceholder}>
-                <Ionicons 
-                  name="person" 
-                  size={24} 
-                  color={Colors[colorScheme ?? 'light'].primary} 
-                />
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
-
         {/* Greeting */}
         <View style={styles.greetingContainer}>
           <Text style={styles.greetingText}>

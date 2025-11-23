@@ -810,12 +810,22 @@ Please pay on or before due date. Thank you.`;
       fontWeight: 'bold',
       color: Colors[colorScheme ?? 'light'].primary,
     },
+    nameContainer: {
+      flexDirection: 'column',
+      alignItems: 'center',
+    },
     nameText: {
       fontSize: 26,
       fontWeight: 'bold',
       color: Colors[colorScheme ?? 'light'].text,
       textAlign: 'center',
-      marginBottom: 8,
+      marginBottom: 4,
+    },
+    accountNumberText: {
+      fontSize: 14,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+      fontWeight: '400',
+      textAlign: 'center',
     },
     roleText: {
       fontSize: 16,
@@ -859,6 +869,15 @@ Please pay on or before due date. Thank you.`;
       fontSize: 15,
       color: Colors[colorScheme ?? 'light'].text,
       fontWeight: '600',
+    },
+    accountNumberInfoContainer: {
+      flexDirection: 'column',
+    },
+    accountNumberInfo: {
+      fontSize: 12,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+      fontWeight: '400',
+      marginTop: 2,
     },
     statusBadge: {
       paddingHorizontal: 12,
@@ -1490,7 +1509,12 @@ Please pay on or before due date. Thank you.`;
                 </Text>
               </View>
             )}
-            <Text style={styles.nameText}>{userDetail.accountNumber || userDetail.fullName}</Text>
+            <View style={styles.nameContainer}>
+              <Text style={styles.nameText}>{userDetail.fullName}</Text>
+              {userDetail.accountNumber && (
+                <Text style={styles.accountNumberText}>{userDetail.accountNumber}</Text>
+              )}
+            </View>
             <Text style={styles.roleText}>{userDetail.role}</Text>
           </View>
 
@@ -1507,7 +1531,10 @@ Please pay on or before due date. Thank you.`;
                 </View>
                 <View style={styles.infoContent}>
                   <Text style={styles.infoLabel}>Account Number</Text>
-                  <Text style={styles.infoValue}>{userDetail.accountNumber}</Text>
+                  <View style={styles.accountNumberInfoContainer}>
+                    <Text style={styles.infoValue}>{userDetail.fullName}</Text>
+                    <Text style={styles.accountNumberInfo}>{userDetail.accountNumber}</Text>
+                  </View>
                 </View>
               </View>
             )}

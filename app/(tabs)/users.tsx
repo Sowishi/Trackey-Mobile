@@ -252,7 +252,12 @@ export default function UsersScreen() {
           </View>
         )}
         <View style={styles.cardInfo}>
-          <Text style={styles.fullName}>{item.accountNumber || item.fullName}</Text>
+          <View style={styles.nameContainer}>
+            <Text style={styles.fullName}>{item.fullName}</Text>
+            {item.accountNumber && (
+              <Text style={styles.accountNumber}>{item.accountNumber}</Text>
+            )}
+          </View>
           <View style={styles.badgeContainer}>
             {/* Payment Status Badge */}
             {item.hasBilling && (
@@ -483,11 +488,19 @@ export default function UsersScreen() {
     cardInfo: {
       flex: 1,
     },
+    nameContainer: {
+      flexDirection: 'column',
+    },
     fullName: {
       fontSize: 16,
       fontWeight: '600',
       color: Colors[colorScheme ?? 'light'].text,
-      marginBottom: 4,
+      marginBottom: 2,
+    },
+    accountNumber: {
+      fontSize: 12,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+      fontWeight: '400',
     },
     email: {
       fontSize: 14,
