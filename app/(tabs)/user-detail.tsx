@@ -187,6 +187,13 @@ export default function UserDetailScreen() {
     return name.split(' ').map((n) => n[0]).join('').toUpperCase();
   };
 
+  // Calculate due date: 29 days after present date
+  const calculateDueDate = (presentDate: Date): Date => {
+    const dueDate = new Date(presentDate);
+    dueDate.setDate(dueDate.getDate() + 29);
+    return dueDate;
+  };
+
   const handleAddBill = async () => {
     if (!userDetail) return;
     
@@ -246,9 +253,11 @@ export default function UserDetailScreen() {
     }
     
     // Set present date to today by default
-    setPresentDate(new Date());
+    const today = new Date();
+    setPresentDate(today);
     setPresentConsumption('');
-    setDueDate(new Date());
+    // Automatically calculate due date (29 days after present date)
+    setDueDate(calculateDueDate(today));
     setTotalAmount('');
     setShowDatePicker(null);
     
@@ -620,6 +629,8 @@ Please pay on or before due date. Thank you.`;
       if (event.type === 'set') {
         if (field === 'present') {
           setPresentDate(currentDate);
+          // Automatically calculate due date (29 days later)
+          setDueDate(calculateDueDate(currentDate));
         } else if (field === 'due') {
           setDueDate(currentDate);
         }
@@ -628,6 +639,8 @@ Please pay on or before due date. Thank you.`;
       // iOS
       if (field === 'present') {
         setPresentDate(currentDate);
+        // Automatically calculate due date (29 days later)
+        setDueDate(calculateDueDate(currentDate));
       } else if (field === 'due') {
         setDueDate(currentDate);
       }
