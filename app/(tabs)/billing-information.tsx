@@ -3,7 +3,7 @@ import { Colors } from '@/constants/theme';
 import { useUser } from '@/contexts/UserContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -29,11 +29,16 @@ interface Bill {
   totalAmount: number;
   status: string;
   createdAt: string;
+  userName?: string;
+  userEmail?: string;
+  accountNumber?: string;
 }
 
 export default function BillingInformationScreen() {
   const colorScheme = useColorScheme();
   const { user } = useUser();
+  const params = useLocalSearchParams();
+  const showUnpaidOnly = params.showUnpaidOnly === 'true';
   const [residentBills, setResidentBills] = useState<Bill[]>([]);
   const [loadingBills, setLoadingBills] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -57,6 +62,71 @@ export default function BillingInformationScreen() {
       console.error('Error fetching user ID:', error);
     }
     return null;
+  };
+
+  // Fetch all unpaid bills with user information
+  const fetchAllUnpaidBills = async () => {
+    setLoadingBills(true);
+    try {
+      const billingRef = collection(db, 'billing');
+      const unpaidQuery = query(
+        billingRef,
+        where('status', '==', 'unpaid')
+      );
+      const unpaidSnapshot = await getDocs(unpaidQuery);
+
+      const billsWithUsers: Bill[] = [];
+      
+      // Fetch user information for each bill
+      for (const billDoc of unpaidSnapshot.docs) {
+        const billData = billDoc.data();
+        try {
+          const userDocRef = doc(db, 'users', billData.userId);
+          const userDocSnap = await getDoc(userDocRef);
+          
+          if (userDocSnap.exists()) {
+            const userData = userDocSnap.data();
+            billsWithUsers.push({
+              id: billDoc.id,
+              ...billData,
+              userName: userData.fullName || userData.name || '',
+              userEmail: userData.email || '',
+              accountNumber: userData.accountNumber || '',
+            } as Bill);
+          } else {
+            billsWithUsers.push({
+              id: billDoc.id,
+              ...billData,
+              userName: 'Unknown User',
+              userEmail: '',
+              accountNumber: '',
+            } as Bill);
+          }
+        } catch (error) {
+          console.error(`Error fetching user for bill ${billDoc.id}:`, error);
+          billsWithUsers.push({
+            id: billDoc.id,
+            ...billData,
+            userName: 'Unknown User',
+            userEmail: '',
+            accountNumber: '',
+          } as Bill);
+        }
+      }
+
+      // Sort by due date (oldest first)
+      billsWithUsers.sort((a, b) => {
+        const dateA = new Date(a.dueDate || a.createdAt).getTime();
+        const dateB = new Date(b.dueDate || b.createdAt).getTime();
+        return dateA - dateB;
+      });
+
+      setResidentBills(billsWithUsers);
+    } catch (error) {
+      console.error('Error fetching unpaid bills:', error);
+    } finally {
+      setLoadingBills(false);
+    }
   };
 
   // Fetch resident bills
@@ -101,20 +171,31 @@ export default function BillingInformationScreen() {
   };
 
   useEffect(() => {
-    fetchUserId().then(() => {
-      fetchResidentBills();
-    });
-  }, [user]);
+    if (showUnpaidOnly) {
+      fetchAllUnpaidBills();
+    } else {
+      fetchUserId().then(() => {
+        fetchResidentBills();
+      });
+    }
+  }, [user, showUnpaidOnly]);
 
   useEffect(() => {
+    if (showUnpaidOnly) {
+      return;
+    }
     if (userId) {
       fetchResidentBills();
     }
-  }, [userId]);
+  }, [userId, showUnpaidOnly]);
 
   const handleRefresh = () => {
     setRefreshing(true);
-    fetchResidentBills().finally(() => setRefreshing(false));
+    if (showUnpaidOnly) {
+      fetchAllUnpaidBills().finally(() => setRefreshing(false));
+    } else {
+      fetchResidentBills().finally(() => setRefreshing(false));
+    }
   };
 
   const handleViewReceipt = (bill: Bill) => {
@@ -163,6 +244,13 @@ export default function BillingInformationScreen() {
             <Text style={styles.billDate}>
               Due: {formatDate(item.dueDate)}
             </Text>
+            {showUnpaidOnly && item.userName && (
+              <View style={styles.billUserInfo}>
+                <Text style={styles.billUserName}>
+                  {item.accountNumber ? `${item.accountNumber} - ${item.userName}` : item.userName}
+                </Text>
+              </View>
+            )}
           </View>
           <View style={[
             styles.billStatusBadge,
@@ -305,6 +393,15 @@ export default function BillingInformationScreen() {
     billDate: {
       fontSize: 14,
       color: Colors[colorScheme ?? 'light'].tabIconDefault,
+      marginBottom: 4,
+    },
+    billUserInfo: {
+      marginTop: 4,
+    },
+    billUserName: {
+      fontSize: 14,
+      color: Colors[colorScheme ?? 'light'].text,
+      fontWeight: '500',
     },
     billStatusBadge: {
       paddingHorizontal: 12,
@@ -410,7 +507,7 @@ export default function BillingInformationScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <ScreenHeader 
-          title="Billing Information" 
+          title={showUnpaidOnly ? "Unpaid Bills" : "Billing Information"} 
           onUserPress={() => router.push('/(tabs)/profile')}
           profilePicUrl={user?.profilePicUrl}
         />
@@ -425,7 +522,7 @@ export default function BillingInformationScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScreenHeader 
-        title="Billing Information" 
+        title={showUnpaidOnly ? "Unpaid Bills" : "Billing Information"} 
         onUserPress={() => router.push('/(tabs)/profile')}
         profilePicUrl={user?.profilePicUrl}
       />
@@ -465,7 +562,9 @@ export default function BillingInformationScreen() {
               color={Colors[colorScheme ?? 'light'].icon}
             />
             <Text style={styles.emptyText}>No bills found</Text>
-            <Text style={styles.emptySubtext}>Your billing records will appear here</Text>
+            <Text style={styles.emptySubtext}>
+              {showUnpaidOnly ? 'All bills have been paid' : 'Your billing records will appear here'}
+            </Text>
           </View>
         )}
         refreshControl={

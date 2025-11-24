@@ -875,10 +875,15 @@ export default function DashboardScreen() {
       color: Colors[colorScheme ?? 'light'].text,
       opacity: 0.6,
     },
+    collectionRateContainer: {
+      flexDirection: 'row',
+      gap: 12,
+      marginBottom: 20,
+    },
     collectionRateCard: {
+      flex: 1,
       borderRadius: 16,
       padding: 20,
-      marginBottom: 20,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.1,
@@ -2330,35 +2335,61 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Collection Rate Card */}
-        <View style={[styles.collectionRateCard, { 
-          backgroundColor: stats.collectionRate >= 75 ? '#D1FAE5' : stats.collectionRate >= 50 ? '#FEF3C7' : '#FEE2E2'
-        }]}>
-          <View style={styles.collectionRateContent}>
-            <View style={[styles.collectionRateIcon, { 
-              backgroundColor: stats.collectionRate >= 75 ? '#059669' : stats.collectionRate >= 50 ? '#F59E0B' : '#DC2626'
-            }]}>
-              <Ionicons 
-                name={stats.collectionRate >= 75 ? "checkmark-circle" : stats.collectionRate >= 50 ? "time" : "warning"} 
-                size={32} 
-                color="#FFFFFF" 
-              />
-            </View>
-            <View style={styles.collectionRateInfo}>
-              <Text style={styles.collectionRateLabel}>Collection Rate</Text>
-              {currentMonthLabel && (
-                <Text style={styles.collectionRateMonth}>{currentMonthLabel}</Text>
-              )}
-              <Text style={[styles.collectionRateValue, { 
-                color: stats.collectionRate >= 75 ? '#059669' : stats.collectionRate >= 50 ? '#F59E0B' : '#DC2626'
+        {/* Collection Rate and Unpaid Bills Cards */}
+        <View style={styles.collectionRateContainer}>
+          <View style={[styles.collectionRateCard, { 
+            backgroundColor: stats.collectionRate >= 75 ? '#D1FAE5' : stats.collectionRate >= 50 ? '#FEF3C7' : '#FEE2E2'
+          }]}>
+            <View style={styles.collectionRateContent}>
+              <View style={[styles.collectionRateIcon, { 
+                backgroundColor: stats.collectionRate >= 75 ? '#059669' : stats.collectionRate >= 50 ? '#F59E0B' : '#DC2626'
               }]}>
-                {stats.collectionRate.toFixed(1)}%
-              </Text>
+                <Ionicons 
+                  name={stats.collectionRate >= 75 ? "checkmark-circle" : stats.collectionRate >= 50 ? "time" : "warning"} 
+                  size={32} 
+                  color="#FFFFFF" 
+                />
+              </View>
+              <View style={styles.collectionRateInfo}>
+                <Text style={styles.collectionRateLabel}>Collection Rate</Text>
+                {currentMonthLabel && (
+                  <Text style={styles.collectionRateMonth}>{currentMonthLabel}</Text>
+                )}
+                <Text style={[styles.collectionRateValue, { 
+                  color: stats.collectionRate >= 75 ? '#059669' : stats.collectionRate >= 50 ? '#F59E0B' : '#DC2626'
+                }]}>
+                  {stats.collectionRate.toFixed(1)}%
+                </Text>
+              </View>
             </View>
+            <Text style={styles.collectionRateSubtext}>
+              {stats.paidResidents} of {stats.paidResidents + stats.unpaidResidents + stats.pendingPayments} bills paid
+            </Text>
           </View>
-          <Text style={styles.collectionRateSubtext}>
-            {stats.paidResidents} of {stats.paidResidents + stats.unpaidResidents + stats.pendingPayments} bills paid
-          </Text>
+
+          {/* Unpaid Bills Card - Clickable */}
+          <TouchableOpacity 
+            style={[styles.metricCardLarge, { backgroundColor: '#FEE2E2' }]}
+            onPress={() => router.push({
+              pathname: '/(tabs)/billing-information',
+              params: { showUnpaidOnly: 'true' }
+            })}
+            activeOpacity={0.7}
+          >
+            <View style={styles.metricHeader}>
+              <View style={[styles.metricIconContainer, { backgroundColor: '#DC2626' }]}>
+                <Ionicons name="document-text" size={24} color="#FFFFFF" />
+              </View>
+            </View>
+            <Text style={styles.metricLabel}>Unpaid Bills</Text>
+            {currentMonthLabel && (
+              <Text style={styles.metricMonth}>{currentMonthLabel}</Text>
+            )}
+            <Text style={[styles.metricValue, { color: '#DC2626' }]}>
+              {stats.unpaidResidents}
+            </Text>
+            <Text style={styles.metricSubtext}>Tap to view details</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Quick Stats Grid */}
