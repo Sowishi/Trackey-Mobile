@@ -183,6 +183,16 @@ export default function UserDetailScreen() {
     });
   };
 
+  const formatCurrency = (amount: string) => {
+    if (!amount) return '';
+    const numValue = parseFloat(amount);
+    if (isNaN(numValue)) return amount;
+    return numValue.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
   const getInitials = (name: string) => {
     return name.split(' ').map((n) => n[0]).join('').toUpperCase();
   };
@@ -1896,7 +1906,7 @@ export default function UserDetailScreen() {
                   style={[styles.formInput, styles.readOnlyInput]}
                   placeholder="Auto-calculated"
                   placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
-                  value={totalAmount ? `₱${totalAmount}` : ''}
+                  value={totalAmount ? `₱${formatCurrency(totalAmount)}` : ''}
                   editable={false}
                   keyboardType="decimal-pad"
                 />
