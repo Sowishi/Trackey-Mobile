@@ -63,10 +63,7 @@ export default function TabLayout() {
         }
       });
 
-      // Also count announcements as unread (they're always shown as new)
-      const announcementsQuery = query(collection(db, 'announcements'));
-      const announcementsSnapshot = await getDocs(announcementsQuery);
-      count += announcementsSnapshot.size;
+   
 
       setUnreadCount(count);
     } catch (error) {
