@@ -407,15 +407,13 @@ export default function UserDetailScreen() {
         console.log('📱 Cleaned Phone Number:', phoneNumber);
         
         const smsMessage = `WATER BILLING NOTICE
-${billToSubmit.userName}
-Billing Period: ${billToSubmit.month}
-Previous: ${billToSubmit.previousConsumption} cubic meters
-Current: ${billToSubmit.consumption} cubic meters
-Usage: ${billToSubmit.consumptionUsed.toFixed(2)} cubic meters
-Rate: PHP ${billToSubmit.waterRatePerCubicMeter} per cubic meter
-AMOUNT DUE: PHP ${billToSubmit.totalAmount.toFixed(2)}
-Due Date: ${formatDateForBill(billToSubmit.dueDate)}
-Please pay on or before due date. Thank you.`;
+        ${billToSubmit.userName}
+        Billing Period: ${billToSubmit.month}
+        Usage: ${billToSubmit.consumptionUsed.toFixed(2)}
+        Rate: PHP ${billToSubmit.waterRatePerCubicMeter} per cubic meter
+        AMOUNT DUE: PHP ${billToSubmit.totalAmount.toFixed(2)}
+        Due Date: ${formatDateForBill(billToSubmit.dueDate)}
+        Please pay on or before due date. Thank you.`;
 
         console.log('📄 SMS Message:', smsMessage);
 
