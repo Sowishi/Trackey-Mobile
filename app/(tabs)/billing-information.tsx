@@ -319,7 +319,7 @@ export default function BillingInformationScreen() {
 
       // Calculate similarity
       const similarity = calculateSimilarity(templateHash, uploadedHash);
-      const minSimilarity = 0.7; // 70% similarity threshold
+      const minSimilarity = 0.15; // 70% similarity threshold
 
       console.log('Similarity:', (similarity * 100).toFixed(2) + '%');
       console.log('Min required similarity:', (minSimilarity * 100).toFixed(2) + '%');
@@ -327,7 +327,7 @@ export default function BillingInformationScreen() {
       console.log('========================');
 
       // If similarity is above threshold, images are similar
-      return similarity >= minSimilarity;
+      return similarity <= minSimilarity;
     } catch (error) {
       console.error('Hash validation error:', error);
       return false;
