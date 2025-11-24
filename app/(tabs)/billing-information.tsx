@@ -3,6 +3,7 @@ import { Colors } from '@/constants/theme';
 import { useUser } from '@/contexts/UserContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
+import { Asset } from 'expo-asset';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -256,39 +257,79 @@ export default function BillingInformationScreen() {
     }
   };
 
-  const validateReceiptWithOCR = async (base64Image: string): Promise<boolean> => {
+  // Simple hash function for image data
+  const simpleHash = async (arrayBuffer: ArrayBuffer): Promise<string> => {
+    // Create a simple hash from image data by sampling pixels
+    const data = new Uint8Array(arrayBuffer);
+    let hash = 0;
+    const sampleRate = Math.floor(data.length / 1000); // Sample every Nth byte
+    
+    for (let i = 0; i < data.length; i += sampleRate) {
+      hash = ((hash << 5) - hash) + data[i];
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    
+    return Math.abs(hash).toString(16);
+  };
+
+  // Calculate similarity between two hashes (simplified)
+  const calculateSimilarity = (hash1: string, hash2: string): number => {
+    // Simple similarity based on hash value difference
+    const num1 = parseInt(hash1, 16);
+    const num2 = parseInt(hash2, 16);
+    const diff = Math.abs(num1 - num2);
+    const maxDiff = Math.max(num1, num2);
+    return 1 - (diff / maxDiff);
+  };
+
+  const validateReceiptWithHash = async (imageUri: string): Promise<boolean> => {
     try {
-      // Using OCR.space API with API key
-      const formData = new FormData();
-      formData.append('base64Image', `data:image/jpeg;base64,${base64Image}`);
-      formData.append('language', 'eng');
-      formData.append('isOverlayRequired', 'false');
-      formData.append('detectOrientation', 'true');
-      formData.append('scale', 'true');
-      formData.append('OCREngine', '2');
-      formData.append('apikey', 'K83043314988957');
+      console.log('=== Hash Validation Log ===');
+      console.log('Validating receipt using image hash comparison...');
 
-      const response = await fetch('https://api.ocr.space/parse/image', {
-        method: 'POST',
-        headers: {
-          'apikey': 'K83043314988957',
-        },
-        body: formData,
-      });
-
-      const result = await response.json();
-
-      if (result.ParsedResults && result.ParsedResults.length > 0) {
-        const parsedText = result.ParsedResults[0].ParsedText;
-        // Check if "Gcash" (case-insensitive) is in the text
-        const hasGcash = /gcash/i.test(parsedText);
-        return hasGcash;
-      } else {
-        // If OCR fails, we'll reject it to be safe
+      // Load template image
+      const templateAsset = Asset.fromModule(require('../../assets/images/gcash_template.jpg'));
+      await templateAsset.downloadAsync();
+      
+      if (!templateAsset.localUri) {
+        console.error('Failed to load template image');
         return false;
       }
+
+      // Convert both images to array buffers
+      const [templateResponse, uploadedResponse] = await Promise.all([
+        fetch(templateAsset.localUri),
+        fetch(imageUri),
+      ]);
+
+      // Use response.arrayBuffer() directly instead of blob().arrayBuffer()
+      const [templateArrayBuffer, uploadedArrayBuffer] = await Promise.all([
+        templateResponse.arrayBuffer(),
+        uploadedResponse.arrayBuffer(),
+      ]);
+
+      // Generate simple hashes for both images
+      const [templateHash, uploadedHash] = await Promise.all([
+        simpleHash(templateArrayBuffer),
+        simpleHash(uploadedArrayBuffer),
+      ]);
+
+      console.log('Template hash:', templateHash);
+      console.log('Uploaded image hash:', uploadedHash);
+
+      // Calculate similarity
+      const similarity = calculateSimilarity(templateHash, uploadedHash);
+      const minSimilarity = 0.7; // 70% similarity threshold
+
+      console.log('Similarity:', (similarity * 100).toFixed(2) + '%');
+      console.log('Min required similarity:', (minSimilarity * 100).toFixed(2) + '%');
+      console.log('Validation result:', similarity >= minSimilarity);
+      console.log('========================');
+
+      // If similarity is above threshold, images are similar
+      return similarity >= minSimilarity;
     } catch (error) {
-      console.error('OCR Validation Error:', error);
+      console.error('Hash validation error:', error);
       return false;
     }
   };
@@ -321,24 +362,20 @@ export default function BillingInformationScreen() {
             { compress: 0.5, format: ImageManipulator.SaveFormat.JPEG, base64: true }
           );
 
-          if (manipulatedImage.base64) {
-            // Validate receipt using OCR
-            const isValid = await validateReceiptWithOCR(manipulatedImage.base64);
+          // Validate receipt using hash comparison (faster than OCR)
+          const isValid = await validateReceiptWithHash(imageUri);
 
-            if (isValid) {
-              // Receipt is valid, set the payment proof
-              setPaymentProof(imageUri);
-              Alert.alert('Success', 'Receipt validated successfully!');
-            } else {
-              // Receipt validation failed
-              Alert.alert(
-                'Invalid Receipt',
-                'The uploaded image does not appear to be a valid GCash receipt. Please upload a clear image of your GCash payment receipt.',
-                [{ text: 'OK' }]
-              );
-            }
+          if (isValid) {
+            // Receipt is valid, set the payment proof
+            setPaymentProof(imageUri);
+            Alert.alert('Success', 'Receipt validated successfully!');
           } else {
-            Alert.alert('Error', 'Failed to process the image. Please try again.');
+            // Receipt validation failed
+            Alert.alert(
+              'Invalid Receipt',
+              'The uploaded image does not match a valid GCash receipt template. Please upload a clear image of your GCash payment receipt.',
+              [{ text: 'OK' }]
+            );
           }
         } catch (error) {
           console.error('Error validating receipt:', error);
