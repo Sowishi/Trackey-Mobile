@@ -4,7 +4,7 @@ import { useUser } from '@/contexts/UserContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -56,6 +56,7 @@ interface Bill {
 export default function DashboardScreen() {
   const colorScheme = useColorScheme();
   const { user } = useUser();
+  const params = useLocalSearchParams();
   const [stats, setStats] = useState<DashboardStats>({
     totalResidents: 0,
     paidResidents: 0,
@@ -272,6 +273,35 @@ export default function DashboardScreen() {
       fetchResidentBills();
     }
   }, [userId]);
+
+  // Handle payBillData parameter from billing information screen
+  useEffect(() => {
+    if (params.payBillData && isResident) {
+      try {
+        const billData = JSON.parse(params.payBillData as string);
+        const bill: Bill = {
+          id: billData.id,
+          month: billData.month,
+          coverageDateFrom: billData.coverageDateFrom,
+          coverageDateTo: billData.coverageDateTo,
+          dueDate: billData.dueDate,
+          previousConsumption: billData.previousConsumption,
+          consumption: billData.consumption,
+          consumptionUsed: billData.consumptionUsed,
+          totalAmount: billData.totalAmount,
+          status: billData.status,
+          createdAt: billData.createdAt,
+        };
+        handlePayBill(bill);
+        // Clear the parameter to avoid reopening on re-render
+        setTimeout(() => {
+          router.setParams({ payBillData: '' });
+        }, 100);
+      } catch (error) {
+        console.error('Error parsing payBillData:', error);
+      }
+    }
+  }, [params.payBillData, isResident]);
 
   // Fetch water rate on component mount
   useEffect(() => {
