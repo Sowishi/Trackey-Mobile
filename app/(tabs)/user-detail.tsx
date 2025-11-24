@@ -221,10 +221,9 @@ export default function UserDetailScreen() {
       if (currentMonthBill) {
         Alert.alert(
           'Warning',
-          `A bill for ${currentMonthString} already exists for this user. You can still create a bill for a different month by changing the present date.`,
+          `A bill for ${currentMonthString} already exists for this user.`,
           [
             { text: 'Cancel', style: 'cancel' },
-            { text: 'Continue', onPress: () => proceedToAddBill(bills) }
           ]
         );
         return;
