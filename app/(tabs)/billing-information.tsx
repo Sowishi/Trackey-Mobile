@@ -3,6 +3,7 @@ import { Colors } from '@/constants/theme';
 import { useUser } from '@/contexts/UserContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -57,6 +58,7 @@ export default function BillingInformationScreen() {
   const [otherMethod, setOtherMethod] = useState('');
   const [paymentProof, setPaymentProof] = useState<string | null>(null);
   const [submittingPayment, setSubmittingPayment] = useState(false);
+  const [validatingReceipt, setValidatingReceipt] = useState(false);
 
   const WATER_RATE_PER_CUBIC_METER = 20; // 20 pesos per cubic meter (fallback)
 
@@ -254,6 +256,43 @@ export default function BillingInformationScreen() {
     }
   };
 
+  const validateReceiptWithOCR = async (base64Image: string): Promise<boolean> => {
+    try {
+      // Using OCR.space API with API key
+      const formData = new FormData();
+      formData.append('base64Image', `data:image/jpeg;base64,${base64Image}`);
+      formData.append('language', 'eng');
+      formData.append('isOverlayRequired', 'false');
+      formData.append('detectOrientation', 'true');
+      formData.append('scale', 'true');
+      formData.append('OCREngine', '2');
+      formData.append('apikey', 'K83043314988957');
+
+      const response = await fetch('https://api.ocr.space/parse/image', {
+        method: 'POST',
+        headers: {
+          'apikey': 'K83043314988957',
+        },
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (result.ParsedResults && result.ParsedResults.length > 0) {
+        const parsedText = result.ParsedResults[0].ParsedText;
+        // Check if "Gcash" (case-insensitive) is in the text
+        const hasGcash = /gcash/i.test(parsedText);
+        return hasGcash;
+      } else {
+        // If OCR fails, we'll reject it to be safe
+        return false;
+      }
+    } catch (error) {
+      console.error('OCR Validation Error:', error);
+      return false;
+    }
+  };
+
   const handlePickImage = async () => {
     try {
       // Request permissions
@@ -271,11 +310,47 @@ export default function BillingInformationScreen() {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setPaymentProof(result.assets[0].uri);
+        const imageUri = result.assets[0].uri;
+        setValidatingReceipt(true);
+
+        try {
+          // Convert image to base64 for OCR
+          const manipulatedImage = await ImageManipulator.manipulateAsync(
+            imageUri,
+            [{ resize: { width: 800 } }], // Resize to reduce processing time
+            { compress: 0.5, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+          );
+
+          if (manipulatedImage.base64) {
+            // Validate receipt using OCR
+            const isValid = await validateReceiptWithOCR(manipulatedImage.base64);
+
+            if (isValid) {
+              // Receipt is valid, set the payment proof
+              setPaymentProof(imageUri);
+              Alert.alert('Success', 'Receipt validated successfully!');
+            } else {
+              // Receipt validation failed
+              Alert.alert(
+                'Invalid Receipt',
+                'The uploaded image does not appear to be a valid GCash receipt. Please upload a clear image of your GCash payment receipt.',
+                [{ text: 'OK' }]
+              );
+            }
+          } else {
+            Alert.alert('Error', 'Failed to process the image. Please try again.');
+          }
+        } catch (error) {
+          console.error('Error validating receipt:', error);
+          Alert.alert('Error', 'Failed to validate receipt. Please try again.');
+        } finally {
+          setValidatingReceipt(false);
+        }
       }
     } catch (error) {
       console.error('Error picking image:', error);
       Alert.alert('Error', 'Failed to pick image. Please try again.');
+      setValidatingReceipt(false);
     }
   };
 
@@ -802,6 +877,28 @@ export default function BillingInformationScreen() {
     paymentProofSection: {
       marginBottom: 20,
     },
+    validatingContainer: {
+      borderWidth: 2,
+      borderStyle: 'dashed',
+      borderColor: Colors[colorScheme ?? 'light'].primary,
+      borderRadius: 12,
+      padding: 32,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+    },
+    validatingText: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].primary,
+      marginTop: 12,
+    },
+    validatingSubtext: {
+      fontSize: 12,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+      marginTop: 4,
+      textAlign: 'center',
+    },
     uploadProofButton: {
       borderWidth: 2,
       borderStyle: 'dashed',
@@ -1071,7 +1168,13 @@ export default function BillingInformationScreen() {
                 {/* Payment Proof Upload */}
                 <View style={styles.paymentProofSection}>
                   <Text style={styles.paymentSectionLabel}>Payment Proof</Text>
-                  {paymentProof ? (
+                  {validatingReceipt ? (
+                    <View style={styles.validatingContainer}>
+                      <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].primary} />
+                      <Text style={styles.validatingText}>Validating receipt...</Text>
+                      <Text style={styles.validatingSubtext}>Please wait while we verify your GCash receipt</Text>
+                    </View>
+                  ) : paymentProof ? (
                     <View style={styles.paymentProofContainer}>
                       <Image
                         source={{ uri: paymentProof }}
@@ -1080,6 +1183,7 @@ export default function BillingInformationScreen() {
                       <TouchableOpacity
                         style={styles.changeProofButton}
                         onPress={handlePickImage}
+                        disabled={validatingReceipt}
                       >
                         <Ionicons
                           name="refresh"
@@ -1093,6 +1197,7 @@ export default function BillingInformationScreen() {
                     <TouchableOpacity
                       style={styles.uploadProofButton}
                       onPress={handlePickImage}
+                      disabled={validatingReceipt}
                     >
                       <Ionicons
                         name="image-outline"
@@ -1100,7 +1205,7 @@ export default function BillingInformationScreen() {
                         color={Colors[colorScheme ?? 'light'].primary}
                       />
                       <Text style={styles.uploadProofText}>Upload Payment Proof</Text>
-                      <Text style={styles.uploadProofSubtext}>Tap to select an image</Text>
+                      <Text style={styles.uploadProofSubtext}>Tap to select a GCash receipt image</Text>
                     </TouchableOpacity>
                   )}
                 </View>
