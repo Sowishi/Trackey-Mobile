@@ -237,6 +237,11 @@ export default function BillingInformationScreen() {
   };
 
   const renderBillCard = ({ item }: { item: Bill }) => {
+    // Check if bill is overdue (unpaid and past due date)
+    const isOverdue = item.status === 'unpaid' && new Date(item.dueDate) < new Date();
+    const penalty = isOverdue ? 30 : 0;
+    const totalWithPenalty = item.totalAmount + penalty;
+
     return (
       <View style={styles.billCard}>
         <View style={styles.billHeader}>
@@ -245,6 +250,9 @@ export default function BillingInformationScreen() {
             <Text style={styles.billDate}>
               Due: {formatDate(item.dueDate)}
             </Text>
+            {isOverdue && (
+              <Text style={styles.overdueLabel}>Overdue</Text>
+            )}
             {showUnpaidOnly && item.userName && (
               <View style={styles.billUserInfo}>
                 <Text style={styles.billUserName}>
@@ -276,7 +284,17 @@ export default function BillingInformationScreen() {
           )}
           <View style={styles.billDetailRow}>
             <Text style={styles.billDetailLabel}>Amount:</Text>
-            <Text style={styles.billAmount}>₱{item.totalAmount.toFixed(2)}</Text>
+            <Text style={styles.billDetailValue}>₱{item.totalAmount.toFixed(2)}</Text>
+          </View>
+          {isOverdue && (
+            <View style={styles.billDetailRow}>
+              <Text style={styles.billDetailLabel}>Penalty (Overdue):</Text>
+              <Text style={styles.billPenalty}>₱{penalty.toFixed(2)}</Text>
+            </View>
+          )}
+          <View style={styles.billDetailRow}>
+            <Text style={styles.billDetailLabel}>Total Amount:</Text>
+            <Text style={styles.billAmount}>₱{totalWithPenalty.toFixed(2)}</Text>
           </View>
         </View>
         <View style={styles.billActions}>
@@ -308,7 +326,11 @@ export default function BillingInformationScreen() {
   const unpaidBills = residentBills.filter(bill => bill.status === 'unpaid' || bill.status === 'Unpaid' || bill.status === 'pending').length;
   const totalAmountDue = residentBills
     .filter(bill => bill.status === 'unpaid' || bill.status === 'Unpaid' || bill.status === 'pending')
-    .reduce((sum, bill) => sum + bill.totalAmount, 0);
+    .reduce((sum, bill) => {
+      const isOverdue = new Date(bill.dueDate) < new Date();
+      const penalty = isOverdue ? 30 : 0;
+      return sum + bill.totalAmount + penalty;
+    }, 0);
 
   const styles = StyleSheet.create({
     safeArea: {
@@ -396,6 +418,13 @@ export default function BillingInformationScreen() {
       color: Colors[colorScheme ?? 'light'].tabIconDefault,
       marginBottom: 4,
     },
+    overdueLabel: {
+      fontSize: 12,
+      color: '#DC2626',
+      fontWeight: '600',
+      marginTop: 2,
+      marginBottom: 4,
+    },
     billUserInfo: {
       marginTop: 4,
     },
@@ -435,6 +464,11 @@ export default function BillingInformationScreen() {
     billDetailValue: {
       fontSize: 14,
       color: Colors[colorScheme ?? 'light'].text,
+      fontWeight: '600',
+    },
+    billPenalty: {
+      fontSize: 14,
+      color: '#DC2626',
       fontWeight: '600',
     },
     billAmount: {
