@@ -39,6 +39,7 @@ export default function BillingInformationScreen() {
   const { user } = useUser();
   const params = useLocalSearchParams();
   const showUnpaidOnly = params.showUnpaidOnly === 'true';
+  const isCollector = user?.position?.toLowerCase() !== 'resident' && user?.position?.toLowerCase() !== 'residents';
   const [residentBills, setResidentBills] = useState<Bill[]>([]);
   const [loadingBills, setLoadingBills] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -286,7 +287,7 @@ export default function BillingInformationScreen() {
             <Ionicons name="receipt" size={18} color={Colors[colorScheme ?? 'light'].primary} />
             <Text style={styles.receiptButtonText}>View Receipt</Text>
           </TouchableOpacity>
-          {item.status === 'unpaid' && (
+          {item.status === 'unpaid' && !isCollector && (
             <>
               <View style={styles.billActionSpacing} />
               <TouchableOpacity

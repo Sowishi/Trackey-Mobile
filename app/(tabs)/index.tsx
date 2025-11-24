@@ -876,7 +876,7 @@ export default function DashboardScreen() {
       opacity: 0.6,
     },
     collectionRateContainer: {
-      flexDirection: 'row',
+      flexDirection: 'column',
       gap: 12,
       marginBottom: 20,
     },
