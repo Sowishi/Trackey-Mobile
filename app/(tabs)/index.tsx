@@ -84,6 +84,7 @@ export default function DashboardScreen() {
   const [complaintModalVisible, setComplaintModalVisible] = useState(false);
   const [complaintDescription, setComplaintDescription] = useState('');
   const [submittingComplaint, setSubmittingComplaint] = useState(false);
+  const [passwordChangeModalVisible, setPasswordChangeModalVisible] = useState(false);
   
   const WATER_RATE_PER_CUBIC_METER = 20; // 20 pesos per cubic meter (fallback)
 
@@ -311,6 +312,13 @@ export default function DashboardScreen() {
     };
     loadWaterRate();
   }, []);
+
+  // Check if user needs to change password
+  useEffect(() => {
+    if (user && user.passwordChanged === false) {
+      setPasswordChangeModalVisible(true);
+    }
+  }, [user]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -1523,6 +1531,29 @@ export default function DashboardScreen() {
     paymentModalBody: {
       padding: 20,
     },
+    passwordChangeHeaderIcon: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 12,
+      alignSelf: 'center',
+    },
+    passwordChangeMessage: {
+      fontSize: 16,
+      color: Colors[colorScheme ?? 'light'].text,
+      textAlign: 'center',
+      marginBottom: 12,
+      lineHeight: 24,
+    },
+    passwordChangeSubtext: {
+      fontSize: 14,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+      textAlign: 'center',
+      lineHeight: 20,
+    },
     paymentBillInfo: {
       backgroundColor: Colors[colorScheme ?? 'light'].accent,
       borderRadius: 12,
@@ -2292,6 +2323,70 @@ export default function DashboardScreen() {
           </Pressable>
         </Modal>
 
+        {/* Password Change Modal */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={passwordChangeModalVisible}
+          onRequestClose={() => setPasswordChangeModalVisible(false)}
+        >
+          <Pressable
+            style={styles.paymentModalOverlay}
+            onPress={() => setPasswordChangeModalVisible(false)}
+          >
+            <View style={styles.paymentModalContent} onStartShouldSetResponder={() => true}>
+              <View style={styles.paymentModalHeader}>
+                <View style={styles.passwordChangeHeaderIcon}>
+                  <Ionicons
+                    name="lock-closed"
+                    size={32}
+                    color={Colors[colorScheme ?? 'light'].primary}
+                  />
+                </View>
+                <Text style={styles.paymentModalTitle}>Change Your Password</Text>
+                <TouchableOpacity
+                  onPress={() => setPasswordChangeModalVisible(false)}
+                  style={styles.closeButton}
+                >
+                  <Ionicons
+                    name="close"
+                    size={24}
+                    color={Colors[colorScheme ?? 'light'].text}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.paymentModalBody}>
+                <Text style={styles.passwordChangeMessage}>
+                  For your security, we recommend changing your default password to a strong, unique password.
+                </Text>
+                <Text style={styles.passwordChangeSubtext}>
+                  You can change your password anytime from your profile settings.
+                </Text>
+              </View>
+
+              <View style={styles.paymentModalFooter}>
+                <TouchableOpacity
+                  style={[styles.paymentCancelButton]}
+                  onPress={() => setPasswordChangeModalVisible(false)}
+                >
+                  <Text style={styles.paymentCancelText}>Later</Text>
+                </TouchableOpacity>
+                <View style={styles.paymentButtonSpacing} />
+                <TouchableOpacity
+                  style={[styles.paymentSubmitButton]}
+                  onPress={() => {
+                    setPasswordChangeModalVisible(false);
+                    router.push('/(tabs)/profile');
+                  }}
+                >
+                  <Text style={styles.paymentSubmitText}>Change Password</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Pressable>
+        </Modal>
+
       </SafeAreaView>
     );
   }
@@ -2565,6 +2660,71 @@ export default function DashboardScreen() {
         </View>
 
       </ScrollView>
+
+      {/* Password Change Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={passwordChangeModalVisible}
+        onRequestClose={() => setPasswordChangeModalVisible(false)}
+      >
+        <Pressable
+          style={styles.paymentModalOverlay}
+          onPress={() => setPasswordChangeModalVisible(false)}
+        >
+          <View style={styles.paymentModalContent} onStartShouldSetResponder={() => true}>
+            <View style={styles.paymentModalHeader}>
+              <Text style={styles.paymentModalTitle}>Change Your Password</Text>
+              <TouchableOpacity
+                onPress={() => setPasswordChangeModalVisible(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons
+                  name="close"
+                  size={24}
+                  color={Colors[colorScheme ?? 'light'].text}
+                />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.passwordChangeHeaderIcon}>
+              <Ionicons
+                name="lock-closed"
+                size={32}
+                color={Colors[colorScheme ?? 'light'].primary}
+              />
+            </View>
+
+            <View style={styles.paymentModalBody}>
+              <Text style={styles.passwordChangeMessage}>
+                For your security, we recommend changing your default password to a strong, unique password.
+              </Text>
+              <Text style={styles.passwordChangeSubtext}>
+                You can change your password anytime from your profile settings.
+              </Text>
+            </View>
+
+            <View style={styles.paymentModalFooter}>
+              <TouchableOpacity
+                style={[styles.paymentCancelButton]}
+                onPress={() => setPasswordChangeModalVisible(false)}
+              >
+                <Text style={styles.paymentCancelText}>Later</Text>
+              </TouchableOpacity>
+              <View style={styles.paymentButtonSpacing} />
+              <TouchableOpacity
+                style={[styles.paymentSubmitButton]}
+                onPress={() => {
+                  setPasswordChangeModalVisible(false);
+                  router.push('/(tabs)/profile');
+                }}
+              >
+                <Ionicons name="key" size={20} color="#FFFFFF" />
+                <Text style={styles.paymentSubmitText}>Change Password</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
