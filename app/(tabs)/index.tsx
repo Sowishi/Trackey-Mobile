@@ -83,6 +83,7 @@ export default function DashboardScreen() {
   const [waterRate, setWaterRate] = useState<number>(20.00);
   const [complaintModalVisible, setComplaintModalVisible] = useState(false);
   const [complaintDescription, setComplaintDescription] = useState('');
+  const [complaintImage, setComplaintImage] = useState<string | null>(null);
   const [submittingComplaint, setSubmittingComplaint] = useState(false);
   const [passwordChangeModalVisible, setPasswordChangeModalVisible] = useState(false);
   
@@ -509,11 +510,24 @@ export default function DashboardScreen() {
     try {
       const currentUserId = userId || await fetchUserId();
       
+      // Upload image if provided
+      let imageUrl = '';
+      if (complaintImage) {
+        try {
+          const fileName = `complaints/${currentUserId}_${Date.now()}.jpg`;
+          imageUrl = await uploadImageToStorage(complaintImage, fileName);
+        } catch (imageError) {
+          console.error('Error uploading image:', imageError);
+          Alert.alert('Warning', 'Failed to upload image, but complaint will still be submitted.');
+        }
+      }
+      
       const complaintData = {
         userId: currentUserId || '',
         userEmail: user.email,
         userName: user.name || '',
         description: complaintDescription.trim(),
+        imageUrl: imageUrl || null,
         status: 'pending',
         createdAt: new Date().toISOString(),
       };
@@ -531,6 +545,7 @@ export default function DashboardScreen() {
             onPress: () => {
               setComplaintModalVisible(false);
               setComplaintDescription('');
+              setComplaintImage(null);
             }
           }
         ]
@@ -546,6 +561,61 @@ export default function DashboardScreen() {
   const handleCancelComplaint = () => {
     setComplaintModalVisible(false);
     setComplaintDescription('');
+    setComplaintImage(null);
+  };
+
+  const handlePickComplaintImage = async () => {
+    try {
+      Alert.alert(
+        'Select Image',
+        'Choose an option',
+        [
+          {
+            text: 'Camera',
+            onPress: async () => {
+              const { status } = await ImagePicker.requestCameraPermissionsAsync();
+              if (status !== 'granted') {
+                Alert.alert('Permission Denied', 'We need camera permission to take a photo.');
+                return;
+              }
+              const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                quality: 0.8,
+              });
+              if (!result.canceled && result.assets && result.assets.length > 0) {
+                setComplaintImage(result.assets[0].uri);
+              }
+            },
+          },
+          {
+            text: 'Gallery',
+            onPress: async () => {
+              const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+              if (status !== 'granted') {
+                Alert.alert('Permission Denied', 'We need permission to access your photos.');
+                return;
+              }
+              const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                quality: 0.8,
+              });
+              if (!result.canceled && result.assets && result.assets.length > 0) {
+                setComplaintImage(result.assets[0].uri);
+              }
+            },
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -1728,6 +1798,66 @@ export default function DashboardScreen() {
       marginTop: 8,
       fontStyle: 'italic',
     },
+    complaintImageSection: {
+      marginBottom: 24,
+    },
+    uploadComplaintImageButton: {
+      borderWidth: 2,
+      borderStyle: 'dashed',
+      borderColor: Colors[colorScheme ?? 'light'].primary,
+      borderRadius: 12,
+      padding: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+    },
+    uploadComplaintImageText: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].primary,
+      marginTop: 12,
+    },
+    uploadComplaintImageSubtext: {
+      fontSize: 12,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+      marginTop: 4,
+    },
+    complaintImageContainer: {
+      position: 'relative',
+      alignItems: 'center',
+    },
+    complaintImage: {
+      width: '100%',
+      height: 200,
+      borderRadius: 12,
+      resizeMode: 'cover',
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+    },
+    removeImageButton: {
+      position: 'absolute',
+      top: 8,
+      right: 8,
+      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+      borderRadius: 12,
+      padding: 4,
+    },
+    changeImageButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 12,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].primary,
+    },
+    changeImageText: {
+      marginLeft: 8,
+      color: Colors[colorScheme ?? 'light'].primary,
+      fontWeight: '600',
+      fontSize: 14,
+    },
     billingListContent: {
       padding: 20,
       paddingBottom: 20,
@@ -2292,6 +2422,53 @@ export default function DashboardScreen() {
                   <Text style={styles.complaintHint}>
                     Please be as detailed as possible so we can help you better.
                   </Text>
+                </View>
+
+                {/* Image Upload Section */}
+                <View style={styles.complaintImageSection}>
+                  <Text style={styles.paymentSectionLabel}>Attach Photo (Optional)</Text>
+                  {complaintImage ? (
+                    <View style={styles.complaintImageContainer}>
+                      <Image
+                        source={{ uri: complaintImage }}
+                        style={styles.complaintImage}
+                      />
+                      <TouchableOpacity
+                        style={styles.removeImageButton}
+                        onPress={() => setComplaintImage(null)}
+                      >
+                        <Ionicons
+                          name="close-circle"
+                          size={24}
+                          color="#DC2626"
+                        />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.changeImageButton}
+                        onPress={handlePickComplaintImage}
+                      >
+                        <Ionicons
+                          name="refresh"
+                          size={20}
+                          color={Colors[colorScheme ?? 'light'].primary}
+                        />
+                        <Text style={styles.changeImageText}>Change Photo</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.uploadComplaintImageButton}
+                      onPress={handlePickComplaintImage}
+                    >
+                      <Ionicons
+                        name="camera-outline"
+                        size={32}
+                        color={Colors[colorScheme ?? 'light'].primary}
+                      />
+                      <Text style={styles.uploadComplaintImageText}>Take or Upload Photo</Text>
+                      <Text style={styles.uploadComplaintImageSubtext}>Tap to add a photo of the problem</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </ScrollView>
 
