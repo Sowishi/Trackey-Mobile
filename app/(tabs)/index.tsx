@@ -4,13 +4,12 @@ import { useUser } from '@/contexts/UserContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Dimensions,
-  FlatList,
   Image,
   Modal,
   Pressable,
@@ -20,11 +19,11 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import { BarChart, PieChart } from 'react-native-chart-kit';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { addDoc, collection, db, doc, getDocs, query, updateDoc, uploadImageToStorage, where } from '../../firebase';
+import { addDoc, collection, db, doc, getDoc, getDocs, query, updateDoc, uploadImageToStorage, where } from '../../firebase';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -57,6 +56,7 @@ interface Bill {
 export default function DashboardScreen() {
   const colorScheme = useColorScheme();
   const { user } = useUser();
+  const params = useLocalSearchParams();
   const [stats, setStats] = useState<DashboardStats>({
     totalResidents: 0,
     paidResidents: 0,
@@ -79,8 +79,33 @@ export default function DashboardScreen() {
   const [otherMethod, setOtherMethod] = useState('');
   const [paymentProof, setPaymentProof] = useState<string | null>(null);
   const [submittingPayment, setSubmittingPayment] = useState(false);
+  const [currentMonthLabel, setCurrentMonthLabel] = useState<string>('');
+  const [waterRate, setWaterRate] = useState<number>(20.00);
+  const [complaintModalVisible, setComplaintModalVisible] = useState(false);
+  const [complaintDescription, setComplaintDescription] = useState('');
+  const [complaintImage, setComplaintImage] = useState<string | null>(null);
+  const [submittingComplaint, setSubmittingComplaint] = useState(false);
+  const [passwordChangeModalVisible, setPasswordChangeModalVisible] = useState(false);
   
-  const WATER_RATE_PER_CUBIC_METER = 20; // 20 pesos per cubic meter
+  const WATER_RATE_PER_CUBIC_METER = 20; // 20 pesos per cubic meter (fallback)
+
+  // Fetch water rate from Firestore settings
+  const fetchWaterRate = async (): Promise<number> => {
+    try {
+      const settingsRef = doc(db, 'settings', 'kRaw13WFzXqfemqvdGPx');
+      const settingsSnap = await getDoc(settingsRef);
+      
+      if (settingsSnap.exists()) {
+        const data = settingsSnap.data();
+        const rate = parseFloat(data.currentWaterRate || data.waterRate || '20.00');
+        return isNaN(rate) ? 20.00 : rate;
+      }
+      return 20.00; // Default fallback
+    } catch (error) {
+      console.error('Error fetching water rate:', error);
+      return 20.00; // Default fallback
+    }
+  };
 
   // Check if user is resident
   const isResident = user?.position?.toLowerCase() === 'resident' || user?.position?.toLowerCase() === 'residents';
@@ -167,6 +192,13 @@ export default function DashboardScreen() {
       let totalConsumption = 0;
       let totalRevenue = 0;
       let totalDue = 0;
+      let mostRecentMonth = '';
+
+      // Find the most recent billing month
+      const months = ['January', 'February', 'March', 'April', 'May', 'June', 
+                      'July', 'August', 'September', 'October', 'November', 'December'];
+      let latestMonthIndex = -1;
+      let latestCreatedAt = '';
 
       billingSnapshot.forEach((doc) => {
         const data = doc.data();
@@ -185,10 +217,30 @@ export default function DashboardScreen() {
           unpaidCount++;
           totalDue += amount;
         }
+
+        // Track most recent month
+        if (data.month) {
+          const monthIndex = months.indexOf(data.month);
+          const createdAt = data.createdAt || '';
+          
+          if (monthIndex > latestMonthIndex || 
+              (monthIndex === latestMonthIndex && createdAt > latestCreatedAt)) {
+            latestMonthIndex = monthIndex;
+            latestCreatedAt = createdAt;
+            mostRecentMonth = data.month;
+          }
+        }
       });
 
       const totalBills = paidCount + unpaidCount + pendingCount;
       const collectionRate = totalBills > 0 ? (paidCount / totalBills) * 100 : 0;
+
+      // Set current month label (use most recent billing month or current calendar month)
+      if (!mostRecentMonth) {
+        const currentDate = new Date();
+        mostRecentMonth = months[currentDate.getMonth()];
+      }
+      setCurrentMonthLabel(mostRecentMonth);
 
       setStats({
         totalResidents: totalResidents,
@@ -224,8 +276,58 @@ export default function DashboardScreen() {
     }
   }, [userId]);
 
+  // Handle payBillData parameter from billing information screen
+  useEffect(() => {
+    if (params.payBillData && isResident) {
+      try {
+        const billData = JSON.parse(params.payBillData as string);
+        const bill: Bill = {
+          id: billData.id,
+          month: billData.month,
+          coverageDateFrom: billData.coverageDateFrom,
+          coverageDateTo: billData.coverageDateTo,
+          dueDate: billData.dueDate,
+          previousConsumption: billData.previousConsumption,
+          consumption: billData.consumption,
+          consumptionUsed: billData.consumptionUsed,
+          totalAmount: billData.totalAmount,
+          status: billData.status,
+          createdAt: billData.createdAt,
+        };
+        handlePayBill(bill);
+        // Clear the parameter to avoid reopening on re-render
+        setTimeout(() => {
+          router.setParams({ payBillData: '' });
+        }, 100);
+      } catch (error) {
+        console.error('Error parsing payBillData:', error);
+      }
+    }
+  }, [params.payBillData, isResident]);
+
+  // Fetch water rate on component mount
+  useEffect(() => {
+    const loadWaterRate = async () => {
+      const rate = await fetchWaterRate();
+      setWaterRate(rate);
+    };
+    loadWaterRate();
+  }, []);
+
+  // Check if user needs to change password
+  useEffect(() => {
+    if (user && user.passwordChanged === false) {
+      setPasswordChangeModalVisible(true);
+    }
+  }, [user]);
+
   const handleRefresh = () => {
     setRefreshing(true);
+    const refreshWaterRate = async () => {
+      const rate = await fetchWaterRate();
+      setWaterRate(rate);
+    };
+    refreshWaterRate();
     if (isResident) {
       fetchResidentBills().finally(() => setRefreshing(false));
     } else {
@@ -272,11 +374,10 @@ export default function DashboardScreen() {
         return;
       }
 
-      // Launch image picker
+      // Launch image picker - full image without cropping
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
+        allowsEditing: false,
         quality: 0.8,
       });
 
@@ -393,6 +494,130 @@ export default function DashboardScreen() {
     setPaymentProof(null);
   };
 
+  const handleSubmitComplaint = async () => {
+    if (!complaintDescription.trim()) {
+      Alert.alert('Validation Error', 'Please describe your problem');
+      return;
+    }
+
+    if (!user?.email) {
+      Alert.alert('Error', 'User information not available');
+      return;
+    }
+
+    setSubmittingComplaint(true);
+
+    try {
+      const currentUserId = userId || await fetchUserId();
+      
+      // Upload image if provided
+      let imageUrl = '';
+      if (complaintImage) {
+        try {
+          const fileName = `complaints/${currentUserId}_${Date.now()}.jpg`;
+          imageUrl = await uploadImageToStorage(complaintImage, fileName);
+        } catch (imageError) {
+          console.error('Error uploading image:', imageError);
+          Alert.alert('Warning', 'Failed to upload image, but complaint will still be submitted.');
+        }
+      }
+      
+      const complaintData = {
+        userId: currentUserId || '',
+        userEmail: user.email,
+        userName: user.name || '',
+        description: complaintDescription.trim(),
+        imageUrl: imageUrl || null,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+      };
+
+      // Save to Firestore complaints collection
+      const complaintsRef = collection(db, 'complaints');
+      await addDoc(complaintsRef, complaintData);
+
+      Alert.alert(
+        'Success',
+        'Your complaint has been submitted successfully. We will review it and get back to you soon.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setComplaintModalVisible(false);
+              setComplaintDescription('');
+              setComplaintImage(null);
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error submitting complaint:', error);
+      Alert.alert('Error', 'Failed to submit complaint. Please try again.');
+    } finally {
+      setSubmittingComplaint(false);
+    }
+  };
+
+  const handleCancelComplaint = () => {
+    setComplaintModalVisible(false);
+    setComplaintDescription('');
+    setComplaintImage(null);
+  };
+
+  const handlePickComplaintImage = async () => {
+    try {
+      Alert.alert(
+        'Select Image',
+        'Choose an option',
+        [
+          {
+            text: 'Camera',
+            onPress: async () => {
+              const { status } = await ImagePicker.requestCameraPermissionsAsync();
+              if (status !== 'granted') {
+                Alert.alert('Permission Denied', 'We need camera permission to take a photo.');
+                return;
+              }
+              const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                quality: 0.8,
+              });
+              if (!result.canceled && result.assets && result.assets.length > 0) {
+                setComplaintImage(result.assets[0].uri);
+              }
+            },
+          },
+          {
+            text: 'Gallery',
+            onPress: async () => {
+              const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+              if (status !== 'granted') {
+                Alert.alert('Permission Denied', 'We need permission to access your photos.');
+                return;
+              }
+              const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                quality: 0.8,
+              });
+              if (!result.canceled && result.assets && result.assets.length > 0) {
+                setComplaintImage(result.assets[0].uri);
+              }
+            },
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  };
+
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
@@ -479,10 +704,94 @@ export default function DashboardScreen() {
   // Calculate resident stats
   const totalBills = residentBills.length;
   const paidBills = residentBills.filter(bill => bill.status === 'paid').length;
-  const unpaidBills = residentBills.filter(bill => bill.status === 'unpaid').length;
+  const unpaidBills = residentBills.filter(bill => bill.status === 'unpaid' || bill.status === 'Unpaid' || bill.status === 'pending').length;
   const totalAmountDue = residentBills
-    .filter(bill => bill.status === 'unpaid')
+    .filter(bill => bill.status === 'unpaid' || bill.status === 'Unpaid' || bill.status === 'pending')
     .reduce((sum, bill) => sum + bill.totalAmount, 0);
+
+  // Calculate water consumption per month for bar graph
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 
+                  'July', 'August', 'September', 'October', 'November', 'December'];
+  
+  // Extract month name from "Month Year" format (e.g., "November 2025" -> "November")
+  const extractMonthName = (monthString: string): string | null => {
+    if (!monthString) return null;
+    // Check if it's in "Month Year" format
+    const parts = monthString.split(' ');
+    if (parts.length >= 1) {
+      const monthName = parts[0];
+      // Check if it matches one of our month names
+      if (months.includes(monthName)) {
+        return monthName;
+      }
+    }
+    // If it's already just a month name, return it
+    if (months.includes(monthString)) {
+      return monthString;
+    }
+    return null;
+  };
+
+  const monthlyConsumption = residentBills.reduce((acc, bill) => {
+    const monthName = extractMonthName(bill.month);
+    if (monthName) {
+      const consumption = bill.consumptionUsed !== undefined ? bill.consumptionUsed : bill.consumption || 0;
+      acc[monthName] = (acc[monthName] || 0) + consumption;
+    }
+    return acc;
+  }, {} as Record<string, number>);
+
+  // Prepare data for bar chart (show all months with data, up to 6 most recent)
+  // Get all months with consumption data, sorted by creation date (most recent first)
+  const billsWithMonth = residentBills
+    .map(bill => {
+      const monthName = extractMonthName(bill.month);
+      if (!monthName) return null;
+      const consumption = bill.consumptionUsed !== undefined ? bill.consumptionUsed : bill.consumption || 0;
+      return {
+        month: monthName,
+        consumption,
+        createdAt: bill.createdAt,
+        monthIndex: months.indexOf(monthName),
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null && item.consumption > 0);
+
+  // Group by month and sum consumption, keeping the most recent date for sorting
+  const monthlyData = billsWithMonth.reduce((acc, item) => {
+    if (!acc[item.month]) {
+      acc[item.month] = {
+        month: item.month,
+        monthIndex: item.monthIndex,
+        consumption: 0,
+        latestDate: item.createdAt,
+      };
+    }
+    acc[item.month].consumption += item.consumption;
+    // Keep the most recent date for sorting
+    if (new Date(item.createdAt) > new Date(acc[item.month].latestDate)) {
+      acc[item.month].latestDate = item.createdAt;
+    }
+    return acc;
+  }, {} as Record<string, { month: string; monthIndex: number; consumption: number; latestDate: string }>);
+
+  // Convert to array, sort by date (most recent first), then take last 6 and reverse for chronological display
+  const monthsWithData = Object.values(monthlyData)
+    .sort((a, b) => new Date(b.latestDate).getTime() - new Date(a.latestDate).getTime())
+    .slice(0, 6)
+    .sort((a, b) => a.monthIndex - b.monthIndex); // Sort chronologically for display
+
+  const chartData = monthsWithData.map(item => ({
+    month: item.month.substring(0, 3), // Short month name (Jan, Feb, etc.)
+    consumption: item.consumption,
+  }));
+
+  const barChartData = {
+    labels: chartData.map(d => d.month),
+    datasets: [{
+      data: chartData.map(d => d.consumption),
+    }],
+  };
 
   const styles = StyleSheet.create({
     safeArea: {
@@ -496,6 +805,38 @@ export default function DashboardScreen() {
     },
     content: {
       padding: 20,
+    },
+    dashboardHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 20,
+      paddingHorizontal: 4,
+    },
+    dashboardLogo: {
+      width: 50,
+      height: 50,
+      resizeMode: 'contain',
+    },
+    dashboardUserIcon: {
+      padding: 4,
+    },
+    dashboardProfilePic: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      borderWidth: 2,
+      borderColor: Colors[colorScheme ?? 'light'].primary,
+    },
+    dashboardUserIconPlaceholder: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: Colors[colorScheme ?? 'light'].primary,
     },
     greetingContainer: {
       marginBottom: 24,
@@ -623,6 +964,13 @@ export default function DashboardScreen() {
       fontWeight: '600',
       color: Colors[colorScheme ?? 'light'].text,
       opacity: 0.7,
+      marginBottom: 4,
+    },
+    metricMonth: {
+      fontSize: 11,
+      fontWeight: '500',
+      color: Colors[colorScheme ?? 'light'].text,
+      opacity: 0.5,
       marginBottom: 8,
     },
     metricValue: {
@@ -635,10 +983,15 @@ export default function DashboardScreen() {
       color: Colors[colorScheme ?? 'light'].text,
       opacity: 0.6,
     },
+    collectionRateContainer: {
+      flexDirection: 'column',
+      gap: 12,
+      marginBottom: 20,
+    },
     collectionRateCard: {
+      flex: 1,
       borderRadius: 16,
       padding: 20,
-      marginBottom: 20,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.1,
@@ -665,6 +1018,13 @@ export default function DashboardScreen() {
       fontSize: 16,
       fontWeight: '600',
       color: Colors[colorScheme ?? 'light'].text,
+      marginBottom: 2,
+    },
+    collectionRateMonth: {
+      fontSize: 11,
+      fontWeight: '500',
+      color: Colors[colorScheme ?? 'light'].text,
+      opacity: 0.5,
       marginBottom: 4,
     },
     collectionRateValue: {
@@ -740,6 +1100,277 @@ export default function DashboardScreen() {
       textAlign: 'center',
     },
     // Resident Dashboard Styles
+    residentContainer: {
+      flex: 1,
+    },
+    residentScrollContent: {
+      flexGrow: 1,
+      paddingBottom: 100,
+    },
+    residentTopSection: {
+      width: '100%',
+      height: 230,
+      overflow: 'hidden',
+    },
+    residentTopBackground: {
+      width: '100%',
+      height: '100%',
+      position: 'absolute',
+    },
+    residentDashboardHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: 20,
+      paddingTop: 20,
+      paddingBottom: 10,
+    },
+    residentDashboardLogo: {
+      width: 50,
+      height: 50,
+      resizeMode: 'contain',
+    },
+    residentDashboardUserIcon: {
+      padding: 4,
+    },
+    residentDashboardProfilePic: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      borderWidth: 2,
+      borderColor: '#FFFFFF',
+    },
+    residentDashboardUserIconPlaceholder: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: '#FFFFFF',
+    },
+    residentGreetingContainer: {
+      flex: 1,
+      justifyContent: 'flex-end',
+      padding: 20,
+      paddingBottom: 80,
+    },
+    residentGreetingText: {
+      fontSize: 16,
+      color: '#FFFFFF',
+      opacity: 0.9,
+      marginBottom: 4,
+    },
+    residentGreetingName: {
+      fontSize: 28,
+      fontWeight: 'bold',
+      color: '#FFFFFF',
+    },
+    residentBottomSection: {
+      backgroundColor: '#FFFFFF',
+      paddingTop: 20,
+      minHeight: 400,
+    },
+    debitCard: {
+      backgroundColor: '#000000',
+      borderRadius: 16,
+      padding: 16,
+      marginHorizontal: 20,
+      marginTop: -80,
+      marginBottom: 20,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.25,
+      shadowRadius: 10,
+      elevation: 6,
+      minHeight: 140,
+    },
+    debitCardHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    debitCardWaterIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    debitCardActiveLabel: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 12,
+    },
+    debitCardActiveDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: '#10B981',
+      marginRight: 6,
+    },
+    debitCardActiveText: {
+      color: '#FFFFFF',
+      fontSize: 11,
+      fontWeight: '600',
+    },
+    debitCardStatusBadge: {
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 10,
+    },
+    debitCardStatusPaid: {
+      backgroundColor: '#10B981',
+    },
+    debitCardStatusUnpaid: {
+      backgroundColor: '#EF4444',
+    },
+    debitCardStatusNoBilling: {
+      backgroundColor: '#6B7280',
+    },
+    debitCardStatusText: {
+      color: '#FFFFFF',
+      fontSize: 11,
+      fontWeight: '600',
+    },
+    debitCardContent: {
+      marginBottom: 16,
+    },
+    debitCardLabel: {
+      fontSize: 11,
+      color: 'rgba(255, 255, 255, 0.8)',
+      marginBottom: 4,
+      fontWeight: '500',
+    },
+    debitCardDueDate: {
+      fontSize: 16,
+      color: '#FFFFFF',
+      fontWeight: '600',
+    },
+    debitCardFooter: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-end',
+    },
+    debitCardFooterRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    debitCardArrow: {
+      marginLeft: 4,
+    },
+    debitCardAmount: {
+      fontSize: 22,
+      color: '#FFFFFF',
+      fontWeight: 'bold',
+    },
+    residentBillsList: {
+      padding: 20,
+      paddingTop: 40,
+      paddingBottom: 100,
+    },
+    waterRateContainer: {
+      padding: 20,
+      paddingTop: 0,
+      paddingBottom: 0,
+    },
+    waterRateCard: {
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      borderRadius: 12,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    waterRateHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 8,
+      gap: 8,
+    },
+    waterRateLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+      opacity: 0.7,
+    },
+    waterRateValue: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: Colors[colorScheme ?? 'light'].primary,
+    },
+    servicesContainer: {
+      padding: 20,
+      paddingTop: 20,
+      paddingBottom: 40,
+    },
+    servicesTitle: {
+      fontSize: 20,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+      marginBottom: 16,
+    },
+    servicesScrollContent: {
+      paddingRight: 20,
+    },
+    serviceItem: {
+      alignItems: 'center',
+      marginRight: 20,
+      minWidth: 80,
+    },
+    serviceIconContainer: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 8,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+    },
+    serviceLabel: {
+      fontSize: 12,
+      fontWeight: '500',
+      color: Colors[colorScheme ?? 'light'].text,
+      textAlign: 'center',
+      maxWidth: 80,
+    },
+    consumptionChartContainer: {
+      padding: 20,
+      paddingTop: 0,
+      paddingBottom: 40,
+    },
+    consumptionChartTitle: {
+      fontSize: 20,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+      marginBottom: 16,
+    },
+    consumptionChartCard: {
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      borderRadius: 12,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+      alignItems: 'center',
+    },
     residentContent: {
       padding: 20,
       paddingBottom: 100,
@@ -970,6 +1601,29 @@ export default function DashboardScreen() {
     paymentModalBody: {
       padding: 20,
     },
+    passwordChangeHeaderIcon: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 12,
+      alignSelf: 'center',
+    },
+    passwordChangeMessage: {
+      fontSize: 16,
+      color: Colors[colorScheme ?? 'light'].text,
+      textAlign: 'center',
+      marginBottom: 12,
+      lineHeight: 24,
+    },
+    passwordChangeSubtext: {
+      fontSize: 14,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+      textAlign: 'center',
+      lineHeight: 20,
+    },
     paymentBillInfo: {
       backgroundColor: Colors[colorScheme ?? 'light'].accent,
       borderRadius: 12,
@@ -1124,6 +1778,122 @@ export default function DashboardScreen() {
     disabledButton: {
       opacity: 0.6,
     },
+    complaintSection: {
+      marginBottom: 24,
+    },
+    complaintInput: {
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+      borderRadius: 12,
+      padding: 14,
+      fontSize: 16,
+      color: Colors[colorScheme ?? 'light'].text,
+      minHeight: 150,
+      textAlignVertical: 'top',
+    },
+    complaintHint: {
+      fontSize: 12,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+      marginTop: 8,
+      fontStyle: 'italic',
+    },
+    complaintImageSection: {
+      marginBottom: 24,
+    },
+    uploadComplaintImageButton: {
+      borderWidth: 2,
+      borderStyle: 'dashed',
+      borderColor: Colors[colorScheme ?? 'light'].primary,
+      borderRadius: 12,
+      padding: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+    },
+    uploadComplaintImageText: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].primary,
+      marginTop: 12,
+    },
+    uploadComplaintImageSubtext: {
+      fontSize: 12,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+      marginTop: 4,
+    },
+    complaintImageContainer: {
+      position: 'relative',
+      alignItems: 'center',
+    },
+    complaintImage: {
+      width: '100%',
+      height: 200,
+      borderRadius: 12,
+      resizeMode: 'cover',
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+    },
+    removeImageButton: {
+      position: 'absolute',
+      top: 8,
+      right: 8,
+      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+      borderRadius: 12,
+      padding: 4,
+    },
+    changeImageButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 12,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].primary,
+    },
+    changeImageText: {
+      marginLeft: 8,
+      color: Colors[colorScheme ?? 'light'].primary,
+      fontWeight: '600',
+      fontSize: 14,
+    },
+    billingListContent: {
+      padding: 20,
+      paddingBottom: 20,
+    },
+    outstandingBalanceContainer: {
+      backgroundColor: '#FEE2E2',
+      borderBottomWidth: 1,
+      borderBottomColor: Colors[colorScheme ?? 'light'].border,
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+    },
+    outstandingBalanceContent: {
+      alignItems: 'center',
+    },
+    outstandingBalanceHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 8,
+      gap: 8,
+    },
+    outstandingBalanceLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: '#DC2626',
+    },
+    outstandingBalanceAmount: {
+      fontSize: 28,
+      fontWeight: 'bold',
+      color: '#DC2626',
+      marginBottom: 4,
+    },
+    outstandingBalanceSubtext: {
+      fontSize: 12,
+      color: Colors[colorScheme ?? 'light'].text,
+      opacity: 0.7,
+    },
   });
 
   if (isResident && loadingBills) {
@@ -1156,85 +1926,29 @@ export default function DashboardScreen() {
 
   // Resident Dashboard View
   if (isResident) {
+    // Get the latest bill
+    const latestBill = residentBills.length > 0 ? residentBills[0] : null;
+
+    const formatDueDate = (dateString?: string) => {
+      if (!dateString) return 'N/A';
+      try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        });
+      } catch {
+        return dateString;
+      }
+    };
+
     return (
       <SafeAreaView style={styles.safeArea}>
-        <ScreenHeader 
-          title="My Bills" 
-          onUserPress={() => router.push('/(tabs)/profile')}
-          profilePicUrl={user?.profilePicUrl}
-        />
-        <FlatList
-          data={residentBills}
-          renderItem={renderBillCard}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.residentContent}
-          ListHeaderComponent={() => (
-            <View style={styles.residentHeader}>
-              <View style={styles.greetingContainer}>
-                <Text style={styles.greetingText}>{getGreeting()}</Text>
-                <Text style={styles.greetingName}>{userName}</Text>
-              </View>
-
-              {/* Resident Stats */}
-              <View style={styles.residentStats}>
-                <View style={styles.residentStatCard}>
-                  <View style={styles.residentStatHeader}>
-                    <Ionicons
-                      name="document-text"
-                      size={20}
-                      color={Colors[colorScheme ?? 'light'].primary}
-                    />
-                  </View>
-                  <Text style={styles.residentStatLabel}>Total Bills</Text>
-                  <Text style={styles.residentStatValue}>{totalBills}</Text>
-                </View>
-                <View style={styles.residentStatCardSpacing} />
-                <View style={styles.residentStatCard}>
-                  <View style={[styles.residentStatHeader, { backgroundColor: '#D1FAE5' }]}>
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={20}
-                      color={Colors[colorScheme ?? 'light'].primary}
-                    />
-                  </View>
-                  <Text style={styles.residentStatLabel}>Paid</Text>
-                  <Text style={styles.residentStatValue}>{paidBills}</Text>
-                </View>
-                <View style={styles.residentStatCardSpacing} />
-                <View style={styles.residentStatCard}>
-                  <View style={[styles.residentStatHeader, { backgroundColor: '#FEE2E2' }]}>
-                    <Ionicons
-                      name="alert-circle"
-                      size={20}
-                      color={Colors[colorScheme ?? 'light'].primary}
-                    />
-                  </View>
-                  <Text style={styles.residentStatLabel}>Unpaid</Text>
-                  <Text style={styles.residentStatValue}>{unpaidBills}</Text>
-                </View>
-              </View>
-
-              {totalAmountDue > 0 && (
-                <View style={styles.amountDueCard}>
-                  <Text style={styles.amountDueLabel}>Total Amount Due</Text>
-                  <Text style={styles.amountDueValue}>₱{totalAmountDue.toFixed(2)}</Text>
-                </View>
-              )}
-
-              <Text style={styles.billsTitle}>My Bills</Text>
-            </View>
-          )}
-          ListEmptyComponent={() => (
-            <View style={styles.emptyContainer}>
-              <Ionicons
-                name="document-text-outline"
-                size={80}
-                color={Colors[colorScheme ?? 'light'].icon}
-              />
-              <Text style={styles.emptyText}>No bills found</Text>
-              <Text style={styles.emptySubtext}>Your billing records will appear here</Text>
-            </View>
-          )}
+        <ScrollView
+          style={styles.residentContainer}
+          contentContainerStyle={styles.residentScrollContent}
+          showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -1242,7 +1956,261 @@ export default function DashboardScreen() {
               colors={[Colors[colorScheme ?? 'light'].primary]}
             />
           }
-        />
+        >
+          {/* Top Section with lupet.jpg background */}
+          <View style={styles.residentTopSection}>
+            <Image
+              source={require('../../assets/images/lupet.jpg')}
+              style={styles.residentTopBackground}
+              resizeMode="cover"
+            />
+            {/* Header with Logo and User Icon */}
+            <View style={styles.residentDashboardHeader}>
+              <Image 
+                source={require('../../assets/images/aquabill-logo.png')}
+                style={styles.residentDashboardLogo}
+              />
+              <TouchableOpacity
+                onPress={() => router.push('/(tabs)/profile')}
+                style={styles.residentDashboardUserIcon}
+              >
+                {user?.profilePicUrl ? (
+                  <Image
+                    source={{ uri: user.profilePicUrl }}
+                    style={styles.residentDashboardProfilePic}
+                  />
+                ) : (
+                  <View style={styles.residentDashboardUserIconPlaceholder}>
+                    <Ionicons 
+                      name="person" 
+                      size={24} 
+                      color="#FFFFFF" 
+                    />
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+            <View style={styles.residentGreetingContainer}>
+              <Text style={styles.residentGreetingText}>{getGreeting()}</Text>
+              <Text style={styles.residentGreetingName}>{userName}</Text>
+            </View>
+          </View>
+
+          {/* Bottom Section with white background */}
+          <View style={styles.residentBottomSection}>
+            {/* Water Billing Card Design with negative marginTop */}
+            <TouchableOpacity 
+              style={styles.debitCard}
+              onPress={() => {
+                if (latestBill) {
+                  handlePayBill(latestBill);
+                } else {
+                  router.push('/(tabs)/billing-information');
+                }
+              }}
+              activeOpacity={0.8}
+            >
+              <View style={styles.debitCardHeader}>
+                <View style={styles.debitCardWaterIcon}>
+                  <Ionicons name="water" size={24} color="#06B6D4" />
+                </View>
+                <View style={styles.debitCardActiveLabel}>
+                  <View style={styles.debitCardActiveDot} />
+                  <Text style={styles.debitCardActiveText}>Active</Text>
+                </View>
+              </View>
+              <View style={styles.debitCardContent}>
+                <Text style={styles.debitCardLabel}>Due Date</Text>
+                <Text style={styles.debitCardDueDate}>
+                  {latestBill ? formatDueDate(latestBill.dueDate) : 'N/A'}
+                </Text>
+              </View>
+              <View style={styles.debitCardFooter}>
+                <View>
+                  <Text style={styles.debitCardLabel}>Total Amount</Text>
+                  <Text style={styles.debitCardAmount}>
+                    {latestBill ? `₱${latestBill.totalAmount.toFixed(2)}` : '₱0.00'}
+                  </Text>
+                </View>
+                <View style={styles.debitCardFooterRight}>
+                  <View style={[
+                    styles.debitCardStatusBadge,
+                    latestBill 
+                      ? (latestBill.status === 'paid' ? styles.debitCardStatusPaid : styles.debitCardStatusUnpaid)
+                      : styles.debitCardStatusNoBilling
+                  ]}>
+                    <Text style={styles.debitCardStatusText}>
+                      {latestBill 
+                        ? (latestBill.status === 'paid' ? 'Paid' : 'Unpaid')
+                        : 'Meter Not Read'
+                      }
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#FFFFFF" style={styles.debitCardArrow} />
+                </View>
+              </View>
+            </TouchableOpacity>
+
+            {/* Current Water Rate Display */}
+            <View style={styles.waterRateContainer}>
+              <View style={styles.waterRateCard}>
+                <View style={styles.waterRateHeader}>
+                  <Ionicons 
+                    name="water" 
+                    size={24} 
+                    color={Colors[colorScheme ?? 'light'].primary} 
+                  />
+                  <Text style={styles.waterRateLabel}>Current Water Rate</Text>
+                </View>
+                <Text style={styles.waterRateValue}>
+                  ₱{waterRate.toFixed(2)} per cubic meter
+                </Text>
+              </View>
+            </View>
+
+            {/* Services Section */}
+            <View style={styles.servicesContainer}>
+              <Text style={styles.servicesTitle}>Services</Text>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.servicesScrollContent}
+              >
+                <TouchableOpacity 
+                  style={styles.serviceItem}
+                  onPress={() => router.push('/(tabs)/billing-information')}
+                >
+                  <View style={styles.serviceIconContainer}>
+                    <Ionicons 
+                      name="document-text" 
+                      size={28} 
+                      color={Colors[colorScheme ?? 'light'].primary} 
+                    />
+                  </View>
+                  <Text style={styles.serviceLabel}>Billing Information</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.serviceItem}
+                  onPress={() => router.push('/(tabs)/payment-history')}
+                >
+                  <View style={styles.serviceIconContainer}>
+                    <Ionicons 
+                      name="receipt" 
+                      size={28} 
+                      color={Colors[colorScheme ?? 'light'].primary} 
+                    />
+                  </View>
+                  <Text style={styles.serviceLabel}>Payment History</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.serviceItem}
+                  onPress={() => router.push('/(tabs)/profile')}
+                >
+                  <View style={styles.serviceIconContainer}>
+                    <Ionicons 
+                      name="person" 
+                      size={28} 
+                      color={Colors[colorScheme ?? 'light'].primary} 
+                    />
+                  </View>
+                  <Text style={styles.serviceLabel}>Profile</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.serviceItem}
+                  onPress={() => router.push('/(tabs)/notifications')}
+                >
+                  <View style={styles.serviceIconContainer}>
+                    <Ionicons 
+                      name="notifications" 
+                      size={28} 
+                      color={Colors[colorScheme ?? 'light'].primary} 
+                    />
+                  </View>
+                  <Text style={styles.serviceLabel}>Notifications</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.serviceItem}
+                  onPress={() => router.push('/(tabs)/meter-calculator')}
+                >
+                  <View style={styles.serviceIconContainer}>
+                    <Ionicons 
+                      name="calculator" 
+                      size={28} 
+                      color={Colors[colorScheme ?? 'light'].primary} 
+                    />
+                  </View>
+                  <Text style={styles.serviceLabel}>Meter Calculator</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.serviceItem}
+                  onPress={handleRefresh}
+                >
+                  <View style={styles.serviceIconContainer}>
+                    <Ionicons 
+                      name="refresh" 
+                      size={28} 
+                      color={Colors[colorScheme ?? 'light'].primary} 
+                    />
+                  </View>
+                  <Text style={styles.serviceLabel}>Refresh</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.serviceItem}
+                  onPress={() => setComplaintModalVisible(true)}
+                >
+                  <View style={styles.serviceIconContainer}>
+                    <Ionicons 
+                      name="alert-circle" 
+                      size={28} 
+                      color={Colors[colorScheme ?? 'light'].primary} 
+                    />
+                  </View>
+                  <Text style={styles.serviceLabel}>Report a problem</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+
+            {/* Water Consumption Bar Graph */}
+            {chartData.length > 0 && (
+              <View style={styles.consumptionChartContainer}>
+                <Text style={styles.consumptionChartTitle}>Water Consumption</Text>
+                <View style={styles.consumptionChartCard}>
+                  <BarChart
+                    data={barChartData}
+                    width={screenWidth - 80}
+                    height={220}
+                    chartConfig={{
+                      backgroundColor: '#FFFFFF',
+                      backgroundGradientFrom: '#FFFFFF',
+                      backgroundGradientTo: '#FFFFFF',
+                      decimalPlaces: 2,
+                      color: (opacity = 1) => `rgba(6, 182, 212, ${opacity})`, // Cyan color for water theme
+                      labelColor: (opacity = 1) => `rgba(31, 41, 55, ${opacity})`,
+                      style: {
+                        borderRadius: 16,
+                      },
+                      barPercentage: 0.7,
+                    }}
+                    style={{
+                      marginVertical: 8,
+                      borderRadius: 16,
+                    }}
+                    yAxisLabel=""
+                    yAxisSuffix=" m³"
+                    showValuesOnTopOfBars
+                    fromZero
+                  />
+                </View>
+              </View>
+            )}
+          </View>
+        </ScrollView>
 
         {/* Payment Modal */}
         <Modal
@@ -1411,6 +2379,191 @@ export default function DashboardScreen() {
             </View>
           </Pressable>
         </Modal>
+
+        {/* Complaint Modal */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={complaintModalVisible}
+          onRequestClose={handleCancelComplaint}
+        >
+          <Pressable
+            style={styles.paymentModalOverlay}
+            onPress={handleCancelComplaint}
+          >
+            <View style={styles.paymentModalContent} onStartShouldSetResponder={() => true}>
+              <View style={styles.paymentModalHeader}>
+                <Text style={styles.paymentModalTitle}>Report a Problem</Text>
+                <TouchableOpacity
+                  onPress={handleCancelComplaint}
+                  style={styles.closeButton}
+                >
+                  <Ionicons
+                    name="close"
+                    size={24}
+                    color={Colors[colorScheme ?? 'light'].text}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={styles.paymentModalBody}>
+                <View style={styles.complaintSection}>
+                  <Text style={styles.paymentSectionLabel}>Describe your problem</Text>
+                  <TextInput
+                    style={styles.complaintInput}
+                    placeholder="Please provide details about the problem you're experiencing..."
+                    placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
+                    value={complaintDescription}
+                    onChangeText={setComplaintDescription}
+                    multiline
+                    numberOfLines={8}
+                    textAlignVertical="top"
+                  />
+                  <Text style={styles.complaintHint}>
+                    Please be as detailed as possible so we can help you better.
+                  </Text>
+                </View>
+
+                {/* Image Upload Section */}
+                <View style={styles.complaintImageSection}>
+                  <Text style={styles.paymentSectionLabel}>Attach Photo (Optional)</Text>
+                  {complaintImage ? (
+                    <View style={styles.complaintImageContainer}>
+                      <Image
+                        source={{ uri: complaintImage }}
+                        style={styles.complaintImage}
+                      />
+                      <TouchableOpacity
+                        style={styles.removeImageButton}
+                        onPress={() => setComplaintImage(null)}
+                      >
+                        <Ionicons
+                          name="close-circle"
+                          size={24}
+                          color="#DC2626"
+                        />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.changeImageButton}
+                        onPress={handlePickComplaintImage}
+                      >
+                        <Ionicons
+                          name="refresh"
+                          size={20}
+                          color={Colors[colorScheme ?? 'light'].primary}
+                        />
+                        <Text style={styles.changeImageText}>Change Photo</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.uploadComplaintImageButton}
+                      onPress={handlePickComplaintImage}
+                    >
+                      <Ionicons
+                        name="camera-outline"
+                        size={32}
+                        color={Colors[colorScheme ?? 'light'].primary}
+                      />
+                      <Text style={styles.uploadComplaintImageText}>Take or Upload Photo</Text>
+                      <Text style={styles.uploadComplaintImageSubtext}>Tap to add a photo of the problem</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </ScrollView>
+
+              <View style={styles.paymentModalFooter}>
+                <TouchableOpacity
+                  style={[styles.paymentCancelButton, submittingComplaint && styles.disabledButton]}
+                  onPress={handleCancelComplaint}
+                  disabled={submittingComplaint}
+                >
+                  <Text style={styles.paymentCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <View style={styles.paymentButtonSpacing} />
+                <TouchableOpacity
+                  style={[styles.paymentSubmitButton, submittingComplaint && styles.disabledButton]}
+                  onPress={handleSubmitComplaint}
+                  disabled={submittingComplaint}
+                >
+                  {submittingComplaint ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Ionicons name="send" size={20} color="#FFFFFF" />
+                      <Text style={styles.paymentSubmitText}>Submit</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Pressable>
+        </Modal>
+
+        {/* Password Change Modal */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={passwordChangeModalVisible}
+          onRequestClose={() => setPasswordChangeModalVisible(false)}
+        >
+          <Pressable
+            style={styles.paymentModalOverlay}
+            onPress={() => setPasswordChangeModalVisible(false)}
+          >
+            <View style={styles.paymentModalContent} onStartShouldSetResponder={() => true}>
+              <View style={styles.paymentModalHeader}>
+                <View style={styles.passwordChangeHeaderIcon}>
+                  <Ionicons
+                    name="lock-closed"
+                    size={32}
+                    color={Colors[colorScheme ?? 'light'].primary}
+                  />
+                </View>
+                <Text style={styles.paymentModalTitle}>Change Your Password</Text>
+                <TouchableOpacity
+                  onPress={() => setPasswordChangeModalVisible(false)}
+                  style={styles.closeButton}
+                >
+                  <Ionicons
+                    name="close"
+                    size={24}
+                    color={Colors[colorScheme ?? 'light'].text}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.paymentModalBody}>
+                <Text style={styles.passwordChangeMessage}>
+                  For your security, we recommend changing your default password to a strong, unique password.
+                </Text>
+                <Text style={styles.passwordChangeSubtext}>
+                  You can change your password anytime from your profile settings.
+                </Text>
+              </View>
+
+              <View style={styles.paymentModalFooter}>
+                <TouchableOpacity
+                  style={[styles.paymentCancelButton]}
+                  onPress={() => setPasswordChangeModalVisible(false)}
+                >
+                  <Text style={styles.paymentCancelText}>Later</Text>
+                </TouchableOpacity>
+                <View style={styles.paymentButtonSpacing} />
+                <TouchableOpacity
+                  style={[styles.paymentSubmitButton]}
+                  onPress={() => {
+                    setPasswordChangeModalVisible(false);
+                    router.push('/(tabs)/profile');
+                  }}
+                >
+                  <Text style={styles.paymentSubmitText}>Change Password</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Pressable>
+        </Modal>
+
       </SafeAreaView>
     );
   }
@@ -1434,7 +2587,7 @@ export default function DashboardScreen() {
             colors={[Colors[colorScheme ?? 'light'].primary]}
           />
         }
-      >
+        >
         {/* Greeting */}
         <View style={styles.greetingContainer}>
           <Text style={styles.greetingText}>
@@ -1453,53 +2606,92 @@ export default function DashboardScreen() {
               </View>
             </View>
             <Text style={styles.metricLabel}>Total Revenue</Text>
+            {currentMonthLabel && (
+              <Text style={styles.metricMonth}>{currentMonthLabel}</Text>
+            )}
             <Text style={[styles.metricValue, { color: '#059669' }]}>
               ₱{stats.totalRevenue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </Text>
             <Text style={styles.metricSubtext}>Collected payments</Text>
           </View>
 
-          {/* Total Due Card */}
-          <View style={[styles.metricCardLarge, { backgroundColor: '#FEE2E2' }]}>
+          {/* Total Due Card - Clickable */}
+          <TouchableOpacity 
+            style={[styles.metricCardLarge, { backgroundColor: '#FEE2E2' }]}
+            onPress={() => router.push('/(tabs)/users')}
+            activeOpacity={0.7}
+          >
             <View style={styles.metricHeader}>
               <View style={[styles.metricIconContainer, { backgroundColor: '#DC2626' }]}>
                 <Ionicons name="alert-circle" size={24} color="#FFFFFF" />
               </View>
             </View>
             <Text style={styles.metricLabel}>Amount Due</Text>
+            {currentMonthLabel && (
+              <Text style={styles.metricMonth}>{currentMonthLabel}</Text>
+            )}
             <Text style={[styles.metricValue, { color: '#DC2626' }]}>
               ₱{stats.totalDue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </Text>
-            <Text style={styles.metricSubtext}>Outstanding balance</Text>
-          </View>
+            <Text style={styles.metricSubtext}>Outstanding balance • Tap to view users</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Collection Rate Card */}
-        <View style={[styles.collectionRateCard, { 
-          backgroundColor: stats.collectionRate >= 75 ? '#D1FAE5' : stats.collectionRate >= 50 ? '#FEF3C7' : '#FEE2E2'
-        }]}>
-          <View style={styles.collectionRateContent}>
-            <View style={[styles.collectionRateIcon, { 
-              backgroundColor: stats.collectionRate >= 75 ? '#059669' : stats.collectionRate >= 50 ? '#F59E0B' : '#DC2626'
-            }]}>
-              <Ionicons 
-                name={stats.collectionRate >= 75 ? "checkmark-circle" : stats.collectionRate >= 50 ? "time" : "warning"} 
-                size={32} 
-                color="#FFFFFF" 
-              />
-            </View>
-            <View style={styles.collectionRateInfo}>
-              <Text style={styles.collectionRateLabel}>Collection Rate</Text>
-              <Text style={[styles.collectionRateValue, { 
-                color: stats.collectionRate >= 75 ? '#059669' : stats.collectionRate >= 50 ? '#F59E0B' : '#DC2626'
+        {/* Collection Rate and Unpaid Bills Cards */}
+        <View style={styles.collectionRateContainer}>
+          <View style={[styles.collectionRateCard, { 
+            backgroundColor: stats.collectionRate >= 75 ? '#D1FAE5' : stats.collectionRate >= 50 ? '#FEF3C7' : '#FEE2E2'
+          }]}>
+            <View style={styles.collectionRateContent}>
+              <View style={[styles.collectionRateIcon, { 
+                backgroundColor: stats.collectionRate >= 75 ? '#059669' : stats.collectionRate >= 50 ? '#F59E0B' : '#DC2626'
               }]}>
-                {stats.collectionRate.toFixed(1)}%
-              </Text>
+                <Ionicons 
+                  name={stats.collectionRate >= 75 ? "checkmark-circle" : stats.collectionRate >= 50 ? "time" : "warning"} 
+                  size={32} 
+                  color="#FFFFFF" 
+                />
+              </View>
+              <View style={styles.collectionRateInfo}>
+                <Text style={styles.collectionRateLabel}>Collection Rate</Text>
+                {currentMonthLabel && (
+                  <Text style={styles.collectionRateMonth}>{currentMonthLabel}</Text>
+                )}
+                <Text style={[styles.collectionRateValue, { 
+                  color: stats.collectionRate >= 75 ? '#059669' : stats.collectionRate >= 50 ? '#F59E0B' : '#DC2626'
+                }]}>
+                  {stats.collectionRate.toFixed(1)}%
+                </Text>
+              </View>
             </View>
+            <Text style={styles.collectionRateSubtext}>
+              {stats.paidResidents} of {stats.paidResidents + stats.unpaidResidents + stats.pendingPayments} bills paid
+            </Text>
           </View>
-          <Text style={styles.collectionRateSubtext}>
-            {stats.paidResidents} of {stats.paidResidents + stats.unpaidResidents + stats.pendingPayments} bills paid
-          </Text>
+
+          {/* Unpaid Bills Card - Clickable */}
+          <TouchableOpacity 
+            style={[styles.metricCardLarge, { backgroundColor: '#FEE2E2' }]}
+            onPress={() => router.push({
+              pathname: '/(tabs)/billing-information',
+              params: { showUnpaidOnly: 'true' }
+            })}
+            activeOpacity={0.7}
+          >
+            <View style={styles.metricHeader}>
+              <View style={[styles.metricIconContainer, { backgroundColor: '#DC2626' }]}>
+                <Ionicons name="document-text" size={24} color="#FFFFFF" />
+              </View>
+            </View>
+            <Text style={styles.metricLabel}>Unpaid Bills</Text>
+            {currentMonthLabel && (
+              <Text style={styles.metricMonth}>{currentMonthLabel}</Text>
+            )}
+            <Text style={[styles.metricValue, { color: '#DC2626' }]}>
+              {stats.unpaidResidents}
+            </Text>
+            <Text style={styles.metricSubtext}>Tap to view details</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Quick Stats Grid */}
@@ -1550,16 +2742,6 @@ export default function DashboardScreen() {
               <Text style={styles.statSubtext}>Overdue bills</Text>
             </View>
 
-            <View style={[styles.statCard, styles.statCardFull]}>
-              <View style={styles.statHeader}>
-                <View style={[styles.statIcon, { backgroundColor: '#E0F7FA' }]}>
-                  <Ionicons name="water" size={18} color={Colors[colorScheme ?? 'light'].primary} />
-                </View>
-              </View>
-              <Text style={styles.statLabel}>Water Consumption</Text>
-              <Text style={styles.statValue}>{stats.totalWaterConsumption.toFixed(2)} m³</Text>
-              <Text style={styles.statSubtext}>Total usage this period</Text>
-            </View>
           </View>
         </View>
 
@@ -1612,55 +2794,7 @@ export default function DashboardScreen() {
               />
             </View>
 
-            {/* Bar Chart */}
-            <View style={styles.chartCard}>
-              <Text style={styles.chartLabel}>Payment Status Comparison</Text>
-              <BarChart
-                data={{
-                  labels: ['Paid', 'Pending', 'Unpaid'],
-                  datasets: [
-                    {
-                      data: [
-                        stats.paidResidents || 0.1, 
-                        stats.pendingPayments || 0.1, 
-                        stats.unpaidResidents || 0.1
-                      ],
-                      colors: [
-                        () => '#059669',
-                        () => '#F59E0B',
-                        () => '#DC2626',
-                      ],
-                    },
-                  ],
-                }}
-                width={screenWidth - 64}
-                height={220}
-                yAxisLabel=""
-                yAxisSuffix=""
-                chartConfig={{
-                  backgroundColor: '#FFFFFF',
-                  backgroundGradientFrom: '#FFFFFF',
-                  backgroundGradientTo: '#FFFFFF',
-                  decimalPlaces: 0,
-                  color: (opacity) => `rgba(0, 119, 182, ${opacity})`,
-                  labelColor: (opacity) => `rgba(31, 41, 55, ${opacity})`,
-                  fillShadowGradient: '#0077b6',
-                  fillShadowGradientOpacity: 1,
-                  style: {
-                    borderRadius: 16,
-                  },
-                  barPercentage: 0.5,
-                }}
-                withCustomBarColorFromData
-                flatColor
-                style={{
-                  marginVertical: 8,
-                  borderRadius: 16,
-                }}
-                fromZero
-                showValuesOnTopOfBars
-              />
-            </View>
+        
           </View>
         )}
 
@@ -1703,6 +2837,71 @@ export default function DashboardScreen() {
         </View>
 
       </ScrollView>
+
+      {/* Password Change Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={passwordChangeModalVisible}
+        onRequestClose={() => setPasswordChangeModalVisible(false)}
+      >
+        <Pressable
+          style={styles.paymentModalOverlay}
+          onPress={() => setPasswordChangeModalVisible(false)}
+        >
+          <View style={styles.paymentModalContent} onStartShouldSetResponder={() => true}>
+            <View style={styles.paymentModalHeader}>
+              <Text style={styles.paymentModalTitle}>Change Your Password</Text>
+              <TouchableOpacity
+                onPress={() => setPasswordChangeModalVisible(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons
+                  name="close"
+                  size={24}
+                  color={Colors[colorScheme ?? 'light'].text}
+                />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.passwordChangeHeaderIcon}>
+              <Ionicons
+                name="lock-closed"
+                size={32}
+                color={Colors[colorScheme ?? 'light'].primary}
+              />
+            </View>
+
+            <View style={styles.paymentModalBody}>
+              <Text style={styles.passwordChangeMessage}>
+                For your security, we recommend changing your default password to a strong, unique password.
+              </Text>
+              <Text style={styles.passwordChangeSubtext}>
+                You can change your password anytime from your profile settings.
+              </Text>
+            </View>
+
+            <View style={styles.paymentModalFooter}>
+              <TouchableOpacity
+                style={[styles.paymentCancelButton]}
+                onPress={() => setPasswordChangeModalVisible(false)}
+              >
+                <Text style={styles.paymentCancelText}>Later</Text>
+              </TouchableOpacity>
+              <View style={styles.paymentButtonSpacing} />
+              <TouchableOpacity
+                style={[styles.paymentSubmitButton]}
+                onPress={() => {
+                  setPasswordChangeModalVisible(false);
+                  router.push('/(tabs)/profile');
+                }}
+              >
+                <Ionicons name="key" size={20} color="#FFFFFF" />
+                <Text style={styles.paymentSubmitText}>Change Password</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }

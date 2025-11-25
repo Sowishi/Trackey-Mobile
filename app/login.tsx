@@ -69,7 +69,8 @@ export default function LoginScreen() {
             password: userData.password || '',
             position: userData.role || userData.position || '', // Support both role and position
             rfid: userData.meterNumber || userData.rfid || '', // Support both meterNumber and rfid
-            profilePicUrl: userData.profilePicUrl || '' // Include profile picture URL
+            profilePicUrl: userData.profilePicUrl || '', // Include profile picture URL
+            passwordChanged: userData.passwordChanged || false // Include passwordChanged status
           };
         }
       }

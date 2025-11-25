@@ -43,6 +43,7 @@ export default function PaymentHistoryScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [confirmingPaymentId, setConfirmingPaymentId] = useState<string | null>(null);
+  const [rejectingPaymentId, setRejectingPaymentId] = useState<string | null>(null);
 
   // Check if user is a collector/admin (not a resident)
   const isCollector = user?.position?.toLowerCase() !== 'resident' && 
@@ -165,6 +166,72 @@ export default function PaymentHistoryScreen() {
     );
   };
 
+  const handleRejectPayment = async (payment: Payment) => {
+    Alert.alert(
+      'Reject Payment',
+      `Are you sure you want to reject the payment of ₱${payment.billAmount.toFixed(2)} for ${payment.billMonth}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reject',
+          style: 'destructive',
+          onPress: async () => {
+            setRejectingPaymentId(payment.id);
+            try {
+              // Update payment status to rejected
+              const paymentRef = doc(db, 'payments', payment.id);
+              await updateDoc(paymentRef, {
+                status: 'rejected',
+                updatedAt: new Date().toISOString(),
+              });
+
+              // Update bill status back to unpaid
+              if (payment.billId) {
+                const billRef = doc(db, 'billing', payment.billId);
+                await updateDoc(billRef, {
+                  status: 'unpaid',
+                  updatedAt: new Date().toISOString(),
+                });
+              }
+
+              // Create notification for the user
+              try {
+                const notificationData = {
+                  userId: payment.userId,
+                  userEmail: payment.userEmail,
+                  userName: payment.userName,
+                  type: 'payment_rejected',
+                  title: 'Payment Rejected',
+                  message: `Your payment of ₱${payment.billAmount.toFixed(2)} for ${payment.billMonth} has been rejected. Please resubmit with valid proof.`,
+                  paymentId: payment.id,
+                  billId: payment.billId,
+                  status: 'unread',
+                  createdAt: new Date().toISOString(),
+                };
+
+                const notificationsRef = collection(db, 'notifications');
+                await addDoc(notificationsRef, notificationData);
+              } catch (notificationError) {
+                console.error('Error creating notification:', notificationError);
+                // Don't fail the payment rejection if notification fails
+              }
+
+              // Refresh payments list
+              await fetchPayments();
+
+              Alert.alert('Success', 'Payment rejected successfully!');
+            } catch (error) {
+              console.error('Error rejecting payment:', error);
+              Alert.alert('Error', 'Failed to reject payment. Please try again.');
+            } finally {
+              setRejectingPaymentId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
@@ -247,22 +314,39 @@ export default function PaymentHistoryScreen() {
         </TouchableOpacity>
       )}
 
-      {/* Confirm Payment Button for Collectors */}
+      {/* Confirm and Reject Payment Buttons for Collectors */}
       {isCollector && item.status === 'pending' && (
-        <TouchableOpacity
-          style={styles.confirmButton}
-          onPress={() => handleConfirmPayment(item)}
-          disabled={confirmingPaymentId === item.id}
-        >
-          {confirmingPaymentId === item.id ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <>
-              <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
-              <Text style={styles.confirmButtonText}>Confirm Payment</Text>
-            </>
-          )}
-        </TouchableOpacity>
+        <View style={styles.actionButtonsContainer}>
+          <TouchableOpacity
+            style={styles.rejectButton}
+            onPress={() => handleRejectPayment(item)}
+            disabled={rejectingPaymentId === item.id || confirmingPaymentId === item.id}
+          >
+            {rejectingPaymentId === item.id ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Ionicons name="close-circle" size={18} color="#FFFFFF" />
+                <Text style={styles.rejectButtonText}>Reject</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.confirmButton}
+            onPress={() => handleConfirmPayment(item)}
+            disabled={confirmingPaymentId === item.id || rejectingPaymentId === item.id}
+          >
+            {confirmingPaymentId === item.id ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
+                <Text style={styles.confirmButtonText}>Confirm</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
       )}
     </View>
   );
@@ -400,9 +484,14 @@ export default function PaymentHistoryScreen() {
       fontWeight: '600',
       marginLeft: 6,
     },
-    confirmButton: {
+    actionButtonsContainer: {
       marginTop: 12,
-      backgroundColor: Colors[colorScheme ?? 'light'].primary,
+      flexDirection: 'row',
+      gap: 8,
+    },
+    confirmButton: {
+      flex: 1,
+      backgroundColor: '#059669',
       borderRadius: 8,
       paddingVertical: 10,
       paddingHorizontal: 16,
@@ -411,6 +500,22 @@ export default function PaymentHistoryScreen() {
       justifyContent: 'center',
     },
     confirmButtonText: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '600',
+      marginLeft: 4,
+    },
+    rejectButton: {
+      flex: 1,
+      backgroundColor: '#DC2626',
+      borderRadius: 8,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    rejectButtonText: {
       color: '#FFFFFF',
       fontSize: 14,
       fontWeight: '600',

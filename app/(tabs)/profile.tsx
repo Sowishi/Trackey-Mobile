@@ -17,7 +17,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { collection, db, doc, getDocs, query, updateDoc, uploadImageToStorage, where } from '../../firebase';
@@ -36,6 +36,14 @@ interface UserProfile {
   role: string;
   status: string;
   meterNumber?: string;
+}
+
+interface Bill {
+  id: string;
+  dueDate?: string;
+  totalAmount?: number;
+  status?: string;
+  month?: string;
 }
 
 export default function ProfileScreen() {

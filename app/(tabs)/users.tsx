@@ -10,6 +10,7 @@ import {
   FlatList,
   Image,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -22,6 +23,7 @@ import { collection, db, getDocs, query, where } from '../../firebase';
 interface Resident {
   id: string;
   age?: number;
+  accountNumber?: string;
   contactNumber?: string;
   createdAt?: string;
   email: string;
@@ -36,7 +38,11 @@ interface Resident {
   role: string;
   status: string;
   hasUnpaidBills?: boolean;
+  hasPaidBills?: boolean;
+  hasBilling?: boolean;
 }
+
+type FilterType = 'all' | 'paid' | 'unpaid' | 'meter-read' | 'no-billing';
 
 export default function UsersScreen() {
   const colorScheme = useColorScheme();
@@ -46,6 +52,7 @@ export default function UsersScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [selectedFilter, setSelectedFilter] = useState<FilterType>('all');
 
   const fetchResidents = async () => {
     try {
@@ -71,21 +78,45 @@ export default function UsersScreen() {
       const residentsWithStatus = await Promise.all(
         residentsList.map(async (resident) => {
           try {
-            const billQuery = query(
+            // Check for any billing
+            const allBillsQuery = query(
+              billingRef,
+              where('userId', '==', resident.id)
+            );
+            const allBillsSnapshot = await getDocs(allBillsQuery);
+            const hasBilling = !allBillsSnapshot.empty;
+
+            // Check for unpaid bills
+            const unpaidBillQuery = query(
               billingRef,
               where('userId', '==', resident.id),
               where('status', '==', 'unpaid')
             );
-            const billSnapshot = await getDocs(billQuery);
+            const unpaidBillSnapshot = await getDocs(unpaidBillQuery);
+            const hasUnpaidBills = !unpaidBillSnapshot.empty;
+
+            // Check for paid bills
+            const paidBillQuery = query(
+              billingRef,
+              where('userId', '==', resident.id),
+              where('status', '==', 'paid')
+            );
+            const paidBillSnapshot = await getDocs(paidBillQuery);
+            const hasPaidBills = !paidBillSnapshot.empty;
+
             return {
               ...resident,
-              hasUnpaidBills: !billSnapshot.empty,
+              hasUnpaidBills,
+              hasPaidBills,
+              hasBilling,
             };
           } catch (error) {
             console.error(`Error fetching bills for ${resident.fullName}:`, error);
             return {
               ...resident,
               hasUnpaidBills: false,
+              hasPaidBills: false,
+              hasBilling: false,
             };
           }
         })
@@ -108,9 +139,27 @@ export default function UsersScreen() {
     fetchResidents();
   }, []);
 
-  // Filter residents based on search text
+  // Filter residents based on search text and filter selection
   useEffect(() => {
     let filtered = [...residents];
+
+    // Filter by selected filter type
+    if (selectedFilter !== 'all') {
+      filtered = filtered.filter((resident) => {
+        switch (selectedFilter) {
+          case 'paid':
+            return resident.hasPaidBills && !resident.hasUnpaidBills;
+          case 'unpaid':
+            return resident.hasUnpaidBills;
+          case 'meter-read':
+            return resident.hasBilling;
+          case 'no-billing':
+            return !resident.hasBilling;
+          default:
+            return true;
+        }
+      });
+    }
 
     // Filter by search text
     if (searchText.trim()) {
@@ -118,6 +167,7 @@ export default function UsersScreen() {
       filtered = filtered.filter(
         (resident) =>
           resident.fullName.toLowerCase().includes(searchLower) ||
+          resident.accountNumber?.toLowerCase().includes(searchLower) ||
           resident.email.toLowerCase().includes(searchLower) ||
           resident.contactNumber?.toLowerCase().includes(searchLower) ||
           resident.meterNumber?.toLowerCase().includes(searchLower)
@@ -125,7 +175,7 @@ export default function UsersScreen() {
     }
 
     setFilteredResidents(filtered);
-  }, [residents, searchText]);
+  }, [residents, searchText, selectedFilter]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -140,6 +190,44 @@ export default function UsersScreen() {
         userId: resident.id,
       },
     });
+  };
+
+  const filters: { type: FilterType; label: string; icon: string }[] = [
+    { type: 'all', label: 'All', icon: 'apps' },
+    { type: 'paid', label: 'Paid', icon: 'checkmark-circle' },
+    { type: 'unpaid', label: 'Unpaid', icon: 'alert-circle' },
+    { type: 'meter-read', label: 'Meter Read', icon: 'speedometer' },
+    { type: 'no-billing', label: 'No Billing', icon: 'document-text-outline' },
+  ];
+
+  const renderFilterBadge = (filter: { type: FilterType; label: string; icon: string }) => {
+    const isSelected = selectedFilter === filter.type;
+    return (
+      <TouchableOpacity
+        key={filter.type}
+        style={[
+          styles.filterBadge,
+          isSelected && styles.filterBadgeSelected,
+        ]}
+        onPress={() => setSelectedFilter(filter.type)}
+        activeOpacity={0.7}
+      >
+        <Ionicons
+          name={filter.icon as any}
+          size={16}
+          color={isSelected ? '#FFFFFF' : Colors[colorScheme ?? 'light'].text}
+          style={styles.filterIcon}
+        />
+        <Text
+          style={[
+            styles.filterBadgeText,
+            isSelected && styles.filterBadgeTextSelected,
+          ]}
+        >
+          {filter.label}
+        </Text>
+      </TouchableOpacity>
+    );
   };
 
   const renderResidentCard = ({ item }: { item: Resident }) => (
@@ -164,14 +252,55 @@ export default function UsersScreen() {
           </View>
         )}
         <View style={styles.cardInfo}>
-          <Text style={styles.fullName}>{item.fullName}</Text>
-          <View style={[
-            styles.paymentBadge,
-            item.hasUnpaidBills ? styles.unpaidBadge : styles.paidBadge
-          ]}>
-            <Text style={styles.badgeText}>
-              {item.hasUnpaidBills ? 'Unpaid' : 'Paid'}
-            </Text>
+          <View style={styles.nameContainer}>
+            <Text style={styles.fullName}>{item.fullName}</Text>
+            {item.accountNumber && (
+              <Text style={styles.accountNumber}>{item.accountNumber}</Text>
+            )}
+          </View>
+          <View style={styles.badgeContainer}>
+            {/* Payment Status Badge */}
+            {item.hasBilling && (
+              <View style={[
+                styles.paymentBadge,
+                item.hasUnpaidBills ? styles.unpaidBadge : styles.paidBadge
+              ]}>
+                <Text style={styles.badgeText}>
+                  {item.hasUnpaidBills ? 'Unpaid' : 'Paid'}
+                </Text>
+              </View>
+            )}
+            
+            {/* Meter Read Badge */}
+            <View style={[
+              styles.meterBadge,
+              item.hasBilling ? styles.meterReadBadge : styles.meterNotReadBadge
+            ]}>
+              <Ionicons
+                name={item.hasBilling ? 'speedometer' : 'speedometer-outline'}
+                size={10}
+                color={Colors[colorScheme ?? 'light'].text}
+                style={styles.meterIcon}
+              />
+              <Text style={styles.meterBadgeText}>
+                {item.hasBilling ? 'Meter Read' : 'Not Read'}
+              </Text>
+            </View>
+
+            {/* No Billing Badge */}
+            {!item.hasBilling && (
+              <View style={styles.noBillingBadge}>
+                <Ionicons
+                  name="document-text-outline"
+                  size={10}
+                  color={Colors[colorScheme ?? 'light'].text}
+                  style={styles.meterIcon}
+                />
+                <Text style={styles.noBillingBadgeText}>
+                  No Billing
+                </Text>
+              </View>
+            )}
           </View>
         </View>
         <Ionicons
@@ -207,7 +336,76 @@ export default function UsersScreen() {
       borderColor: Colors[colorScheme ?? 'light'].border,
       paddingHorizontal: 10,
       paddingVertical: 5,
-      marginBottom: 12,
+      marginBottom: 8,
+    },
+    filterContainer: {
+      paddingBottom: 8,
+    },
+    filterScrollView: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    filterBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 20,
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+      marginRight: 8,
+    },
+    filterBadgeSelected: {
+      backgroundColor: Colors[colorScheme ?? 'light'].primary,
+      borderColor: Colors[colorScheme ?? 'light'].primary,
+    },
+    filterIcon: {
+      marginRight: 6,
+    },
+    filterBadgeText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+    },
+    filterBadgeTextSelected: {
+      color: '#FFFFFF',
+    },
+    monthLabelContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      borderRadius: 8,
+      marginTop: 8,
+      marginBottom: 4,
+    },
+    monthIcon: {
+      marginRight: 6,
+    },
+    monthLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].primary,
+    },
+    noteContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 6,
+      marginTop: 4,
+      marginBottom: 8,
+    },
+    noteIcon: {
+      marginRight: 6,
+    },
+    noteText: {
+      fontSize: 12,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+      fontStyle: 'italic',
+      flex: 1,
     },
     searchIcon: {
       marginRight: 12,
@@ -290,16 +488,31 @@ export default function UsersScreen() {
     cardInfo: {
       flex: 1,
     },
+    nameContainer: {
+      flexDirection: 'column',
+    },
     fullName: {
       fontSize: 16,
       fontWeight: '600',
       color: Colors[colorScheme ?? 'light'].text,
-      marginBottom: 4,
+      marginBottom: 2,
+    },
+    accountNumber: {
+      fontSize: 12,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+      fontWeight: '400',
     },
     email: {
       fontSize: 14,
       color: Colors[colorScheme ?? 'light'].text,
       opacity: 0.6,
+    },
+    badgeContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: 6,
+      marginTop: 4,
     },
     cardDetails: {
       flexDirection: 'row',
@@ -322,7 +535,6 @@ export default function UsersScreen() {
       paddingVertical: 4,
       borderRadius: 12,
       alignSelf: 'flex-start',
-      marginTop: 4,
     },
     paidBadge: {
       backgroundColor: '#D1FAE5',
@@ -332,6 +544,42 @@ export default function UsersScreen() {
     },
     badgeText: {
       fontSize: 12,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+    },
+    meterBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 10,
+      alignSelf: 'flex-start',
+    },
+    meterReadBadge: {
+      backgroundColor: '#E0F2FE',
+    },
+    meterNotReadBadge: {
+      backgroundColor: '#FEF3C7',
+    },
+    meterIcon: {
+      marginRight: 3,
+    },
+    meterBadgeText: {
+      fontSize: 10,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+    },
+    noBillingBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 10,
+      alignSelf: 'flex-start',
+      backgroundColor: '#FFE4E6',
+    },
+    noBillingBadgeText: {
+      fontSize: 10,
       fontWeight: '600',
       color: Colors[colorScheme ?? 'light'].text,
     },
@@ -372,7 +620,7 @@ export default function UsersScreen() {
             />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search by name, email, contact, or meter..."
+              placeholder="Search..."
               placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
               value={searchText}
               onChangeText={setSearchText}
@@ -388,6 +636,43 @@ export default function UsersScreen() {
                 />
               </TouchableOpacity>
             )}
+          </View>
+
+          {/* Filter Badges */}
+          <View style={styles.filterContainer}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterScrollView}
+            >
+              {filters.map(renderFilterBadge)}
+            </ScrollView>
+          </View>
+
+          {/* Current Month Label */}
+          <View style={styles.monthLabelContainer}>
+            <Ionicons
+              name="calendar-outline"
+              size={16}
+              color={Colors[colorScheme ?? 'light'].primary}
+              style={styles.monthIcon}
+            />
+            <Text style={styles.monthLabel}>
+              {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+            </Text>
+          </View>
+
+          {/* Note */}
+          <View style={styles.noteContainer}>
+            <Ionicons
+              name="information-circle-outline"
+              size={14}
+              color={Colors[colorScheme ?? 'light'].tabIconDefault}
+              style={styles.noteIcon}
+            />
+            <Text style={styles.noteText}>
+              Note: Next month will reset and turn paid to unpaid
+            </Text>
           </View>
         </View>
 

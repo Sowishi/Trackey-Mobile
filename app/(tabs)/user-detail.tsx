@@ -28,6 +28,7 @@ import { addDoc, collection, db, doc, getDoc, getDocs, query, where } from '../.
 interface UserDetail {
   id: string;
   age?: number;
+  accountNumber?: string;
   contactNumber?: string;
   createdAt?: string;
   email: string;
@@ -62,10 +63,35 @@ export default function UserDetailScreen() {
   const [billingData, setBillingData] = useState<any[]>([]);
   const [loadingBilling, setLoadingBilling] = useState(false);
   const [processingOCR, setProcessingOCR] = useState(false);
+  const [confirmationModalVisible, setConfirmationModalVisible] = useState(false);
+  const [isConfirmed, setIsConfirmed] = useState(false);
+  const [billToSubmit, setBillToSubmit] = useState<any>(null);
+  const [waterRate, setWaterRate] = useState<number>(20.00);
 
-  const WATER_RATE_PER_CUBIC_METER = 20; // 20 pesos per cubic meter
+  // Fetch water rate from Firestore settings
+  const fetchWaterRate = async (): Promise<number> => {
+    try {
+      const settingsRef = doc(db, 'settings', 'kRaw13WFzXqfemqvdGPx');
+      const settingsSnap = await getDoc(settingsRef);
+      
+      if (settingsSnap.exists()) {
+        const data = settingsSnap.data();
+        const rate = parseFloat(data.currentWaterRate || data.waterRate || '20.00');
+        return isNaN(rate) ? 20.00 : rate;
+      }
+      return 20.00; // Default fallback
+    } catch (error) {
+      console.error('Error fetching water rate:', error);
+      return 20.00; // Default fallback
+    }
+  };
 
   useEffect(() => {
+    // Fetch water rate on component mount
+    fetchWaterRate().then(rate => {
+      setWaterRate(rate);
+    });
+    
     if (userId) {
       fetchUserDetail();
     }
@@ -78,15 +104,17 @@ export default function UserDetailScreen() {
       const previousValue = parseFloat(previousConsumption);
       if (!isNaN(presentValue) && !isNaN(previousValue) && presentValue > previousValue) {
         const consumptionDiff = presentValue - previousValue;
-        const calculatedTotal = consumptionDiff * WATER_RATE_PER_CUBIC_METER;
-        setTotalAmount(calculatedTotal.toFixed(2));
+        const calculatedTotal = consumptionDiff * waterRate;
+        // Apply minimum payment of 150 if consumption is less than 10
+        const finalTotal = consumptionDiff < 10 ? 150 : calculatedTotal;
+        setTotalAmount(finalTotal.toFixed(2));
       } else {
         setTotalAmount('');
       }
     } else {
       setTotalAmount('');
     }
-  }, [presentConsumption, previousConsumption]);
+  }, [presentConsumption, previousConsumption, waterRate]);
 
   const fetchUserDetail = async () => {
     try {
@@ -107,6 +135,7 @@ export default function UserDetailScreen() {
         setUserDetail({
           id: userDocSnap.id,
           age: userData.age,
+          accountNumber: userData.accountNumber,
           contactNumber: userData.contactNumber,
           createdAt: userData.createdAt,
           email: userData.email,
@@ -154,8 +183,25 @@ export default function UserDetailScreen() {
     });
   };
 
+  const formatCurrency = (amount: string) => {
+    if (!amount) return '';
+    const numValue = parseFloat(amount);
+    if (isNaN(numValue)) return amount;
+    return numValue.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
   const getInitials = (name: string) => {
     return name.split(' ').map((n) => n[0]).join('').toUpperCase();
+  };
+
+  // Calculate due date: 29 days after present date
+  const calculateDueDate = (presentDate: Date): Date => {
+    const dueDate = new Date(presentDate);
+    dueDate.setDate(dueDate.getDate() + 29);
+    return dueDate;
   };
 
   const handleAddBill = async () => {
@@ -178,33 +224,54 @@ export default function UserDetailScreen() {
         });
       });
       
-      // Sort by createdAt to get the most recent bill
-      bills.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      // Check if a bill for the current month already exists
+      const currentMonthString = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      const currentMonthBill = bills.find(bill => bill.month === currentMonthString);
       
-      if (bills.length > 0) {
-        const lastBill = bills[0];
-        // Set previous data from the last bill's present data
-        setPreviousCoverageDate(new Date(lastBill.coverageDateTo));
-        setPreviousConsumption(lastBill.consumption.toString());
-      } else {
-        // First bill - set previous to null/empty
-        setPreviousCoverageDate(null);
-        setPreviousConsumption('0');
+      if (currentMonthBill) {
+        Alert.alert(
+          'Warning',
+          `A bill for ${currentMonthString} already exists for this user.`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+          ]
+        );
+        return;
       }
       
-      // Set present date to today by default
-      setPresentDate(new Date());
-      setPresentConsumption('');
-      setDueDate(new Date());
-      setTotalAmount('');
-      setShowDatePicker(null);
-      
-      // Open form modal
-      setFormModalVisible(true);
+      proceedToAddBill(bills);
     } catch (error) {
       console.error('Error fetching last bill:', error);
       alert('Failed to load previous bill data');
     }
+  };
+
+  const proceedToAddBill = (bills: any[]) => {
+    // Sort by createdAt to get the most recent bill
+    bills.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    
+    if (bills.length > 0) {
+      const lastBill = bills[0];
+      // Set previous data from the last bill's present data
+      setPreviousCoverageDate(new Date(lastBill.coverageDateTo));
+      setPreviousConsumption(lastBill.consumption.toString());
+    } else {
+      // First bill - set previous to null/empty
+      setPreviousCoverageDate(null);
+      setPreviousConsumption('0');
+    }
+    
+    // Set present date to today by default
+    const today = new Date();
+    setPresentDate(today);
+    setPresentConsumption('');
+    // Automatically calculate due date (29 days after present date)
+    setDueDate(calculateDueDate(today));
+    setTotalAmount('');
+    setShowDatePicker(null);
+    
+    // Open form modal
+    setFormModalVisible(true);
   };
 
   const handleSubmitBill = async () => {
@@ -226,8 +293,9 @@ export default function UserDetailScreen() {
 
     const consumptionDiff = presentConsumptionValue - previousConsumptionValue;
 
-    // Validate the calculation
-    const expectedAmount = consumptionDiff * WATER_RATE_PER_CUBIC_METER;
+    // Validate the calculation (with minimum payment of 150 if consumption < 10)
+    const calculatedAmount = consumptionDiff * waterRate;
+    const expectedAmount = consumptionDiff < 10 ? 150 : calculatedAmount;
     if (Math.abs(amountValueFloat - expectedAmount) > 0.01) {
       alert('Amount calculation mismatch. Please check the consumption values.');
       return;
@@ -238,17 +306,30 @@ export default function UserDetailScreen() {
       return;
     }
 
-    setSubmittingBill(true);
-
     try {
       // Generate month string from present date
       const monthString = presentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
-      // Prepare bill data
+      // Check if a bill for this month already exists
+      const billingRef = collection(db, 'billing');
+      const monthCheckQuery = query(
+        billingRef,
+        where('userId', '==', userDetail.id),
+        where('month', '==', monthString)
+      );
+      const existingBillsSnapshot = await getDocs(monthCheckQuery);
+
+      if (!existingBillsSnapshot.empty) {
+        alert(`A bill for ${monthString} already exists for this user. Cannot create duplicate billing for the same month.`);
+        return;
+      }
+
+      // Prepare bill data for confirmation
       const billData = {
         userId: userDetail.id,
         userEmail: userDetail.email,
         userName: userDetail.fullName,
+        accountNumber: userDetail.accountNumber,
         meterNumber: userDetail.meterNumber || '',
         month: monthString,
         coverageDateFrom: previousCoverageDate ? previousCoverageDate.toISOString() : presentDate.toISOString(),
@@ -257,32 +338,56 @@ export default function UserDetailScreen() {
         previousConsumption: previousConsumptionValue,
         consumption: presentConsumptionValue,
         consumptionUsed: consumptionDiff,
-        waterRatePerCubicMeter: WATER_RATE_PER_CUBIC_METER,
+        waterRatePerCubicMeter: waterRate,
         totalAmount: amountValueFloat,
-        status: 'unpaid', // Default status
+        status: 'unpaid',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
+      // Store bill data and show confirmation modal
+      setBillToSubmit(billData);
+      setIsConfirmed(false);
+      setConfirmationModalVisible(true);
+    } catch (error) {
+      console.error('Error preparing bill:', error);
+      alert('Failed to prepare bill. Please try again.');
+    }
+  };
+
+  const handleConfirmAndSubmit = async () => {
+    if (!isConfirmed) {
+      alert('Please confirm that the billing information is correct');
+      return;
+    }
+
+    if (!billToSubmit) {
+      alert('No billing data to submit');
+      return;
+    }
+
+    setSubmittingBill(true);
+
+    try {
       // Save to Firestore billing collection
       const billingRef = collection(db, 'billing');
-      const docRef = await addDoc(billingRef, billData);
+      const docRef = await addDoc(billingRef, billToSubmit);
       
       // Add document ID to bill data for receipt
       const receiptBillData = {
-        ...billData,
+        ...billToSubmit,
         id: docRef.id,
       };
 
       // Create notification for the user about the new bill
       try {
         const notificationData = {
-          userId: userDetail.id,
-          userEmail: userDetail.email,
-          userName: userDetail.fullName,
+          userId: billToSubmit.userId,
+          userEmail: billToSubmit.userEmail,
+          userName: billToSubmit.userName,
           type: 'bill_created',
-          title: 'New Bill Generated',
-          message: `A new water bill for ${monthString} (₱${amountValueFloat.toFixed(2)}) has been generated. Please check your dashboard.`,
+          title: 'Bill Noticed',
+          message: `A new water bill for ${billToSubmit.month} (₱${billToSubmit.totalAmount.toFixed(2)}) has been generated. Please check your dashboard.`,
           billId: docRef.id,
           status: 'unread',
           createdAt: new Date().toISOString(),
@@ -292,13 +397,95 @@ export default function UserDetailScreen() {
         await addDoc(notificationsRef, notificationData);
         console.log('Notification created successfully for bill:', docRef.id);
       } catch (notificationError) {
-        // Log error but don't fail the bill creation
         console.error('Error creating notification:', notificationError);
-        // Bill is already saved, so we continue even if notification fails
       }
 
-      // Close form and reset
+      // Send SMS notification to user
+      try {
+        console.log('=== SMS NOTIFICATION START ===');
+        
+        if (!userDetail?.contactNumber) {
+          console.log('❌ No contact number available for SMS notification');
+          console.log('User Detail:', userDetail);
+          console.log('=== SMS NOTIFICATION END ===');
+          return;
+        }
+
+        const phoneNumber = userDetail.contactNumber.replace(/[^0-9]/g, '');
+        console.log('📱 Original Contact Number:', userDetail.contactNumber);
+        console.log('📱 Cleaned Phone Number:', phoneNumber);
+        
+        const smsMessage = `WATER BILLING NOTICE
+        ${billToSubmit.userName}
+        Billing Period: ${billToSubmit.month}
+        Usage: ${billToSubmit.consumptionUsed.toFixed(2)}
+        Rate: PHP ${billToSubmit.waterRatePerCubicMeter} per cubic meter
+        AMOUNT DUE: PHP ${billToSubmit.totalAmount.toFixed(2)}
+        Due Date: ${formatDateForBill(billToSubmit.dueDate)}
+        Please pay on or before due date. Thank you.`;
+
+        console.log('📄 SMS Message:', smsMessage);
+
+        const smsApiUrl = 'https://sms.iprogtech.com/api/v1/sms_messages';
+        const requestBody = {
+          api_token: '22db33496bbfdb9e6557cf841d80f9ef0c809ccd',
+          phone_number: phoneNumber,
+          message: smsMessage,
+        };
+
+        console.log('🌐 SMS API URL:', smsApiUrl);
+        console.log('📦 Request Body:', JSON.stringify(requestBody, null, 2));
+        
+        const smsResponse = await fetch(smsApiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
+        });
+
+        console.log('📊 Response Status:', smsResponse.status);
+        console.log('📊 Response Status Text:', smsResponse.statusText);
+        console.log('📊 Response Headers:', JSON.stringify(Object.fromEntries(smsResponse.headers.entries()), null, 2));
+
+        if (smsResponse.ok) {
+          try {
+            const responseData = await smsResponse.json();
+            console.log('✅ SMS sent successfully!');
+            console.log('📥 Response Data:', JSON.stringify(responseData, null, 2));
+          } catch (jsonError) {
+            const responseText = await smsResponse.text();
+            console.log('✅ SMS sent successfully (non-JSON response)');
+            console.log('📥 Response Text:', responseText);
+          }
+        } else {
+          try {
+            const errorData = await smsResponse.json();
+            console.error('❌ SMS sending failed (JSON error):');
+            console.error('Error Data:', JSON.stringify(errorData, null, 2));
+          } catch (jsonError) {
+            const errorText = await smsResponse.text();
+            console.error('❌ SMS sending failed (Text error):');
+            console.error('Error Text:', errorText);
+          }
+        }
+        
+        console.log('=== SMS NOTIFICATION END ===');
+      } catch (smsError: any) {
+        console.error('❌ SMS Exception occurred:');
+        console.error('Error Name:', smsError?.name);
+        console.error('Error Message:', smsError?.message);
+        console.error('Error Stack:', smsError?.stack);
+        console.error('Full Error:', smsError);
+        console.log('=== SMS NOTIFICATION END (WITH ERROR) ===');
+        // Don't fail the billing creation if SMS fails
+      }
+
+      // Close modals and reset
+      setConfirmationModalVisible(false);
       setFormModalVisible(false);
+      setBillToSubmit(null);
+      setIsConfirmed(false);
       setPreviousCoverageDate(null);
       setPreviousConsumption('');
       setPresentDate(null);
@@ -353,7 +540,19 @@ export default function UserDetailScreen() {
       // Sort by createdAt (newest first)
       bills.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-      setBillingData(bills);
+      // Filter out duplicate months, keeping only the most recent bill for each month
+      const uniqueMonthBills: any[] = [];
+      const seenMonths = new Set<string>();
+
+      bills.forEach((bill) => {
+        const month = bill.month || 'Unknown';
+        if (!seenMonths.has(month)) {
+          seenMonths.add(month);
+          uniqueMonthBills.push(bill);
+        }
+      });
+
+      setBillingData(uniqueMonthBills);
     } catch (error) {
       console.error('Error fetching billing:', error);
       alert('Failed to fetch billing data');
@@ -378,18 +577,6 @@ export default function UserDetailScreen() {
     } catch {
       return dateString;
     }
-  };
-
-  const groupBillsByMonth = (bills: any[]) => {
-    const grouped: { [key: string]: any[] } = {};
-    bills.forEach((bill) => {
-      const month = bill.month || 'Unknown';
-      if (!grouped[month]) {
-        grouped[month] = [];
-      }
-      grouped[month].push(bill);
-    });
-    return grouped;
   };
 
   const renderBillItem = ({ item }: { item: any }) => {
@@ -449,6 +636,8 @@ export default function UserDetailScreen() {
       if (event.type === 'set') {
         if (field === 'present') {
           setPresentDate(currentDate);
+          // Automatically calculate due date (29 days later)
+          setDueDate(calculateDueDate(currentDate));
         } else if (field === 'due') {
           setDueDate(currentDate);
         }
@@ -457,6 +646,8 @@ export default function UserDetailScreen() {
       // iOS
       if (field === 'present') {
         setPresentDate(currentDate);
+        // Automatically calculate due date (29 days later)
+        setDueDate(calculateDueDate(currentDate));
       } else if (field === 'due') {
         setDueDate(currentDate);
       }
@@ -626,12 +817,22 @@ export default function UserDetailScreen() {
       fontWeight: 'bold',
       color: Colors[colorScheme ?? 'light'].primary,
     },
+    nameContainer: {
+      flexDirection: 'column',
+      alignItems: 'center',
+    },
     nameText: {
       fontSize: 26,
       fontWeight: 'bold',
       color: Colors[colorScheme ?? 'light'].text,
       textAlign: 'center',
-      marginBottom: 8,
+      marginBottom: 4,
+    },
+    accountNumberText: {
+      fontSize: 14,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+      fontWeight: '400',
+      textAlign: 'center',
     },
     roleText: {
       fontSize: 16,
@@ -675,6 +876,15 @@ export default function UserDetailScreen() {
       fontSize: 15,
       color: Colors[colorScheme ?? 'light'].text,
       fontWeight: '600',
+    },
+    accountNumberInfoContainer: {
+      flexDirection: 'column',
+    },
+    accountNumberInfo: {
+      fontSize: 12,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+      fontWeight: '400',
+      marginTop: 2,
     },
     statusBadge: {
       paddingHorizontal: 12,
@@ -1077,6 +1287,175 @@ export default function UserDetailScreen() {
       shadowRadius: 4,
       elevation: 4,
     },
+    confirmationOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+    },
+    confirmationModalContent: {
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      borderRadius: 24,
+      width: '100%',
+      maxHeight: '90%',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 8,
+    },
+    confirmationHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors[colorScheme ?? 'light'].border,
+    },
+    confirmationTitle: {
+      fontSize: 22,
+      fontWeight: 'bold',
+      color: Colors[colorScheme ?? 'light'].text,
+    },
+    confirmationContent: {
+      padding: 20,
+      maxHeight: '70%',
+    },
+    confirmationSubtitle: {
+      fontSize: 14,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+      marginBottom: 20,
+      textAlign: 'center',
+    },
+    confirmationDetailsContainer: {
+      gap: 16,
+    },
+    confirmationSection: {
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      borderRadius: 12,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+    },
+    confirmationSectionTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: Colors[colorScheme ?? 'light'].primary,
+      marginBottom: 12,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    confirmationRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: 10,
+    },
+    confirmationLabel: {
+      fontSize: 14,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+      fontWeight: '500',
+      flex: 1,
+    },
+    confirmationValue: {
+      fontSize: 14,
+      color: Colors[colorScheme ?? 'light'].text,
+      fontWeight: '600',
+      flex: 1,
+      textAlign: 'right',
+    },
+    confirmationHighlight: {
+      color: Colors[colorScheme ?? 'light'].primary,
+      fontWeight: '700',
+    },
+    confirmationTotalSection: {
+      backgroundColor: Colors[colorScheme ?? 'light'].primary + '15',
+      borderColor: Colors[colorScheme ?? 'light'].primary,
+      borderWidth: 2,
+    },
+    confirmationTotalLabel: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: Colors[colorScheme ?? 'light'].text,
+      flex: 1,
+    },
+    confirmationTotalValue: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: Colors[colorScheme ?? 'light'].primary,
+      flex: 1,
+      textAlign: 'right',
+    },
+    checkboxContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      padding: 16,
+      borderRadius: 12,
+      borderWidth: 2,
+      borderColor: Colors[colorScheme ?? 'light'].primary,
+      marginTop: 8,
+      marginBottom: 50,
+    },
+    checkbox: {
+      width: 24,
+      height: 24,
+      borderRadius: 6,
+      borderWidth: 2,
+      borderColor: Colors[colorScheme ?? 'light'].primary,
+      marginRight: 12,
+      justifyContent: 'center',
+      alignItems: 'center',
+    
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+    },
+    checkboxChecked: {
+      backgroundColor: Colors[colorScheme ?? 'light'].primary,
+      borderColor: Colors[colorScheme ?? 'light'].primary,
+    },
+    checkboxLabel: {
+      flex: 1,
+      fontSize: 14,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+      lineHeight: 20,
+    },
+    confirmationFooter: {
+      flexDirection: 'row',
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderTopWidth: 1,
+      borderTopColor: Colors[colorScheme ?? 'light'].border,
+    },
+    confirmationCancelButton: {
+      flex: 1,
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      paddingVertical: 16,
+      borderRadius: 12,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+    },
+    confirmationCancelButtonText: {
+      color: Colors[colorScheme ?? 'light'].text,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    confirmationSubmitButton: {
+      flex: 1,
+      backgroundColor: Colors[colorScheme ?? 'light'].primary,
+      paddingVertical: 16,
+      borderRadius: 12,
+      alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'center',
+    },
+    confirmationSubmitButtonText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '600',
+    },
   });
 
   if (loading) {
@@ -1137,12 +1516,36 @@ export default function UserDetailScreen() {
                 </Text>
               </View>
             )}
-            <Text style={styles.nameText}>{userDetail.fullName}</Text>
+            <View style={styles.nameContainer}>
+              <Text style={styles.nameText}>{userDetail.fullName}</Text>
+              {userDetail.accountNumber && (
+                <Text style={styles.accountNumberText}>{userDetail.accountNumber}</Text>
+              )}
+            </View>
             <Text style={styles.roleText}>{userDetail.role}</Text>
           </View>
 
           {/* User Information */}
           <View style={styles.infoSection}>
+            {userDetail.accountNumber && (
+              <View style={styles.infoItem}>
+                <View style={styles.infoIcon}>
+                  <Ionicons
+                    name="card"
+                    size={20}
+                    color={Colors[colorScheme ?? 'light'].primary}
+                  />
+                </View>
+                <View style={styles.infoContent}>
+                  <Text style={styles.infoLabel}>Account Number</Text>
+                  <View style={styles.accountNumberInfoContainer}>
+                    <Text style={styles.infoValue}>{userDetail.fullName}</Text>
+                    <Text style={styles.accountNumberInfo}>{userDetail.accountNumber}</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
             <View style={styles.infoItem}>
               <View style={styles.infoIcon}>
                 <Ionicons
@@ -1503,12 +1906,12 @@ export default function UserDetailScreen() {
                   style={[styles.formInput, styles.readOnlyInput]}
                   placeholder="Auto-calculated"
                   placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
-                  value={totalAmount ? `₱${totalAmount}` : ''}
+                  value={totalAmount ? `₱${formatCurrency(totalAmount)}` : ''}
                   editable={false}
                   keyboardType="decimal-pad"
                 />
                 <Text style={styles.rateInfo}>
-                  Rate: ₱{WATER_RATE_PER_CUBIC_METER.toFixed(2)} per cubic meter
+                  Rate: ₱{waterRate.toFixed(2)} per cubic meter
                 </Text>
               </View>
             </ScrollView>
@@ -1522,18 +1925,10 @@ export default function UserDetailScreen() {
               </TouchableOpacity>
               <View style={styles.formButtonSpacing} />
               <TouchableOpacity
-                style={[styles.submitButton, submittingBill && styles.disabledButton]}
+                style={styles.submitButton}
                 onPress={handleSubmitBill}
-                disabled={submittingBill}
               >
-                {submittingBill ? (
-                  <View style={styles.submitButtonContent}>
-                    <ActivityIndicator size="small" color="#FFFFFF" style={styles.submitButtonSpinner} />
-                    <Text style={styles.submitButtonText}>Submitting...</Text>
-                  </View>
-                ) : (
-                  <Text style={styles.submitButtonText}>Submit</Text>
-                )}
+                <Text style={styles.submitButtonText}>Review & Continue</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1591,6 +1986,176 @@ export default function UserDetailScreen() {
             )}
           </View>
         </Pressable>
+      </Modal>
+
+      {/* Confirmation Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={confirmationModalVisible}
+        onRequestClose={() => setConfirmationModalVisible(false)}
+      >
+        <View style={styles.confirmationOverlay}>
+          <View style={styles.confirmationModalContent}>
+            <View style={styles.confirmationHeader}>
+              <Text style={styles.confirmationTitle}>Confirm Billing Details</Text>
+              <TouchableOpacity
+                onPress={() => setConfirmationModalVisible(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons
+                  name="close"
+                  size={24}
+                  color={Colors[colorScheme ?? 'light'].text}
+                />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.confirmationContent}>
+              <Text style={styles.confirmationSubtitle}>
+                Please review the billing information carefully before submitting
+              </Text>
+
+              {billToSubmit && (
+                <View style={styles.confirmationDetailsContainer}>
+                  {/* User Info Section */}
+                  <View style={styles.confirmationSection}>
+                    <Text style={styles.confirmationSectionTitle}>User Information</Text>
+                    {billToSubmit.accountNumber && (
+                      <View style={styles.confirmationRow}>
+                        <Text style={styles.confirmationLabel}>Account Number:</Text>
+                        <Text style={styles.confirmationValue}>{billToSubmit.accountNumber}</Text>
+                      </View>
+                    )}
+                    <View style={styles.confirmationRow}>
+                      <Text style={styles.confirmationLabel}>Name:</Text>
+                      <Text style={styles.confirmationValue}>{billToSubmit.userName}</Text>
+                    </View>
+                    <View style={styles.confirmationRow}>
+                      <Text style={styles.confirmationLabel}>Email:</Text>
+                      <Text style={styles.confirmationValue}>{billToSubmit.userEmail}</Text>
+                    </View>
+                    {billToSubmit.meterNumber && (
+                      <View style={styles.confirmationRow}>
+                        <Text style={styles.confirmationLabel}>Meter Number:</Text>
+                        <Text style={styles.confirmationValue}>{billToSubmit.meterNumber}</Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Billing Period Section */}
+                  <View style={styles.confirmationSection}>
+                    <Text style={styles.confirmationSectionTitle}>Billing Period</Text>
+                    <View style={styles.confirmationRow}>
+                      <Text style={styles.confirmationLabel}>Month:</Text>
+                      <Text style={[styles.confirmationValue, styles.confirmationHighlight]}>
+                        {billToSubmit.month}
+                      </Text>
+                    </View>
+                    <View style={styles.confirmationRow}>
+                      <Text style={styles.confirmationLabel}>Coverage:</Text>
+                      <Text style={styles.confirmationValue}>
+                        {formatDateForBill(billToSubmit.coverageDateFrom)} - {formatDateForBill(billToSubmit.coverageDateTo)}
+                      </Text>
+                    </View>
+                    <View style={styles.confirmationRow}>
+                      <Text style={styles.confirmationLabel}>Due Date:</Text>
+                      <Text style={styles.confirmationValue}>
+                        {formatDateForBill(billToSubmit.dueDate)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Consumption Section */}
+                  <View style={styles.confirmationSection}>
+                    <Text style={styles.confirmationSectionTitle}>Water Consumption</Text>
+                    <View style={styles.confirmationRow}>
+                      <Text style={styles.confirmationLabel}>Previous Reading:</Text>
+                      <Text style={styles.confirmationValue}>{billToSubmit.previousConsumption} m³</Text>
+                    </View>
+                    <View style={styles.confirmationRow}>
+                      <Text style={styles.confirmationLabel}>Present Reading:</Text>
+                      <Text style={styles.confirmationValue}>{billToSubmit.consumption} m³</Text>
+                    </View>
+                    <View style={styles.confirmationRow}>
+                      <Text style={styles.confirmationLabel}>Consumption Used:</Text>
+                      <Text style={[styles.confirmationValue, styles.confirmationHighlight]}>
+                        {billToSubmit.consumptionUsed.toFixed(2)} m³
+                      </Text>
+                    </View>
+                    <View style={styles.confirmationRow}>
+                      <Text style={styles.confirmationLabel}>Rate per m³:</Text>
+                      <Text style={styles.confirmationValue}>
+                        ₱{billToSubmit.waterRatePerCubicMeter.toFixed(2)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Total Amount Section */}
+                  <View style={[styles.confirmationSection, styles.confirmationTotalSection]}>
+                    <View style={styles.confirmationRow}>
+                      <Text style={styles.confirmationTotalLabel}>Total Amount:</Text>
+                      <Text style={styles.confirmationTotalValue}>
+                        ₱{billToSubmit.totalAmount.toFixed(2)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Confirmation Checkbox */}
+                  <TouchableOpacity
+                    style={styles.checkboxContainer}
+                    onPress={() => setIsConfirmed(!isConfirmed)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.checkbox, isConfirmed && styles.checkboxChecked]}>
+                      {isConfirmed && (
+                        <Ionicons
+                          name="checkmark"
+                          size={18}
+                          color="#FFFFFF"
+                        />
+                      )}
+                    </View>
+                    <Text style={styles.checkboxLabel}>
+                      I confirm that all billing information above is correct
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </ScrollView>
+
+            <View style={styles.confirmationFooter}>
+              <TouchableOpacity
+                style={[styles.confirmationCancelButton, submittingBill && styles.disabledButton]}
+                onPress={() => setConfirmationModalVisible(false)}
+                disabled={submittingBill}
+              >
+                <Text style={styles.confirmationCancelButtonText}>Back</Text>
+              </TouchableOpacity>
+              <View style={styles.formButtonSpacing} />
+              <TouchableOpacity
+                style={[
+                  styles.confirmationSubmitButton,
+                  (!isConfirmed || submittingBill) && styles.disabledButton
+                ]}
+                onPress={handleConfirmAndSubmit}
+                disabled={!isConfirmed || submittingBill}
+              >
+                {submittingBill ? (
+                  <View style={styles.submitButtonContent}>
+                    <ActivityIndicator size="small" color="#FFFFFF" style={styles.submitButtonSpinner} />
+                    <Text style={styles.confirmationSubmitButtonText}>Submitting...</Text>
+                  </View>
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" style={styles.buttonIcon} />
+                    <Text style={styles.confirmationSubmitButtonText}>Confirm</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
 
     </SafeAreaView>

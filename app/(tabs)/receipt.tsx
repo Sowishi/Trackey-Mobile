@@ -5,6 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as MediaLibrary from 'expo-media-library';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
+import { doc, getDoc } from '../../firebase';
+import { db } from '../../firebase';
 import {
   ActivityIndicator,
   Alert,
@@ -24,9 +26,28 @@ export default function ReceiptScreen() {
   const params = useLocalSearchParams();
   const receiptRef = useRef<View>(null);
   const [saving, setSaving] = useState(false);
+  const [waterRate, setWaterRate] = useState<number>(20.00);
 
   // Parse bill data from params
   const billData = params.billData ? JSON.parse(params.billData as string) : null;
+
+  // Fetch water rate from Firestore settings (same logic as dashboard)
+  const fetchWaterRate = async (): Promise<number> => {
+    try {
+      const settingsRef = doc(db, 'settings', 'kRaw13WFzXqfemqvdGPx');
+      const settingsSnap = await getDoc(settingsRef);
+      
+      if (settingsSnap.exists()) {
+        const data = settingsSnap.data();
+        const rate = parseFloat(data.currentWaterRate || data.waterRate || '20.00');
+        return isNaN(rate) ? 20.00 : rate;
+      }
+      return 20.00; // Default fallback
+    } catch (error) {
+      console.error('Error fetching water rate:', error);
+      return 20.00; // Default fallback
+    }
+  };
 
   useEffect(() => {
     // Request media library permissions
@@ -38,6 +59,13 @@ export default function ReceiptScreen() {
         }
       }
     })();
+
+    // Fetch water rate
+    const loadWaterRate = async () => {
+      const rate = await fetchWaterRate();
+      setWaterRate(rate);
+    };
+    loadWaterRate();
   }, []);
 
   const formatDate = (dateString: string) => {
@@ -372,7 +400,7 @@ export default function ReceiptScreen() {
             )}
             <View style={styles.receiptRow}>
               <Text style={styles.receiptLabel}>Rate per m³:</Text>
-              <Text style={styles.receiptValue}>₱{billData.waterRatePerCubicMeter.toFixed(2)}</Text>
+              <Text style={styles.receiptValue}>₱{waterRate.toFixed(2)}</Text>
             </View>
             <View style={styles.receiptRow}>
               <Text style={styles.receiptLabel}>Status:</Text>
