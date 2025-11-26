@@ -2163,19 +2163,7 @@ export default function DashboardScreen() {
                   <Text style={styles.serviceLabel}>Meter Calculator</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity 
-                  style={styles.serviceItem}
-                  onPress={handleRefresh}
-                >
-                  <View style={styles.serviceIconContainer}>
-                    <Ionicons 
-                      name="refresh" 
-                      size={28} 
-                      color={Colors[colorScheme ?? 'light'].primary} 
-                    />
-                  </View>
-                  <Text style={styles.serviceLabel}>Refresh</Text>
-                </TouchableOpacity>
+        
 
                 <TouchableOpacity 
                   style={styles.serviceItem}
@@ -2760,43 +2748,7 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {/* Quick Actions */}
-        <View style={styles.quickActionsContainer}>
-          <Text style={styles.statsTitle}>Quick Actions</Text>
-          <View style={styles.quickActionsGrid}>
-            <TouchableOpacity 
-              style={styles.quickActionButton}
-              onPress={() => router.push('/(tabs)/users')}
-            >
-              <Ionicons name="people-outline" size={28} color={Colors[colorScheme ?? 'light'].primary} />
-              <Text style={styles.quickActionText}>View Users</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.quickActionButton}
-              onPress={() => router.push('/(tabs)/payment-history')}
-            >
-              <Ionicons name="document-text-outline" size={28} color={Colors[colorScheme ?? 'light'].primary} />
-              <Text style={styles.quickActionText}>Payments</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.quickActionButton}
-              onPress={() => router.push('/(tabs)/notifications')}
-            >
-              <Ionicons name="notifications-outline" size={28} color={Colors[colorScheme ?? 'light'].primary} />
-              <Text style={styles.quickActionText}>Notifications</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.quickActionButton}
-              onPress={handleRefresh}
-            >
-              <Ionicons name="refresh-outline" size={28} color={Colors[colorScheme ?? 'light'].primary} />
-              <Text style={styles.quickActionText}>Refresh</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+     
 
       </ScrollView>
 
