@@ -400,7 +400,7 @@ export default function ReceiptScreen() {
             )}
             <View style={styles.receiptRow}>
               <Text style={styles.receiptLabel}>Rate per m³:</Text>
-              <Text style={styles.receiptValue}>₱{waterRate.toFixed(2)}</Text>
+              <Text style={styles.receiptValue}>₱{waterRate.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
             </View>
             <View style={styles.receiptRow}>
               <Text style={styles.receiptLabel}>Status:</Text>
@@ -421,7 +421,7 @@ export default function ReceiptScreen() {
           <View style={styles.totalSection}>
             <View style={styles.totalRow}>
               <Text style={styles.totalLabel}>Total Amount:</Text>
-              <Text style={styles.totalValue}>₱{billData.totalAmount.toFixed(2)}</Text>
+              <Text style={styles.totalValue}>₱{billData.totalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
             </View>
           </View>
 

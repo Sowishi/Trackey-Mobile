@@ -387,7 +387,7 @@ export default function UserDetailScreen() {
           userName: billToSubmit.userName,
           type: 'bill_created',
           title: 'Bill Noticed',
-          message: `A new water bill for ${billToSubmit.month} (₱${billToSubmit.totalAmount.toFixed(2)}) has been generated. Please check your dashboard.`,
+          message: `A new water bill for ${billToSubmit.month} (₱${billToSubmit.totalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}) has been generated. Please check your dashboard.`,
           billId: docRef.id,
           status: 'unread',
           createdAt: new Date().toISOString(),
@@ -419,8 +419,8 @@ export default function UserDetailScreen() {
         ${billToSubmit.userName}
         Billing Period: ${billToSubmit.month}
         Usage: ${billToSubmit.consumptionUsed.toFixed(2)}
-        Rate: PHP ${billToSubmit.waterRatePerCubicMeter} per cubic meter
-        AMOUNT DUE: PHP ${billToSubmit.totalAmount.toFixed(2)}
+        Rate: ₱${billToSubmit.waterRatePerCubicMeter} per cubic meter
+        AMOUNT DUE: ₱${billToSubmit.totalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         Due Date: ${formatDateForBill(billToSubmit.dueDate)}
         Please pay on or before due date. Thank you.`;
 
@@ -621,7 +621,7 @@ export default function UserDetailScreen() {
           </View>
           <View style={styles.billDetailRow}>
             <Text style={styles.billDetailLabel}>Total Amount:</Text>
-            <Text style={styles.billDetailAmount}>₱{item.totalAmount.toFixed(2)}</Text>
+            <Text style={styles.billDetailAmount}>₱{item.totalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
           </View>
         </View>
       </View>
@@ -1901,7 +1901,7 @@ export default function UserDetailScreen() {
 
               {/* Total Amount */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Total Amount (PHP)</Text>
+                <Text style={styles.formLabel}>Total Amount (₱)</Text>
                 <TextInput
                   style={[styles.formInput, styles.readOnlyInput]}
                   placeholder="Auto-calculated"
@@ -1911,7 +1911,7 @@ export default function UserDetailScreen() {
                   keyboardType="decimal-pad"
                 />
                 <Text style={styles.rateInfo}>
-                  Rate: ₱{waterRate.toFixed(2)} per cubic meter
+                  Rate: ₱{waterRate.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per cubic meter
                 </Text>
               </View>
             </ScrollView>
@@ -2086,7 +2086,7 @@ export default function UserDetailScreen() {
                     <View style={styles.confirmationRow}>
                       <Text style={styles.confirmationLabel}>Rate per m³:</Text>
                       <Text style={styles.confirmationValue}>
-                        ₱{billToSubmit.waterRatePerCubicMeter.toFixed(2)}
+                        ₱{billToSubmit.waterRatePerCubicMeter.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </Text>
                     </View>
                   </View>
@@ -2096,7 +2096,7 @@ export default function UserDetailScreen() {
                     <View style={styles.confirmationRow}>
                       <Text style={styles.confirmationTotalLabel}>Total Amount:</Text>
                       <Text style={styles.confirmationTotalValue}>
-                        ₱{billToSubmit.totalAmount.toFixed(2)}
+                        ₱{billToSubmit.totalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </Text>
                     </View>
                   </View>

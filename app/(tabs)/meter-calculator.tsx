@@ -178,7 +178,7 @@ export default function MeterCalculatorScreen() {
 
     Alert.alert(
       'Calculation Result',
-      `Consumption: ${consumption.toFixed(2)} m³\nEstimated Price: ₱${price.toFixed(2)}`,
+      `Consumption: ${consumption.toFixed(2)} m³\nEstimated Price: ₱${price.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       [{ text: 'OK' }]
     );
   };
@@ -429,12 +429,12 @@ export default function MeterCalculatorScreen() {
             <View style={[styles.resultRow, { marginTop: 8, paddingTop: 16, borderTopWidth: 1, borderTopColor: Colors[colorScheme ?? 'light'].border }]}>
               <Text style={styles.resultLabel}>Estimated Price:</Text>
               <Text style={styles.priceValue}>
-                ₱{price.toFixed(2)}
+                ₱{price.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </Text>
             </View>
 
             <Text style={styles.infoText}>
-              Rate: ₱{waterRate.toFixed(2)} per cubic meter
+              Rate: ₱{waterRate.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per cubic meter
             </Text>
           </View>
         )}

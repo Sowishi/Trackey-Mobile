@@ -285,7 +285,7 @@ export default function NotificationsScreen() {
         </View>
         <View style={styles.notificationContent}>
           <Text style={styles.notificationTitle}>
-            {item.isAnnouncement && '📢 '}
+            {item.isAnnouncement}
             {item.title}
           </Text>
           {isCollector && item.userName && !item.isAnnouncement && (

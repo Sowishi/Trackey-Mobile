@@ -451,7 +451,7 @@ export default function BillingInformationScreen() {
         userName: user?.name || '',
         type: 'payment_submitted',
         title: 'Payment Submitted',
-        message: `Payment of ₱${selectedBill.totalAmount.toFixed(2)} for ${selectedBill.month} has been submitted via ${finalPaymentMethod}`,
+        message: `Payment of ₱${selectedBill.totalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} for ${selectedBill.month} has been submitted via ${finalPaymentMethod}`,
         paymentId: paymentDocRef.id,
         billId: selectedBill.id,
         paymentProof: paymentProofURL,
@@ -567,17 +567,17 @@ export default function BillingInformationScreen() {
           )}
           <View style={styles.billDetailRow}>
             <Text style={styles.billDetailLabel}>Amount:</Text>
-            <Text style={styles.billDetailValue}>₱{item.totalAmount.toFixed(2)}</Text>
+            <Text style={styles.billDetailValue}>₱{item.totalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
           </View>
           {isOverdue && (
             <View style={styles.billDetailRow}>
               <Text style={styles.billDetailLabel}>Penalty (Overdue):</Text>
-              <Text style={styles.billPenalty}>₱{penalty.toFixed(2)}</Text>
+              <Text style={styles.billPenalty}>₱{penalty.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
             </View>
           )}
           <View style={styles.billDetailRow}>
             <Text style={styles.billDetailLabel}>Total Amount:</Text>
-            <Text style={styles.billAmount}>₱{totalWithPenalty.toFixed(2)}</Text>
+            <Text style={styles.billAmount}>₱{totalWithPenalty.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
           </View>
         </View>
         <View style={styles.billActions}>
@@ -1131,7 +1131,7 @@ export default function BillingInformationScreen() {
               <ScrollView style={styles.paymentModalBody}>
                 <View style={styles.paymentBillInfo}>
                   <Text style={styles.paymentBillMonth}>{selectedBill.month}</Text>
-                  <Text style={styles.paymentBillAmount}>₱{selectedBill.totalAmount.toFixed(2)}</Text>
+                  <Text style={styles.paymentBillAmount}>₱{selectedBill.totalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                 </View>
 
                 {/* Payment Method Selection */}

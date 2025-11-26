@@ -104,7 +104,7 @@ export default function PaymentHistoryScreen() {
   const handleConfirmPayment = async (payment: Payment) => {
     Alert.alert(
       'Confirm Payment',
-      `Are you sure you want to confirm the payment of ₱${payment.billAmount.toFixed(2)} for ${payment.billMonth}?`,
+      `Are you sure you want to confirm the payment of ₱${payment.billAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} for ${payment.billMonth}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -136,7 +136,7 @@ export default function PaymentHistoryScreen() {
                   userName: payment.userName,
                   type: 'payment_approved',
                   title: 'Payment Approved',
-                  message: `Your payment of ₱${payment.billAmount.toFixed(2)} for ${payment.billMonth} has been approved.`,
+                  message: `Your payment of ₱${payment.billAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} for ${payment.billMonth} has been approved.`,
                   paymentId: payment.id,
                   billId: payment.billId,
                   status: 'unread',
@@ -169,7 +169,7 @@ export default function PaymentHistoryScreen() {
   const handleRejectPayment = async (payment: Payment) => {
     Alert.alert(
       'Reject Payment',
-      `Are you sure you want to reject the payment of ₱${payment.billAmount.toFixed(2)} for ${payment.billMonth}?`,
+      `Are you sure you want to reject the payment of ₱${payment.billAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} for ${payment.billMonth}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -202,7 +202,7 @@ export default function PaymentHistoryScreen() {
                   userName: payment.userName,
                   type: 'payment_rejected',
                   title: 'Payment Rejected',
-                  message: `Your payment of ₱${payment.billAmount.toFixed(2)} for ${payment.billMonth} has been rejected. Please resubmit with valid proof.`,
+                  message: `Your payment of ₱${payment.billAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} for ${payment.billMonth} has been rejected. Please resubmit with valid proof.`,
                   paymentId: payment.id,
                   billId: payment.billId,
                   status: 'unread',
@@ -290,7 +290,7 @@ export default function PaymentHistoryScreen() {
       <View style={styles.paymentDetails}>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Amount:</Text>
-          <Text style={styles.detailValue}>₱{item.billAmount.toFixed(2)}</Text>
+          <Text style={styles.detailValue}>₱{item.billAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
         </View>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Method:</Text>

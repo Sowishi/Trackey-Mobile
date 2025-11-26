@@ -443,7 +443,7 @@ export default function DashboardScreen() {
         userName: user?.name || '',
         type: 'payment_submitted',
         title: 'Payment Submitted',
-        message: `Payment of ₱${selectedBill.totalAmount.toFixed(2)} for ${selectedBill.month} has been submitted via ${finalPaymentMethod}`,
+        message: `Payment of ₱${selectedBill.totalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} for ${selectedBill.month} has been submitted via ${finalPaymentMethod}`,
         paymentId: paymentDocRef.id,
         billId: selectedBill.id,
         paymentProof: paymentProofURL,
@@ -664,7 +664,7 @@ export default function DashboardScreen() {
           )}
           <View style={styles.billDetailRow}>
             <Text style={styles.billDetailLabel}>Amount:</Text>
-            <Text style={styles.billAmount}>₱{item.totalAmount.toFixed(2)}</Text>
+            <Text style={styles.billAmount}>₱{item.totalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
           </View>
         </View>
         <View style={styles.billActions}>
@@ -2046,7 +2046,7 @@ export default function DashboardScreen() {
                 <View>
                   <Text style={styles.debitCardLabel}>Total Amount</Text>
                   <Text style={styles.debitCardAmount}>
-                    {latestBill ? `₱${latestBill.totalAmount.toFixed(2)}` : '₱0.00'}
+                    {latestBill ? `₱${latestBill.totalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '₱0.00'}
                   </Text>
                 </View>
                 <View style={styles.debitCardFooterRight}>
@@ -2080,7 +2080,7 @@ export default function DashboardScreen() {
                   <Text style={styles.waterRateLabel}>Current Water Rate</Text>
                 </View>
                 <Text style={styles.waterRateValue}>
-                  ₱{waterRate.toFixed(2)} per cubic meter
+                  ₱{waterRate.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per cubic meter
                 </Text>
               </View>
             </View>
@@ -2247,7 +2247,7 @@ export default function DashboardScreen() {
                 <ScrollView style={styles.paymentModalBody}>
                   <View style={styles.paymentBillInfo}>
                     <Text style={styles.paymentBillMonth}>{selectedBill.month}</Text>
-                    <Text style={styles.paymentBillAmount}>₱{selectedBill.totalAmount.toFixed(2)}</Text>
+                    <Text style={styles.paymentBillAmount}>₱{selectedBill.totalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                   </View>
 
                   {/* Payment Method Selection */}
