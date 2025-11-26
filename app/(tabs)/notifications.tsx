@@ -19,7 +19,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { collection, db, doc, getDocs, query, updateDoc, where } from '../../firebase';
+import { collection, db, doc, getDoc, getDocs, query, updateDoc, where } from '../../firebase';
 
 interface Notification {
   id: string;
@@ -202,6 +202,103 @@ export default function NotificationsScreen() {
     fetchNotifications();
   };
 
+  const handleNotificationPress = async (item: Notification) => {
+    try {
+      // Mark notification as read
+      if (item.status === 'unread' && !item.isAnnouncement) {
+        try {
+          const notificationRef = doc(db, 'notifications', item.id);
+          await updateDoc(notificationRef, { status: 'read' });
+          // Update local state
+          setNotifications(prev => 
+            prev.map(n => n.id === item.id ? { ...n, status: 'read' as const } : n)
+          );
+        } catch (error) {
+          console.error('Error marking notification as read:', error);
+        }
+      }
+
+      // Navigate based on notification type
+      switch (item.type) {
+        case 'payment_approved':
+          // Navigate to receipt if billId is available
+          if (item.billId) {
+            try {
+              const billRef = doc(db, 'billing', item.billId);
+              const billSnap = await getDoc(billRef);
+              
+              if (billSnap.exists()) {
+                const billData = billSnap.data();
+                
+                // Fetch water rate from settings
+                let waterRate = 20.00;
+                try {
+                  const settingsRef = doc(db, 'settings', 'kRaw13WFzXqfemqvdGPx');
+                  const settingsSnap = await getDoc(settingsRef);
+                  if (settingsSnap.exists()) {
+                    const settingsData = settingsSnap.data();
+                    const rate = parseFloat(settingsData.currentWaterRate || settingsData.waterRate || '20.00');
+                    waterRate = isNaN(rate) ? 20.00 : rate;
+                  }
+                } catch (rateError) {
+                  console.error('Error fetching water rate:', rateError);
+                }
+                
+                router.push({
+                  pathname: '/(tabs)/receipt',
+                  params: {
+                    billData: JSON.stringify({
+                      ...billData,
+                      id: item.billId,
+                      userId: item.userId || '',
+                      userEmail: item.userEmail || '',
+                      userName: item.userName || '',
+                      waterRatePerCubicMeter: waterRate,
+                    }),
+                  },
+                });
+              } else {
+                // If bill not found, navigate to payment history
+                router.push('/(tabs)/payment-history');
+              }
+            } catch (error) {
+              console.error('Error fetching bill for receipt:', error);
+              router.push('/(tabs)/payment-history');
+            }
+          } else {
+            router.push('/(tabs)/payment-history');
+          }
+          break;
+
+        case 'payment_submitted':
+          // Navigate to payment history
+          router.push('/(tabs)/payment-history');
+          break;
+
+        case 'payment_rejected':
+          // Navigate to billing information to resubmit payment
+          router.push('/(tabs)/billing-information');
+          break;
+
+        case 'bill_created':
+          // Navigate to billing information
+          router.push('/(tabs)/billing-information');
+          break;
+
+        case 'announcement':
+          // Announcements don't navigate anywhere
+          break;
+
+        default:
+          // Default: navigate to billing information
+          router.push('/(tabs)/billing-information');
+          break;
+      }
+    } catch (error) {
+      console.error('Error handling notification press:', error);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
@@ -263,12 +360,15 @@ export default function NotificationsScreen() {
   };
 
   const renderNotificationItem = ({ item }: { item: Notification }) => (
-    <View
+    <TouchableOpacity
       style={[
         styles.notificationCard,
         item.status === 'unread' && styles.unreadCard,
         item.isAnnouncement && styles.announcementCard,
       ]}
+      onPress={() => handleNotificationPress(item)}
+      activeOpacity={0.7}
+      disabled={item.isAnnouncement}
     >
       <View style={styles.notificationHeader}>
         <View
@@ -317,7 +417,7 @@ export default function NotificationsScreen() {
           </View>
         </TouchableOpacity>
       )}
-    </View>
+    </TouchableOpacity>
   );
 
   const styles = StyleSheet.create({

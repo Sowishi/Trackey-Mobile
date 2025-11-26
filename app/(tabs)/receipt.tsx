@@ -5,8 +5,6 @@ import { Ionicons } from '@expo/vector-icons';
 import * as MediaLibrary from 'expo-media-library';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { doc, getDoc } from '../../firebase';
-import { db } from '../../firebase';
 import {
   ActivityIndicator,
   Alert,
@@ -20,6 +18,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { captureRef } from 'react-native-view-shot';
+import { db, doc, getDoc } from '../../firebase';
 
 export default function ReceiptScreen() {
   const colorScheme = useColorScheme();
@@ -385,17 +384,17 @@ export default function ReceiptScreen() {
             {billData.previousConsumption !== undefined && (
               <View style={styles.receiptRow}>
                 <Text style={styles.receiptLabel}>Previous Consumption:</Text>
-                <Text style={styles.receiptValue}>{billData.previousConsumption} cubic meters</Text>
+                <Text style={styles.receiptValue}>{billData.previousConsumption} </Text>
               </View>
             )}
             <View style={styles.receiptRow}>
               <Text style={styles.receiptLabel}>Present Consumption:</Text>
-              <Text style={styles.receiptValue}>{billData.consumption} cubic meters</Text>
+              <Text style={styles.receiptValue}>{billData.consumption} </Text>
             </View>
             {billData.consumptionUsed !== undefined && (
               <View style={styles.receiptRow}>
                 <Text style={styles.receiptLabel}>Consumption Used:</Text>
-                <Text style={styles.receiptValue}>{billData.consumptionUsed.toFixed(2)} cubic meters</Text>
+                <Text style={styles.receiptValue}>{billData.consumptionUsed.toFixed(2)} </Text>
               </View>
             )}
             <View style={styles.receiptRow}>
