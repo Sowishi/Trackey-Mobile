@@ -934,6 +934,23 @@ export default function DashboardScreen() {
       color: Colors[colorScheme ?? 'light'].text,
       opacity: 0.6,
     },
+    metricsGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+      marginBottom: 20,
+    },
+    uniformMetricCard: {
+      width: '48%', // 2 columns with gap
+      borderRadius: 16,
+      padding: 20,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 6,
+      elevation: 4,
+      minHeight: 160, // Uniform height for all cards
+    },
     topMetricsContainer: {
       flexDirection: 'row',
       marginBottom: 16,
@@ -2596,10 +2613,10 @@ export default function DashboardScreen() {
           <Text style={styles.greetingName}>{userName}</Text>
         </View>
 
-        {/* Key Metrics - Top Cards */}
-        <View style={styles.topMetricsContainer}>
+        {/* Metrics Grid - 2x2 Layout */}
+        <View style={styles.metricsGrid}>
           {/* Total Revenue Card */}
-          <View style={[styles.metricCardLarge, { backgroundColor: '#D1FAE5' }]}>
+          <View style={[styles.uniformMetricCard, { backgroundColor: '#D1FAE5' }]}>
             <View style={styles.metricHeader}>
               <View style={[styles.metricIconContainer, { backgroundColor: '#059669' }]}>
                 <Ionicons name="cash" size={24} color="#FFFFFF" />
@@ -2615,9 +2632,9 @@ export default function DashboardScreen() {
             <Text style={styles.metricSubtext}>Collected payments</Text>
           </View>
 
-          {/* Total Due Card - Clickable */}
+          {/* Amount Due Card - Clickable */}
           <TouchableOpacity 
-            style={[styles.metricCardLarge, { backgroundColor: '#FEE2E2' }]}
+            style={[styles.uniformMetricCard, { backgroundColor: '#FEE2E2' }]}
             onPress={() => router.push('/(tabs)/users')}
             activeOpacity={0.7}
           >
@@ -2633,45 +2650,41 @@ export default function DashboardScreen() {
             <Text style={[styles.metricValue, { color: '#DC2626' }]}>
               ₱{stats.totalDue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </Text>
-            <Text style={styles.metricSubtext}>Outstanding balance • Tap to view users</Text>
+            <Text style={styles.metricSubtext}>Outstanding balance</Text>
           </TouchableOpacity>
-        </View>
 
-        {/* Collection Rate and Unpaid Bills Cards */}
-        <View style={styles.collectionRateContainer}>
-          <View style={[styles.collectionRateCard, { 
+          {/* Collection Rate Card */}
+          <View style={[styles.uniformMetricCard, { 
             backgroundColor: stats.collectionRate >= 75 ? '#D1FAE5' : stats.collectionRate >= 50 ? '#FEF3C7' : '#FEE2E2'
           }]}>
-            <View style={styles.collectionRateContent}>
-              <View style={[styles.collectionRateIcon, { 
+            <View style={styles.metricHeader}>
+              <View style={[styles.metricIconContainer, { 
                 backgroundColor: stats.collectionRate >= 75 ? '#059669' : stats.collectionRate >= 50 ? '#F59E0B' : '#DC2626'
               }]}>
                 <Ionicons 
                   name={stats.collectionRate >= 75 ? "checkmark-circle" : stats.collectionRate >= 50 ? "time" : "warning"} 
-                  size={32} 
+                  size={24} 
                   color="#FFFFFF" 
                 />
               </View>
-              <View style={styles.collectionRateInfo}>
-                <Text style={styles.collectionRateLabel}>Collection Rate</Text>
-                {currentMonthLabel && (
-                  <Text style={styles.collectionRateMonth}>{currentMonthLabel}</Text>
-                )}
-                <Text style={[styles.collectionRateValue, { 
-                  color: stats.collectionRate >= 75 ? '#059669' : stats.collectionRate >= 50 ? '#F59E0B' : '#DC2626'
-                }]}>
-                  {stats.collectionRate.toFixed(1)}%
-                </Text>
-              </View>
             </View>
-            <Text style={styles.collectionRateSubtext}>
+            <Text style={styles.metricLabel}>Collection Rate</Text>
+            {currentMonthLabel && (
+              <Text style={styles.metricMonth}>{currentMonthLabel}</Text>
+            )}
+            <Text style={[styles.metricValue, { 
+              color: stats.collectionRate >= 75 ? '#059669' : stats.collectionRate >= 50 ? '#F59E0B' : '#DC2626'
+            }]}>
+              {stats.collectionRate.toFixed(1)}%
+            </Text>
+            <Text style={styles.metricSubtext}>
               {stats.paidResidents} of {stats.paidResidents + stats.unpaidResidents + stats.pendingPayments} bills paid
             </Text>
           </View>
 
           {/* Unpaid Bills Card - Clickable */}
           <TouchableOpacity 
-            style={[styles.metricCardLarge, { backgroundColor: '#FEE2E2' }]}
+            style={[styles.uniformMetricCard, { backgroundColor: '#FEE2E2' }]}
             onPress={() => router.push({
               pathname: '/(tabs)/billing-information',
               params: { showUnpaidOnly: 'true' }
@@ -2692,57 +2705,6 @@ export default function DashboardScreen() {
             </Text>
             <Text style={styles.metricSubtext}>Tap to view details</Text>
           </TouchableOpacity>
-        </View>
-
-        {/* Quick Stats Grid */}
-        <View style={styles.statsContainer}>
-          <Text style={styles.statsTitle}>Overview</Text>
-          <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
-              <View style={styles.statHeader}>
-                <View style={[styles.statIcon, { backgroundColor: '#E3F2FD' }]}>
-                  <Ionicons name="people" size={18} color="#1976D2" />
-                </View>
-              </View>
-              <Text style={styles.statLabel}>Residents</Text>
-              <Text style={styles.statValue}>{stats.totalResidents}</Text>
-              <Text style={styles.statSubtext}>Active users</Text>
-            </View>
-
-            <View style={styles.statCard}>
-              <View style={styles.statHeader}>
-                <View style={[styles.statIcon, { backgroundColor: '#E8F5E9' }]}>
-                  <Ionicons name="checkmark-done" size={18} color="#388E3C" />
-                </View>
-              </View>
-              <Text style={styles.statLabel}>Paid Bills</Text>
-              <Text style={[styles.statValue, { color: '#388E3C' }]}>{stats.paidResidents}</Text>
-              <Text style={styles.statSubtext}>Completed</Text>
-            </View>
-
-            <View style={styles.statCard}>
-              <View style={styles.statHeader}>
-                <View style={[styles.statIcon, { backgroundColor: '#FFF3E0' }]}>
-                  <Ionicons name="hourglass" size={18} color="#F57C00" />
-                </View>
-              </View>
-              <Text style={styles.statLabel}>Pending</Text>
-              <Text style={[styles.statValue, { color: '#F57C00' }]}>{stats.pendingPayments}</Text>
-              <Text style={styles.statSubtext}>Awaiting approval</Text>
-            </View>
-
-            <View style={styles.statCard}>
-              <View style={styles.statHeader}>
-                <View style={[styles.statIcon, { backgroundColor: '#FFEBEE' }]}>
-                  <Ionicons name="close-circle" size={18} color="#D32F2F" />
-                </View>
-              </View>
-              <Text style={styles.statLabel}>Unpaid</Text>
-              <Text style={[styles.statValue, { color: '#D32F2F' }]}>{stats.unpaidResidents}</Text>
-              <Text style={styles.statSubtext}>Overdue bills</Text>
-            </View>
-
-          </View>
         </View>
 
         {/* Charts Section */}
