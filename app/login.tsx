@@ -235,6 +235,19 @@ export default function LoginScreen() {
       textShadowOffset: { width: 0, height: 1 },
       textShadowRadius: 2,
     },
+    forgotPasswordLink: {
+      marginTop: 16,
+      alignItems: 'center',
+    },
+    forgotPasswordText: {
+      color: white,
+      fontSize: 14,
+      fontWeight: '500',
+      textDecorationLine: 'underline',
+      textShadowColor: 'rgba(0, 0, 0, 0.5)',
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 2,
+    },
   });
 
   return (
@@ -328,6 +341,12 @@ export default function LoginScreen() {
                   </Text>
                 </TouchableOpacity>
 
+                <TouchableOpacity 
+                  style={styles.forgotPasswordLink}
+                  onPress={() => router.push('/forgot-password')}
+                >
+                  <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                </TouchableOpacity>
               
               </View>
             </View>
