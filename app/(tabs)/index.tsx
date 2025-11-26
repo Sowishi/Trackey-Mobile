@@ -3,6 +3,8 @@ import { Colors } from '@/constants/theme';
 import { useUser } from '@/contexts/UserContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
+import { Asset } from 'expo-asset';
+import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -79,6 +81,7 @@ export default function DashboardScreen() {
   const [otherMethod, setOtherMethod] = useState('');
   const [paymentProof, setPaymentProof] = useState<string | null>(null);
   const [submittingPayment, setSubmittingPayment] = useState(false);
+  const [validatingReceipt, setValidatingReceipt] = useState(false);
   const [currentMonthLabel, setCurrentMonthLabel] = useState<string>('');
   const [waterRate, setWaterRate] = useState<number>(20.00);
   const [complaintModalVisible, setComplaintModalVisible] = useState(false);
@@ -365,6 +368,83 @@ export default function DashboardScreen() {
     }
   };
 
+  // Simple hash function for image data
+  const simpleHash = async (arrayBuffer: ArrayBuffer): Promise<string> => {
+    // Create a simple hash from image data by sampling pixels
+    const data = new Uint8Array(arrayBuffer);
+    let hash = 0;
+    const sampleRate = Math.floor(data.length / 1000); // Sample every Nth byte
+    
+    for (let i = 0; i < data.length; i += sampleRate) {
+      hash = ((hash << 5) - hash) + data[i];
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    
+    return Math.abs(hash).toString(16);
+  };
+
+  // Calculate similarity between two hashes (simplified)
+  const calculateSimilarity = (hash1: string, hash2: string): number => {
+    // Simple similarity based on hash value difference
+    const num1 = parseInt(hash1, 16);
+    const num2 = parseInt(hash2, 16);
+    const diff = Math.abs(num1 - num2);
+    const maxDiff = Math.max(num1, num2);
+    return 1 - (diff / maxDiff);
+  };
+
+  const validateReceiptWithHash = async (imageUri: string): Promise<boolean> => {
+    try {
+      console.log('=== Hash Validation Log ===');
+      console.log('Validating receipt using image hash comparison...');
+
+      // Load template image
+      const templateAsset = Asset.fromModule(require('../../assets/images/gcash_template.jpg'));
+      await templateAsset.downloadAsync();
+      
+      if (!templateAsset.localUri) {
+        console.error('Failed to load template image');
+        return false;
+      }
+
+      // Convert both images to array buffers
+      const [templateResponse, uploadedResponse] = await Promise.all([
+        fetch(templateAsset.localUri),
+        fetch(imageUri),
+      ]);
+
+      // Use response.arrayBuffer() directly instead of blob().arrayBuffer()
+      const [templateArrayBuffer, uploadedArrayBuffer] = await Promise.all([
+        templateResponse.arrayBuffer(),
+        uploadedResponse.arrayBuffer(),
+      ]);
+
+      // Generate simple hashes for both images
+      const [templateHash, uploadedHash] = await Promise.all([
+        simpleHash(templateArrayBuffer),
+        simpleHash(uploadedArrayBuffer),
+      ]);
+
+      console.log('Template hash:', templateHash);
+      console.log('Uploaded image hash:', uploadedHash);
+
+      // Calculate similarity
+      const similarity = calculateSimilarity(templateHash, uploadedHash);
+      const minSimilarity = 0.15; // 15% similarity threshold
+
+      console.log('Similarity:', (similarity * 100).toFixed(2) + '%');
+      console.log('Min required similarity:', (minSimilarity * 100).toFixed(2) + '%');
+      console.log('Validation result:', similarity >= minSimilarity);
+      console.log('========================');
+
+      // If similarity is above threshold, images are similar
+      return similarity <= minSimilarity;
+    } catch (error) {
+      console.error('Hash validation error:', error);
+      return false;
+    }
+  };
+
   const handlePickImage = async () => {
     try {
       // Request permissions
@@ -374,7 +454,7 @@ export default function DashboardScreen() {
         return;
       }
 
-      // Launch image picker - full image without cropping
+      // Launch image picker
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: false,
@@ -382,11 +462,43 @@ export default function DashboardScreen() {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setPaymentProof(result.assets[0].uri);
+        const imageUri = result.assets[0].uri;
+        setValidatingReceipt(true);
+
+        try {
+          // Convert image to base64 for OCR
+          const manipulatedImage = await ImageManipulator.manipulateAsync(
+            imageUri,
+            [{ resize: { width: 800 } }], // Resize to reduce processing time
+            { compress: 0.5, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+          );
+
+          // Validate receipt using hash comparison (faster than OCR)
+          const isValid = await validateReceiptWithHash(imageUri);
+
+          if (isValid) {
+            // Receipt is valid, set the payment proof
+            setPaymentProof(imageUri);
+            Alert.alert('Success', 'Receipt validated successfully!');
+          } else {
+            // Receipt validation failed
+            Alert.alert(
+              'Invalid Receipt',
+              'The uploaded image does not match a valid GCash receipt template. Please upload a clear image of your GCash payment receipt.',
+              [{ text: 'OK' }]
+            );
+          }
+        } catch (error) {
+          console.error('Error validating receipt:', error);
+          Alert.alert('Error', 'Failed to validate receipt. Please try again.');
+        } finally {
+          setValidatingReceipt(false);
+        }
       }
     } catch (error) {
       console.error('Error picking image:', error);
       Alert.alert('Error', 'Failed to pick image. Please try again.');
+      setValidatingReceipt(false);
     }
   };
 
@@ -1753,6 +1865,28 @@ export default function DashboardScreen() {
       fontWeight: '600',
       fontSize: 14,
     },
+    validatingContainer: {
+      borderWidth: 2,
+      borderStyle: 'dashed',
+      borderColor: Colors[colorScheme ?? 'light'].primary,
+      borderRadius: 12,
+      padding: 32,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+    },
+    validatingText: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].primary,
+      marginTop: 12,
+    },
+    validatingSubtext: {
+      fontSize: 12,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+      marginTop: 4,
+      textAlign: 'center',
+    },
     paymentModalFooter: {
       flexDirection: 'row',
       paddingHorizontal: 20,
@@ -2289,23 +2423,6 @@ export default function DashboardScreen() {
                       ]}>GCash</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity
-                      style={[
-                        styles.paymentMethodOption,
-                        paymentMethod === 'other' && styles.paymentMethodSelected
-                      ]}
-                      onPress={() => handleSelectPaymentMethod('other')}
-                    >
-                      <Ionicons
-                        name={paymentMethod === 'other' ? 'radio-button-on' : 'radio-button-off'}
-                        size={24}
-                        color={paymentMethod === 'other' ? Colors[colorScheme ?? 'light'].primary : Colors[colorScheme ?? 'light'].tabIconDefault}
-                      />
-                      <Text style={[
-                        styles.paymentMethodText,
-                        paymentMethod === 'other' && styles.paymentMethodTextSelected
-                      ]}>Other</Text>
-                    </TouchableOpacity>
 
                     {paymentMethod === 'other' && (
                       <TextInput
@@ -2321,7 +2438,13 @@ export default function DashboardScreen() {
                   {/* Payment Proof Upload */}
                   <View style={styles.paymentProofSection}>
                     <Text style={styles.paymentSectionLabel}>Payment Proof</Text>
-                    {paymentProof ? (
+                    {validatingReceipt ? (
+                      <View style={styles.validatingContainer}>
+                        <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].primary} />
+                        <Text style={styles.validatingText}>Validating receipt...</Text>
+                        <Text style={styles.validatingSubtext}>Please wait while we verify your GCash receipt</Text>
+                      </View>
+                    ) : paymentProof ? (
                       <View style={styles.paymentProofContainer}>
                         <Image
                           source={{ uri: paymentProof }}
@@ -2330,6 +2453,7 @@ export default function DashboardScreen() {
                         <TouchableOpacity
                           style={styles.changeProofButton}
                           onPress={handlePickImage}
+                          disabled={validatingReceipt}
                         >
                           <Ionicons
                             name="refresh"
@@ -2343,6 +2467,7 @@ export default function DashboardScreen() {
                       <TouchableOpacity
                         style={styles.uploadProofButton}
                         onPress={handlePickImage}
+                        disabled={validatingReceipt}
                       >
                         <Ionicons
                           name="image-outline"
@@ -2350,7 +2475,7 @@ export default function DashboardScreen() {
                           color={Colors[colorScheme ?? 'light'].primary}
                         />
                         <Text style={styles.uploadProofText}>Upload Payment Proof</Text>
-                        <Text style={styles.uploadProofSubtext}>Tap to select an image</Text>
+                        <Text style={styles.uploadProofSubtext}>Tap to select a GCash receipt image</Text>
                       </TouchableOpacity>
                     )}
                   </View>

@@ -1173,23 +1173,7 @@ export default function BillingInformationScreen() {
                     ]}>GCash</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={[
-                      styles.paymentMethodOption,
-                      paymentMethod === 'other' && styles.paymentMethodSelected
-                    ]}
-                    onPress={() => handleSelectPaymentMethod('other')}
-                  >
-                    <Ionicons
-                      name={paymentMethod === 'other' ? 'radio-button-on' : 'radio-button-off'}
-                      size={24}
-                      color={paymentMethod === 'other' ? Colors[colorScheme ?? 'light'].primary : Colors[colorScheme ?? 'light'].tabIconDefault}
-                    />
-                    <Text style={[
-                      styles.paymentMethodText,
-                      paymentMethod === 'other' && styles.paymentMethodTextSelected
-                    ]}>Other</Text>
-                  </TouchableOpacity>
+          
 
                   {paymentMethod === 'other' && (
                     <TextInput
