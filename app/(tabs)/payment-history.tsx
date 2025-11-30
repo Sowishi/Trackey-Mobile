@@ -19,7 +19,7 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { addDoc, collection, db, doc, getDoc, getDocs, query, updateDoc, where } from '../../firebase';
+import { addDoc, collection, db, doc, getDocs, query, updateDoc, where } from '../../firebase';
 
 interface Payment {
   id: string;
@@ -154,35 +154,29 @@ export default function PaymentHistoryScreen() {
               try {
                 console.log('=== PAYMENT CONFIRMATION SMS START ===');
                 
-                // Fetch user data to get contact number
-                const userRef = doc(db, 'users', payment.userId);
-                const userDoc = await getDoc(userRef);
+                // Fetch user data to get contact number - query by email like in user-detail
+                const usersRef = collection(db, 'users');
+                const userQuery = query(usersRef, where('email', '==', payment.userEmail));
+                const userQuerySnapshot = await getDocs(userQuery);
                 
-                if (!userDoc.exists()) {
+                if (userQuerySnapshot.empty) {
                   console.log('❌ User document not found');
                   console.log('=== PAYMENT CONFIRMATION SMS END ===');
                 } else {
+                  const userDoc = userQuerySnapshot.docs[0];
                   const userData = userDoc.data();
                   const contactNumber = userData.contactNumber;
                   
                   if (!contactNumber) {
                     console.log('❌ No contact number available for SMS notification');
+                    console.log('User Data:', userData);
                     console.log('=== PAYMENT CONFIRMATION SMS END ===');
                   } else {
                     const phoneNumber = contactNumber.replace(/[^0-9]/g, '');
                     console.log('📱 Original Contact Number:', contactNumber);
                     console.log('📱 Cleaned Phone Number:', phoneNumber);
                     
-                    const smsMessage = `PAYMENT CONFIRMED
-
-Dear ${payment.userName},
-
-Your payment has been confirmed:
-Amount: ₱${payment.billAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-Billing Period: ${payment.billMonth}
-Payment Method: ${payment.paymentMethod}
-
-Thank you for your payment!`;
+                    const smsMessage = `Your Payment is confirmed. Aquabill Team.`;
 
                     console.log('📄 SMS Message:', smsMessage);
 
@@ -206,6 +200,7 @@ Thank you for your payment!`;
 
                     console.log('📊 Response Status:', smsResponse.status);
                     console.log('📊 Response Status Text:', smsResponse.statusText);
+                    console.log('📊 Response Headers:', JSON.stringify(Object.fromEntries(smsResponse.headers.entries()), null, 2));
 
                     if (smsResponse.ok) {
                       try {
