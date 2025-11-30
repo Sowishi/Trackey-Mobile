@@ -78,14 +78,12 @@ export default function TabLayout() {
       return;
     }
 
-    // Set up real-time listeners for notifications and announcements
+    // Set up real-time listener for notifications
     let notificationsUnsubscribe: (() => void) | null = null;
-    let announcementsUnsubscribe: (() => void) | null = null;
     let notificationCount = 0;
-    let announcementCount = 0;
 
     const updateTotalCount = () => {
-      setUnreadCount(notificationCount + announcementCount);
+      setUnreadCount(notificationCount);
     };
 
     try {
@@ -133,20 +131,6 @@ export default function TabLayout() {
           setUnreadCount(0);
         }
       );
-
-      // Set up real-time listener for announcements
-      const announcementsQuery = query(collection(db, 'announcements'));
-      announcementsUnsubscribe = onSnapshot(
-        announcementsQuery,
-        (announcementsSnapshot) => {
-          announcementCount = announcementsSnapshot.size;
-          updateTotalCount();
-        },
-        (error) => {
-          console.error('Error listening to announcements:', error);
-          updateTotalCount();
-        }
-      );
     } catch (error) {
       console.error('Error setting up notification listeners:', error);
       setUnreadCount(0);
@@ -156,9 +140,6 @@ export default function TabLayout() {
     return () => {
       if (notificationsUnsubscribe) {
         notificationsUnsubscribe();
-      }
-      if (announcementsUnsubscribe) {
-        announcementsUnsubscribe();
       }
     };
   }, [user, isCollector]);
