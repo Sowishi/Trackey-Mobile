@@ -144,15 +144,23 @@ export default function MeterCalculatorScreen() {
   }, [userId]);
 
   const calculateConsumption = (): number => {
-    if (!currentReading || !lastReading) return 0;
+    if (!currentReading) return 0;
     const current = parseFloat(currentReading);
-    const last = lastReading;
-    if (isNaN(current) || current < last) return 0;
+    if (isNaN(current)) return 0;
+    
+    // If no last reading, use 0 as default (first time billing)
+    const last = lastReading !== null ? lastReading : 0;
+    
+    if (current < last) return 0;
     return current - last;
   };
 
   const calculatePrice = (): number => {
     const consumption = calculateConsumption();
+    // Minimum charge of 150 if consumption is below 10
+    if (consumption > 0 && consumption < 10) {
+      return 150;
+    }
     return consumption * waterRate;
   };
 
@@ -168,17 +176,22 @@ export default function MeterCalculatorScreen() {
       return;
     }
 
-    if (lastReading !== null && current < lastReading) {
+    const last = lastReading !== null ? lastReading : 0;
+    if (current < last) {
       Alert.alert('Validation Error', 'Current reading cannot be less than last reading');
       return;
     }
 
     const consumption = calculateConsumption();
     const price = calculatePrice();
+    
+    const priceMessage = consumption > 0 && consumption < 10
+      ? `Consumption: ${consumption.toFixed(2)} m³\nEstimated Price: ₱${price.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n(Minimum charge applied)`
+      : `Consumption: ${consumption.toFixed(2)} m³\nEstimated Price: ₱${price.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
     Alert.alert(
       'Calculation Result',
-      `Consumption: ${consumption.toFixed(2)} m³\nEstimated Price: ₱${price.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      priceMessage,
       [{ text: 'OK' }]
     );
   };
@@ -374,12 +387,16 @@ export default function MeterCalculatorScreen() {
           <View style={styles.readingDisplay}>
             <Text style={styles.readingLabel}>Previous Reading</Text>
             <Text style={styles.readingValue}>
-              {lastReading !== null ? `${lastReading.toFixed(2)} m³` : 'N/A'}
+              {lastReading !== null ? `${lastReading.toFixed(2)} m³` : '0.00 m³'}
             </Text>
           </View>
-          {latestBill && (
+          {latestBill ? (
             <Text style={styles.infoText}>
               From: {latestBill.month}
+            </Text>
+          ) : (
+            <Text style={styles.infoText}>
+              No previous billing found. Using 0.00 as starting point.
             </Text>
           )}
         </View>
@@ -401,14 +418,14 @@ export default function MeterCalculatorScreen() {
         </View>
 
         {/* Calculation Results */}
-        {currentReading && !isNaN(parseFloat(currentReading)) && consumption > 0 && (
+        {currentReading && !isNaN(parseFloat(currentReading)) && consumption >= 0 && (
           <View style={styles.resultCard}>
             <Text style={styles.resultTitle}>Calculation Result</Text>
             
             <View style={styles.resultRow}>
               <Text style={styles.resultLabel}>Last Reading:</Text>
               <Text style={styles.resultValue}>
-                {lastReading !== null ? `${lastReading.toFixed(2)} m³` : 'N/A'}
+                {lastReading !== null ? `${lastReading.toFixed(2)} m³` : '0.00 m³'}
               </Text>
             </View>
 
@@ -434,7 +451,10 @@ export default function MeterCalculatorScreen() {
             </View>
 
             <Text style={styles.infoText}>
-              Rate: ₱{waterRate.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per cubic meter
+              {consumption > 0 && consumption < 10 
+                ? 'Minimum charge applied (consumption below 10 m³)'
+                : `Rate: ₱${waterRate.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per cubic meter`
+              }
             </Text>
           </View>
         )}
