@@ -19,7 +19,7 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { addDoc, collection, db, doc, getDocs, query, updateDoc, where } from '../../firebase';
+import { addDoc, collection, db, doc, getDoc, getDocs, query, updateDoc, where } from '../../firebase';
 
 interface Payment {
   id: string;
@@ -148,6 +148,98 @@ export default function PaymentHistoryScreen() {
               } catch (notificationError) {
                 console.error('Error creating notification:', notificationError);
                 // Don't fail the payment confirmation if notification fails
+              }
+
+              // Send SMS confirmation to user
+              try {
+                console.log('=== PAYMENT CONFIRMATION SMS START ===');
+                
+                // Fetch user data to get contact number
+                const userRef = doc(db, 'users', payment.userId);
+                const userDoc = await getDoc(userRef);
+                
+                if (!userDoc.exists()) {
+                  console.log('❌ User document not found');
+                  console.log('=== PAYMENT CONFIRMATION SMS END ===');
+                } else {
+                  const userData = userDoc.data();
+                  const contactNumber = userData.contactNumber;
+                  
+                  if (!contactNumber) {
+                    console.log('❌ No contact number available for SMS notification');
+                    console.log('=== PAYMENT CONFIRMATION SMS END ===');
+                  } else {
+                    const phoneNumber = contactNumber.replace(/[^0-9]/g, '');
+                    console.log('📱 Original Contact Number:', contactNumber);
+                    console.log('📱 Cleaned Phone Number:', phoneNumber);
+                    
+                    const smsMessage = `PAYMENT CONFIRMED
+
+Dear ${payment.userName},
+
+Your payment has been confirmed:
+Amount: ₱${payment.billAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+Billing Period: ${payment.billMonth}
+Payment Method: ${payment.paymentMethod}
+
+Thank you for your payment!`;
+
+                    console.log('📄 SMS Message:', smsMessage);
+
+                    const smsApiUrl = 'https://sms.iprogtech.com/api/v1/sms_messages';
+                    const requestBody = {
+                      api_token: '9d955a7153ec9346cf3027ba86ca3038277a6094',
+                      phone_number: phoneNumber,
+                      message: smsMessage,
+                    };
+
+                    console.log('🌐 SMS API URL:', smsApiUrl);
+                    console.log('📦 Request Body:', JSON.stringify(requestBody, null, 2));
+                    
+                    const smsResponse = await fetch(smsApiUrl, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify(requestBody),
+                    });
+
+                    console.log('📊 Response Status:', smsResponse.status);
+                    console.log('📊 Response Status Text:', smsResponse.statusText);
+
+                    if (smsResponse.ok) {
+                      try {
+                        const responseData = await smsResponse.json();
+                        console.log('✅ Payment confirmation SMS sent successfully!');
+                        console.log('📥 Response Data:', JSON.stringify(responseData, null, 2));
+                      } catch (jsonError) {
+                        const responseText = await smsResponse.text();
+                        console.log('✅ Payment confirmation SMS sent successfully (non-JSON response)');
+                        console.log('📥 Response Text:', responseText);
+                      }
+                    } else {
+                      try {
+                        const errorData = await smsResponse.json();
+                        console.error('❌ Payment confirmation SMS sending failed (JSON error):');
+                        console.error('Error Data:', JSON.stringify(errorData, null, 2));
+                      } catch (jsonError) {
+                        const errorText = await smsResponse.text();
+                        console.error('❌ Payment confirmation SMS sending failed (Text error):');
+                        console.error('Error Text:', errorText);
+                      }
+                    }
+                    
+                    console.log('=== PAYMENT CONFIRMATION SMS END ===');
+                  }
+                }
+              } catch (smsError: any) {
+                console.error('❌ Payment confirmation SMS Exception occurred:');
+                console.error('Error Name:', smsError?.name);
+                console.error('Error Message:', smsError?.message);
+                console.error('Error Stack:', smsError?.stack);
+                console.error('Full Error:', smsError);
+                console.log('=== PAYMENT CONFIRMATION SMS END (WITH ERROR) ===');
+                // Don't fail the payment confirmation if SMS fails
               }
 
               // Refresh payments list

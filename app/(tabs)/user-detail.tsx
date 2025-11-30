@@ -416,13 +416,16 @@ export default function UserDetailScreen() {
         console.log('📱 Cleaned Phone Number:', phoneNumber);
         
         const smsMessage = `WATER BILLING NOTICE
-        ${billToSubmit.userName}
-        Billing Period: ${billToSubmit.month}
-        Usage: ${billToSubmit.consumptionUsed.toFixed(2)}
-        Rate: ₱${billToSubmit.waterRatePerCubicMeter} per cubic meter
-        AMOUNT DUE: ₱${billToSubmit.totalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        Due Date: ${formatDateForBill(billToSubmit.dueDate)}
-        Please pay on or before due date. Thank you.`;
+
+Customer: ${billToSubmit.userName}
+Billing Period: ${billToSubmit.month}
+Water Usage: ${billToSubmit.consumptionUsed.toFixed(2)} m³
+Rate: ₱${billToSubmit.waterRatePerCubicMeter}/m³
+
+AMOUNT DUE: ₱${billToSubmit.totalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+Due Date: ${formatDateForBill(billToSubmit.dueDate)}
+
+Please pay on or before due date. Thank you.`;
 
         console.log('📄 SMS Message:', smsMessage);
 
