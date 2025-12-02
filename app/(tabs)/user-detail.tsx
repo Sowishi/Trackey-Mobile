@@ -23,6 +23,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+// @ts-ignore - Library may have type issues
+import { BLEPrinter } from 'react-native-thermal-receipt-printer';
 import { addDoc, collection, db, doc, getDoc, getDocs, query, where } from '../../firebase';
 
 interface UserDetail {
@@ -67,6 +69,12 @@ export default function UserDetailScreen() {
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [billToSubmit, setBillToSubmit] = useState<any>(null);
   const [waterRate, setWaterRate] = useState<number>(20.00);
+  const [printerConnected, setPrinterConnected] = useState(false);
+  const [connectingPrinter, setConnectingPrinter] = useState(false);
+  const [printerDevice, setPrinterDevice] = useState<any>(null);
+  const [scanningDevices, setScanningDevices] = useState(false);
+  const [availableDevices, setAvailableDevices] = useState<any[]>([]);
+  const [deviceListModalVisible, setDeviceListModalVisible] = useState(false);
 
   // Fetch water rate from Firestore settings
   const fetchWaterRate = async (): Promise<number> => {
@@ -497,13 +505,47 @@ Please pay on or before due date. Thank you.`;
       setTotalAmount('');
       setShowDatePicker(null);
 
-      // Navigate to receipt screen with bill data
-      router.push({
-        pathname: '/(tabs)/receipt',
-        params: {
-          billData: JSON.stringify(receiptBillData),
-        },
-      });
+      // Show print receipt option if printer is connected
+      if (printerConnected) {
+        Alert.alert(
+          'Bill Created Successfully',
+          'Would you like to print the receipt?',
+          [
+            {
+              text: 'Skip',
+              style: 'cancel',
+              onPress: () => {
+                router.push({
+                  pathname: '/(tabs)/receipt',
+                  params: {
+                    billData: JSON.stringify(receiptBillData),
+                  },
+                });
+              },
+            },
+            {
+              text: 'Print Receipt',
+              onPress: async () => {
+                await printReceipt(receiptBillData);
+                router.push({
+                  pathname: '/(tabs)/receipt',
+                  params: {
+                    billData: JSON.stringify(receiptBillData),
+                  },
+                });
+              },
+            },
+          ]
+        );
+      } else {
+        // Navigate to receipt screen with bill data
+        router.push({
+          pathname: '/(tabs)/receipt',
+          params: {
+            billData: JSON.stringify(receiptBillData),
+          },
+        });
+      }
     } catch (error) {
       console.error('Error saving bill:', error);
       alert('Failed to save bill. Please try again.');
@@ -521,6 +563,208 @@ Please pay on or before due date. Thank you.`;
     setDueDate(null);
     setTotalAmount('');
     setShowDatePicker(null);
+  };
+
+  // Bluetooth Printer Functions
+  const scanForDevices = async () => {
+    setScanningDevices(true);
+    setAvailableDevices([]);
+    setDeviceListModalVisible(true);
+    
+    try {
+      // Check platform - this library primarily works on Android
+      if (Platform.OS !== 'android') {
+        Alert.alert(
+          'Not Supported',
+          'Bluetooth printer connection is currently only supported on Android devices.',
+          [{ text: 'OK', onPress: () => setDeviceListModalVisible(false) }]
+        );
+        setScanningDevices(false);
+        return;
+      }
+
+      // Check if BLEPrinter is available
+      if (!BLEPrinter || typeof BLEPrinter.init !== 'function') {
+        throw new Error('BLE Printer library not properly initialized. Please rebuild the app.');
+      }
+
+      // Initialize BLE printer
+      try {
+        const initResult = await BLEPrinter.init();
+        console.log('BLE Printer initialized successfully:', initResult);
+      } catch (initError: any) {
+        const initErrorMsg = initError?.message || String(initError);
+        console.log('Init warning:', initErrorMsg);
+        
+        // If init fails with a specific error, we might still be able to continue
+        if (initErrorMsg.includes('already') || initErrorMsg.includes('initialized')) {
+          console.log('Printer already initialized, continuing...');
+        } else {
+          throw initError;
+        }
+      }
+      
+      // Small delay to ensure initialization completes
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Get list of available Bluetooth devices
+      console.log('Requesting device list...');
+      
+      if (typeof BLEPrinter.getDeviceList !== 'function') {
+        throw new Error('getDeviceList method not available');
+      }
+      
+      const devices = await BLEPrinter.getDeviceList();
+      
+      console.log('Found devices:', devices);
+      console.log('Devices type:', typeof devices);
+      console.log('Is array:', Array.isArray(devices));
+      
+      // Ensure devices is an array
+      let deviceList: any[] = [];
+      if (Array.isArray(devices)) {
+        deviceList = devices;
+      } else if (devices && typeof devices === 'object') {
+        // If it's an object, try to convert to array
+        deviceList = Object.values(devices);
+      }
+      
+      setAvailableDevices(deviceList);
+      setScanningDevices(false);
+      
+      if (deviceList.length === 0) {
+        Alert.alert('No Devices Found', 'No Bluetooth devices found nearby. Make sure your printer is turned on and in pairing mode.');
+      }
+    } catch (error: any) {
+      console.error('Error scanning devices:', error);
+      console.error('Error name:', error?.name);
+      console.error('Error message:', error?.message);
+      console.error('Error stack:', error?.stack);
+      setScanningDevices(false);
+      
+      let errorMessage = 'Unknown error';
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error?.toString) {
+        errorMessage = error.toString();
+      }
+      
+      // Check for specific error types
+      if (errorMessage.includes('int') || errorMessage.includes('property')) {
+        errorMessage = 'Native module error. The app may need to be rebuilt. Please try:\n1. Stop the app\n2. Run: npx expo run:android\n3. Restart the app';
+      }
+      
+      Alert.alert(
+        'Error Scanning Devices', 
+        `Failed to scan for devices.\n\nError: ${errorMessage}\n\nPlease make sure:\n- Bluetooth is enabled on your device\n- Location permission is granted (required for Bluetooth scanning)\n- Printer is turned on and in pairing mode\n- App has been rebuilt after installing the library`,
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
+  const connectToDevice = async (device: any) => {
+    setConnectingPrinter(true);
+    setDeviceListModalVisible(false);
+    
+    try {
+      // Connect to the selected device using inner_mac_address
+      await BLEPrinter.connectPrinter(device.inner_mac_address);
+      
+      setPrinterDevice(device);
+      setPrinterConnected(true);
+      setConnectingPrinter(false);
+      
+      // Show toast notification
+      Alert.alert('Success', `Connected to ${device.device_name || device.inner_mac_address}!`, [{ text: 'OK' }]);
+    } catch (error: any) {
+      console.error('Error connecting to device:', error);
+      setConnectingPrinter(false);
+      Alert.alert('Error', `Failed to connect to ${device.device_name || device.inner_mac_address}. Please try again.`);
+    }
+  };
+
+  const connectToPrinter = () => {
+    scanForDevices();
+  };
+
+  const disconnectPrinter = async () => {
+    try {
+      if (printerDevice) {
+        await BLEPrinter.closeConn();
+      }
+      setPrinterConnected(false);
+      setPrinterDevice(null);
+      Alert.alert('Disconnected', 'Printer disconnected');
+    } catch (error: any) {
+      console.error('Error disconnecting:', error);
+      setPrinterConnected(false);
+      setPrinterDevice(null);
+      Alert.alert('Disconnected', 'Printer disconnected');
+    }
+  };
+
+  const printReceipt = async (billData: any) => {
+    if (!printerConnected || !printerDevice) {
+      Alert.alert('Error', 'Please connect to printer first');
+      return;
+    }
+
+    try {
+      // Format receipt content
+      const receiptContent = formatReceiptContent(billData);
+      
+      // Print using the thermal printer library
+      BLEPrinter.printText(receiptContent, {});
+      
+      Alert.alert('Success', 'Receipt sent to printer!');
+    } catch (error: any) {
+      console.error('Error printing receipt:', error);
+      Alert.alert('Error', 'Failed to print receipt. Please try again.');
+    }
+  };
+
+  const formatReceiptContent = (billData: any): string => {
+    const date = new Date().toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+    const time = new Date().toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+
+    return `
+================================
+      AQUABILL RECEIPT
+================================
+
+Date: ${date} ${time}
+Account: ${billData.accountNumber || 'N/A'}
+Customer: ${billData.userName}
+
+--------------------------------
+BILLING PERIOD: ${billData.month}
+--------------------------------
+
+Previous Reading: ${billData.previousConsumption?.toFixed(2) || '0.00'} m³
+Present Reading: ${billData.consumption?.toFixed(2) || '0.00'} m³
+Consumption: ${billData.consumptionUsed?.toFixed(2) || '0.00'} m³
+
+Rate: ₱${billData.waterRatePerCubicMeter?.toFixed(2) || '0.00'}/m³
+
+--------------------------------
+TOTAL AMOUNT: ₱${billData.totalAmount?.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
+--------------------------------
+
+Due Date: ${formatDateForBill(billData.dueDate)}
+
+================================
+    Thank you for your payment!
+================================
+`;
   };
 
   const fetchUserBilling = async () => {
@@ -937,6 +1181,75 @@ Please pay on or before due date. Thank you.`;
       color: Colors[colorScheme ?? 'light'].text,
       opacity: 0.6,
     },
+    printerSection: {
+      backgroundColor: Colors[colorScheme ?? 'light'].background,
+      borderRadius: 16,
+      padding: 20,
+      margin: 20,
+      marginTop: 10,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    printerHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    printerTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+      marginLeft: 12,
+    },
+    printerStatus: {
+      alignItems: 'flex-start',
+    },
+    printerStatusRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    printerStatusText: {
+      fontSize: 14,
+      color: Colors[colorScheme ?? 'light'].text,
+      marginLeft: 8,
+    },
+    connectButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: Colors[colorScheme ?? 'light'].primary,
+      paddingVertical: 14,
+      paddingHorizontal: 20,
+      borderRadius: 12,
+    },
+    connectButtonDisabled: {
+      opacity: 0.6,
+    },
+    connectButtonText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '600',
+      marginLeft: 8,
+    },
+    disconnectButton: {
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+    },
+    disconnectButtonText: {
+      color: Colors[colorScheme ?? 'light'].text,
+      fontSize: 14,
+      fontWeight: '500',
+    },
     buttonContainer: {
       paddingHorizontal: 20,
       paddingBottom: 20,
@@ -1262,6 +1575,42 @@ Please pay on or before due date. Thank you.`;
       color: Colors[colorScheme ?? 'light'].tabIconDefault,
       marginTop: 8,
       textAlign: 'center',
+    },
+    billingLoadingSubtext: {
+      fontSize: 12,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
+      marginTop: 8,
+      textAlign: 'center',
+    },
+    deviceItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+    },
+    deviceItemContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+    },
+    deviceItemInfo: {
+      marginLeft: 12,
+      flex: 1,
+    },
+    deviceItemName: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+      marginBottom: 4,
+    },
+    deviceItemAddress: {
+      fontSize: 12,
+      color: Colors[colorScheme ?? 'light'].tabIconDefault,
     },
     inputWithButton: {
       flexDirection: 'row',
@@ -1673,6 +2022,58 @@ Please pay on or before due date. Thank you.`;
               </View>
             )}
           </View>
+        </View>
+
+        {/* Printer Connection Section */}
+        <View style={styles.printerSection}>
+          <View style={styles.printerHeader}>
+            <Ionicons
+              name="print-outline"
+              size={24}
+              color={Colors[colorScheme ?? 'light'].primary}
+            />
+            <Text style={styles.printerTitle}>Thermal Printer</Text>
+          </View>
+          {printerConnected ? (
+            <View style={styles.printerStatus}>
+              <View style={styles.printerStatusRow}>
+                <Ionicons
+                  name="checkmark-circle"
+                  size={20}
+                  color="#10B981"
+                />
+                <Text style={styles.printerStatusText}>
+                  Connected: {printerDevice?.device_name || 'Thermal Printer'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.disconnectButton}
+                onPress={disconnectPrinter}
+              >
+                <Text style={styles.disconnectButtonText}>Disconnect</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.connectButton, connectingPrinter && styles.connectButtonDisabled]}
+              onPress={connectToPrinter}
+              disabled={connectingPrinter}
+            >
+              {connectingPrinter ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Ionicons
+                  name="bluetooth"
+                  size={20}
+                  color="#FFFFFF"
+                  style={styles.buttonIcon}
+                />
+              )}
+              <Text style={styles.connectButtonText}>
+                {connectingPrinter ? 'Connecting...' : 'Connect Printer'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Action Buttons */}
@@ -2159,6 +2560,102 @@ Please pay on or before due date. Thank you.`;
             </View>
           </View>
         </View>
+      </Modal>
+
+      {/* Bluetooth Device List Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={deviceListModalVisible}
+        onRequestClose={() => setDeviceListModalVisible(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setDeviceListModalVisible(false)}
+        >
+          <View style={styles.billingModalContent} onStartShouldSetResponder={() => true}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Bluetooth Printer</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setDeviceListModalVisible(false);
+                  setScanningDevices(false);
+                }}
+                style={styles.closeButton}
+              >
+                <Ionicons
+                  name="close"
+                  size={24}
+                  color={Colors[colorScheme ?? 'light'].text}
+                />
+              </TouchableOpacity>
+            </View>
+
+            {scanningDevices ? (
+              <View style={styles.billingLoadingContainer}>
+                <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].primary} />
+                <Text style={styles.billingLoadingText}>Scanning for devices...</Text>
+                <Text style={styles.billingLoadingSubtext}>Make sure your printer is turned on and in pairing mode</Text>
+              </View>
+            ) : availableDevices.length === 0 ? (
+              <View style={styles.billingEmptyContainer}>
+                <Ionicons
+                  name="bluetooth-outline"
+                  size={60}
+                  color={Colors[colorScheme ?? 'light'].icon}
+                />
+                <Text style={styles.billingEmptyText}>No devices found</Text>
+                <Text style={styles.billingEmptySubtext}>Make sure your printer is turned on and try again</Text>
+                <TouchableOpacity
+                  style={styles.connectButton}
+                  onPress={scanForDevices}
+                >
+                  <Ionicons
+                    name="refresh"
+                    size={20}
+                    color="#FFFFFF"
+                    style={styles.buttonIcon}
+                  />
+                  <Text style={styles.connectButtonText}>Scan Again</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <FlatList
+                data={availableDevices}
+                keyExtractor={(item, index) => item.inner_mac_address || `device-${index}`}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.deviceItem}
+                    onPress={() => connectToDevice(item)}
+                  >
+                    <View style={styles.deviceItemContent}>
+                      <Ionicons
+                        name="print"
+                        size={24}
+                        color={Colors[colorScheme ?? 'light'].primary}
+                      />
+                      <View style={styles.deviceItemInfo}>
+                        <Text style={styles.deviceItemName}>
+                          {item.device_name || 'Unknown Device'}
+                        </Text>
+                        <Text style={styles.deviceItemAddress}>
+                          {item.inner_mac_address}
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons
+                      name="chevron-forward"
+                      size={20}
+                      color={Colors[colorScheme ?? 'light'].tabIconDefault}
+                    />
+                  </TouchableOpacity>
+                )}
+                contentContainerStyle={styles.billingList}
+                showsVerticalScrollIndicator={true}
+              />
+            )}
+          </View>
+        </Pressable>
       </Modal>
 
     </SafeAreaView>
