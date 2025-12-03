@@ -423,14 +423,14 @@ export default function UserDetailScreen() {
         console.log('📱 Original Contact Number:', userDetail.contactNumber);
         console.log('📱 Cleaned Phone Number:', phoneNumber);
         
-        const smsMessage = `WATER BILLING NOTICE
+        const smsMessage = `AQUA-BILL WATER BILLING NOTICE
 
 Customer: ${billToSubmit.userName}
 Billing Period: ${billToSubmit.month}
-Water Usage: ${billToSubmit.consumptionUsed.toFixed(2)} m³
-Rate: ₱${billToSubmit.waterRatePerCubicMeter}/m³
+Water Usage: ${billToSubmit.consumptionUsed.toFixed(2)}
+Rate: ${billToSubmit.waterRatePerCubicMeter}
 
-AMOUNT DUE: ₱${billToSubmit.totalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+AMOUNT DUE: ${billToSubmit.totalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PHP
 Due Date: ${formatDateForBill(billToSubmit.dueDate)}
 
 Please pay on or before due date. Thank you.`;

@@ -136,7 +136,7 @@ export default function PaymentHistoryScreen() {
                   userName: payment.userName,
                   type: 'payment_approved',
                   title: 'Payment Approved',
-                  message: `Your payment of ₱${payment.billAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} for ${payment.billMonth} has been approved.`,
+                  message: `Your payment of ₱${payment.billAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} for ${payment.billMonth} has been approved`,
                   paymentId: payment.id,
                   billId: payment.billId,
                   status: 'unread',
@@ -176,7 +176,8 @@ export default function PaymentHistoryScreen() {
                     console.log('📱 Original Contact Number:', contactNumber);
                     console.log('📱 Cleaned Phone Number:', phoneNumber);
                     
-                    const smsMessage = `Your Payment is confirmed. Aquabill Team.`;
+                    const smsMessage = `AQUA-BILL
+                    Your payment of ${payment.billAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} for ${payment.billMonth} has been approved`;
 
                     console.log('📄 SMS Message:', smsMessage);
 
