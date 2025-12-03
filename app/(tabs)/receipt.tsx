@@ -332,8 +332,8 @@ export default function ReceiptScreen() {
               source={require('../../assets/images/aquabill-logo.png')}
               style={styles.logo}
             />
-            <Text style={styles.receiptTitle}>WATER BILL RECEIPT</Text>
-            <Text style={styles.receiptSubtitle}>AquaBill Billing System</Text>
+            <Text style={styles.receiptTitle}>BILLING NOTICE</Text>
+            <Text style={styles.receiptSubtitle}>Magahis III West Water System Tuy, Batangas 4214</Text>
           </View>
 
           {/* Customer Information */}
@@ -418,10 +418,44 @@ export default function ReceiptScreen() {
 
           {/* Total Amount */}
           <View style={styles.totalSection}>
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Total Amount:</Text>
-              <Text style={styles.totalValue}>₱{billData.totalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-            </View>
+            {(() => {
+              // Copy penalty calculation logic from billing-information.tsx
+              const baseAmount = billData.totalAmount || 0;
+              
+              // Check if bill was overdue - same logic as billing-information.tsx
+              const isOverdue = billData.dueDate && new Date(billData.dueDate) < new Date();
+              const penalty = isOverdue ? 30 : 0;
+              const totalAmount = baseAmount + penalty;
+              
+              // Show penalty if it exists
+              const shouldShowPenalty = penalty > 0;
+
+              return (
+                <>
+                  {shouldShowPenalty && penalty > 0 ? (
+                    <>
+                      <View style={styles.totalRow}>
+                        <Text style={styles.totalLabel}>Subtotal:</Text>
+                        <Text style={styles.totalValue}>₱{baseAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                      </View>
+                      <View style={styles.totalRow}>
+                        <Text style={styles.totalLabel}>Penalty (Overdue):</Text>
+                        <Text style={[styles.totalValue, { color: '#DC2626', fontSize: 18 }]}>₱{penalty.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                      </View>
+                      <View style={[styles.totalRow, { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: Colors[colorScheme ?? 'light'].border }]}>
+                        <Text style={styles.totalLabel}>Total Amount:</Text>
+                        <Text style={styles.totalValue}>₱{totalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                      </View>
+                    </>
+                  ) : (
+                    <View style={styles.totalRow}>
+                      <Text style={styles.totalLabel}>Total Amount:</Text>
+                      <Text style={styles.totalValue}>₱{baseAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                    </View>
+                  )}
+                </>
+              );
+            })()}
           </View>
 
           {/* Footer */}

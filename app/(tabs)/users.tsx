@@ -600,7 +600,7 @@ export default function UsersScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <ScreenHeader 
-        title="List of Users" 
+        title="Consumers" 
         onUserPress={() => router.push('/(tabs)/profile')}
         profilePicUrl={user?.profilePicUrl}
       />
@@ -615,7 +615,7 @@ export default function UsersScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScreenHeader 
-        title="List of Users" 
+        title="Consumers" 
         onUserPress={() => router.push('/(tabs)/profile')}
         profilePicUrl={user?.profilePicUrl}
       />
@@ -682,7 +682,7 @@ export default function UsersScreen() {
               style={styles.noteIcon}
             />
             <Text style={styles.noteText}>
-              Note: Next month will reset and turn paid to unpaid
+              Note: Next month will reset and turn paid to no billing
             </Text>
           </View>
         </View>

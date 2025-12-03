@@ -24,7 +24,7 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { addDoc, collection, db, doc, getDoc, getDocs, query, updateDoc, uploadImageToStorage, where } from '../../firebase';
+import { addDoc, collection, db, doc, getDoc, getDocs, query, uploadImageToStorage, where } from '../../firebase';
 
 interface Bill {
   id: string;
@@ -533,7 +533,7 @@ export default function BillingInformationScreen() {
             {showUnpaidOnly && item.userName && (
               <View style={styles.billUserInfo}>
                 <Text style={styles.billUserName}>
-                  {item.accountNumber ? `${item.accountNumber} - ${item.userName}` : item.userName}
+                  {item.accountNumber ? `${item.userName}` : item.userName}
                 </Text>
               </View>
             )}
