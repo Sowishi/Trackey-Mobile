@@ -122,8 +122,12 @@ export default function UsersScreen() {
         })
       );
 
-      // Sort by fullName alphabetically
-      residentsWithStatus.sort((a, b) => a.fullName.localeCompare(b.fullName));
+      // Sort by fullName alphabetically (case-insensitive)
+      residentsWithStatus.sort((a, b) => {
+        const nameA = (a.fullName || '').toLowerCase();
+        const nameB = (b.fullName || '').toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
 
       setResidents(residentsWithStatus);
       setFilteredResidents(residentsWithStatus);
@@ -173,6 +177,13 @@ export default function UsersScreen() {
           resident.meterNumber?.toLowerCase().includes(searchLower)
       );
     }
+
+    // Sort filtered results alphabetically by fullName
+    filtered.sort((a, b) => {
+      const nameA = (a.fullName || '').toLowerCase();
+      const nameB = (b.fullName || '').toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
 
     setFilteredResidents(filtered);
   }, [residents, searchText, selectedFilter]);

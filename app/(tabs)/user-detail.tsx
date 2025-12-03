@@ -2024,57 +2024,6 @@ Due Date: ${formatDateForBill(billData.dueDate)}
           </View>
         </View>
 
-        {/* Printer Connection Section */}
-        <View style={styles.printerSection}>
-          <View style={styles.printerHeader}>
-            <Ionicons
-              name="print-outline"
-              size={24}
-              color={Colors[colorScheme ?? 'light'].primary}
-            />
-            <Text style={styles.printerTitle}>Thermal Printer</Text>
-          </View>
-          {printerConnected ? (
-            <View style={styles.printerStatus}>
-              <View style={styles.printerStatusRow}>
-                <Ionicons
-                  name="checkmark-circle"
-                  size={20}
-                  color="#10B981"
-                />
-                <Text style={styles.printerStatusText}>
-                  Connected: {printerDevice?.device_name || 'Thermal Printer'}
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={styles.disconnectButton}
-                onPress={disconnectPrinter}
-              >
-                <Text style={styles.disconnectButtonText}>Disconnect</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={[styles.connectButton, connectingPrinter && styles.connectButtonDisabled]}
-              onPress={connectToPrinter}
-              disabled={connectingPrinter}
-            >
-              {connectingPrinter ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Ionicons
-                  name="bluetooth"
-                  size={20}
-                  color="#FFFFFF"
-                  style={styles.buttonIcon}
-                />
-              )}
-              <Text style={styles.connectButtonText}>
-                {connectingPrinter ? 'Connecting...' : 'Connect Printer'}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
 
         {/* Action Buttons */}
         <View style={styles.buttonContainer}>
