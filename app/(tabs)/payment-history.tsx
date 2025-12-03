@@ -176,8 +176,7 @@ export default function PaymentHistoryScreen() {
                     console.log('📱 Original Contact Number:', contactNumber);
                     console.log('📱 Cleaned Phone Number:', phoneNumber);
                     
-                    const smsMessage = `AQUA-BILL
-                    Your payment of ${payment.billAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} for ${payment.billMonth} has been approved`;
+                    const smsMessage = `Your payment of ${payment.billAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} for ${payment.billMonth} has been approved`;
 
                     console.log('📄 SMS Message:', smsMessage);
 
