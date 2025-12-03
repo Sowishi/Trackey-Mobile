@@ -462,14 +462,8 @@ export default function BillingInformationScreen() {
       const notificationsRef = collection(db, 'notifications');
       await addDoc(notificationsRef, notificationData);
 
-      // Update bill status to pending
-      const billRef = doc(db, 'billing', selectedBill.id);
-      await updateDoc(billRef, {
-        status: 'pending',
-        paymentMethod: finalPaymentMethod,
-        paymentProof: paymentProofURL,
-        updatedAt: new Date().toISOString(),
-      });
+      // Don't update bill status - keep as unpaid until collector approves payment
+      // Bill status will only be updated to 'paid' when payment is approved in payment-history screen
 
       // Refresh bills
       if (showUnpaidOnly) {
@@ -606,9 +600,9 @@ export default function BillingInformationScreen() {
   };
 
   // Calculate resident stats
-  const unpaidBills = residentBills.filter(bill => bill.status === 'unpaid' || bill.status === 'Unpaid' || bill.status === 'pending').length;
+  const unpaidBills = residentBills.filter(bill => bill.status === 'unpaid' || bill.status === 'Unpaid').length;
   const totalAmountDue = residentBills
-    .filter(bill => bill.status === 'unpaid' || bill.status === 'Unpaid' || bill.status === 'pending')
+    .filter(bill => bill.status === 'unpaid' || bill.status === 'Unpaid')
     .reduce((sum, bill) => {
       const isOverdue = new Date(bill.dueDate) < new Date();
       const penalty = isOverdue ? 30 : 0;

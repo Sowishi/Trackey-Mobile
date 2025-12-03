@@ -191,7 +191,6 @@ export default function DashboardScreen() {
 
       let paidCount = 0;
       let unpaidCount = 0;
-      let pendingCount = 0;
       let totalConsumption = 0;
       let totalRevenue = 0;
       let totalDue = 0;
@@ -213,9 +212,6 @@ export default function DashboardScreen() {
         if (data.status === 'paid') {
           paidCount++;
           totalRevenue += amount;
-        } else if (data.status === 'pending') {
-          pendingCount++;
-          totalDue += amount;
         } else if (data.status === 'unpaid') {
           unpaidCount++;
           totalDue += amount;
@@ -235,7 +231,7 @@ export default function DashboardScreen() {
         }
       });
 
-      const totalBills = paidCount + unpaidCount + pendingCount;
+      const totalBills = paidCount + unpaidCount;
       const collectionRate = totalBills > 0 ? (paidCount / totalBills) * 100 : 0;
 
       // Set current month label (use most recent billing month or current calendar month)
@@ -249,7 +245,7 @@ export default function DashboardScreen() {
         totalResidents: totalResidents,
         paidResidents: paidCount,
         unpaidResidents: unpaidCount,
-        pendingPayments: pendingCount,
+        pendingPayments: 0, // Will be calculated from payments collection if needed
         totalWaterConsumption: totalConsumption,
         totalWaterRate: totalConsumption * WATER_RATE_PER_CUBIC_METER,
         totalRevenue: totalRevenue,
@@ -566,14 +562,8 @@ export default function DashboardScreen() {
       const notificationsRef = collection(db, 'notifications');
       await addDoc(notificationsRef, notificationData);
 
-      // Update bill status to pending (or keep as unpaid until admin approves)
-      const billRef = doc(db, 'billing', selectedBill.id);
-      await updateDoc(billRef, {
-        status: 'pending', // Change to pending instead of paid
-        paymentMethod: finalPaymentMethod,
-        paymentProof: paymentProofURL,
-        updatedAt: new Date().toISOString(),
-      });
+      // Don't update bill status - keep as unpaid until collector approves payment
+      // Bill status will only be updated to 'paid' when payment is approved in payment-history screen
 
       // Refresh bills
       await fetchResidentBills();
@@ -816,9 +806,9 @@ export default function DashboardScreen() {
   // Calculate resident stats
   const totalBills = residentBills.length;
   const paidBills = residentBills.filter(bill => bill.status === 'paid').length;
-  const unpaidBills = residentBills.filter(bill => bill.status === 'unpaid' || bill.status === 'Unpaid' || bill.status === 'pending').length;
+  const unpaidBills = residentBills.filter(bill => bill.status === 'unpaid' || bill.status === 'Unpaid').length;
   const totalAmountDue = residentBills
-    .filter(bill => bill.status === 'unpaid' || bill.status === 'Unpaid' || bill.status === 'pending')
+    .filter(bill => bill.status === 'unpaid' || bill.status === 'Unpaid')
     .reduce((sum, bill) => sum + bill.totalAmount, 0);
 
   // Calculate water consumption per month for bar graph
