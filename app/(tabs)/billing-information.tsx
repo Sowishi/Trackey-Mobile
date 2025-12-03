@@ -55,7 +55,7 @@ export default function BillingInformationScreen() {
   const [userId, setUserId] = useState<string | null>(null);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'gcash' | 'other' | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'gcash' | 'other' | null>(null);
   const [otherMethod, setOtherMethod] = useState('');
   const [paymentProof, setPaymentProof] = useState<string | null>(null);
   const [submittingPayment, setSubmittingPayment] = useState(false);
@@ -250,7 +250,7 @@ export default function BillingInformationScreen() {
     setPaymentModalVisible(true);
   };
 
-  const handleSelectPaymentMethod = (method: 'cash' | 'gcash' | 'other') => {
+  const handleSelectPaymentMethod = (method: 'gcash' | 'other') => {
     setPaymentMethod(method);
     if (method !== 'other') {
       setOtherMethod('');
@@ -1131,24 +1131,6 @@ export default function BillingInformationScreen() {
                 {/* Payment Method Selection */}
                 <View style={styles.paymentMethodSection}>
                   <Text style={styles.paymentSectionLabel}>Payment Method</Text>
-                  <TouchableOpacity
-                    style={[
-                      styles.paymentMethodOption,
-                      paymentMethod === 'cash' && styles.paymentMethodSelected
-                    ]}
-                    onPress={() => handleSelectPaymentMethod('cash')}
-                  >
-                    <Ionicons
-                      name={paymentMethod === 'cash' ? 'radio-button-on' : 'radio-button-off'}
-                      size={24}
-                      color={paymentMethod === 'cash' ? Colors[colorScheme ?? 'light'].primary : Colors[colorScheme ?? 'light'].tabIconDefault}
-                    />
-                    <Text style={[
-                      styles.paymentMethodText,
-                      paymentMethod === 'cash' && styles.paymentMethodTextSelected
-                    ]}>Cash</Text>
-                  </TouchableOpacity>
-
                   <TouchableOpacity
                     style={[
                       styles.paymentMethodOption,
