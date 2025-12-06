@@ -83,6 +83,9 @@ export default function DashboardScreen() {
   const [submittingPayment, setSubmittingPayment] = useState(false);
   const [validatingReceipt, setValidatingReceipt] = useState(false);
   const [currentMonthLabel, setCurrentMonthLabel] = useState<string>('');
+  const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const [availableMonths, setAvailableMonths] = useState<string[]>([]);
+  const [monthFilterVisible, setMonthFilterVisible] = useState(false);
   const [waterRate, setWaterRate] = useState<number>(20.00);
   const [complaintModalVisible, setComplaintModalVisible] = useState(false);
   const [complaintDescription, setComplaintDescription] = useState('');
@@ -189,21 +192,85 @@ export default function DashboardScreen() {
       const billingRef = collection(db, 'billing');
       const billingSnapshot = await getDocs(billingRef);
 
-      let paidCount = 0;
-      let unpaidCount = 0;
-      let totalConsumption = 0;
-      let totalRevenue = 0;
-      let totalDue = 0;
-      let mostRecentMonth = '';
-
-      // Find the most recent billing month
       const months = ['January', 'February', 'March', 'April', 'May', 'June', 
                       'July', 'August', 'September', 'October', 'November', 'December'];
+      
+      // Extract unique months from billing data
+      const uniqueMonths = new Set<string>();
+      let mostRecentMonth = '';
       let latestMonthIndex = -1;
       let latestCreatedAt = '';
 
       billingSnapshot.forEach((doc) => {
         const data = doc.data();
+        if (data.month) {
+          // Extract month name if it's in "Month Year" format
+          const monthName = data.month.split(' ')[0];
+          if (months.includes(monthName)) {
+            uniqueMonths.add(monthName);
+            
+            const monthIndex = months.indexOf(monthName);
+            const createdAt = data.createdAt || '';
+            
+            if (monthIndex > latestMonthIndex || 
+                (monthIndex === latestMonthIndex && createdAt > latestCreatedAt)) {
+              latestMonthIndex = monthIndex;
+              latestCreatedAt = createdAt;
+              mostRecentMonth = monthName;
+            }
+          } else if (months.includes(data.month)) {
+            uniqueMonths.add(data.month);
+            
+            const monthIndex = months.indexOf(data.month);
+            const createdAt = data.createdAt || '';
+            
+            if (monthIndex > latestMonthIndex || 
+                (monthIndex === latestMonthIndex && createdAt > latestCreatedAt)) {
+              latestMonthIndex = monthIndex;
+              latestCreatedAt = createdAt;
+              mostRecentMonth = data.month;
+            }
+          }
+        }
+      });
+
+      // Set available months (sorted by month order)
+      const sortedMonths = Array.from(uniqueMonths).sort((a, b) => 
+        months.indexOf(a) - months.indexOf(b)
+      );
+      setAvailableMonths(sortedMonths);
+
+      // Set current month label (use most recent billing month or current calendar month)
+      if (!mostRecentMonth) {
+        const currentDate = new Date();
+        mostRecentMonth = months[currentDate.getMonth()];
+      }
+      
+      // Set selected month if not already set
+      if (!selectedMonth && mostRecentMonth) {
+        setSelectedMonth(mostRecentMonth);
+      }
+      
+      const monthToFilter = selectedMonth || mostRecentMonth;
+      setCurrentMonthLabel(monthToFilter);
+
+      // Filter billing data by selected month
+      let paidCount = 0;
+      let unpaidCount = 0;
+      let totalConsumption = 0;
+      let totalRevenue = 0;
+      let totalDue = 0;
+      let pendingCount = 0;
+
+      billingSnapshot.forEach((doc) => {
+        const data = doc.data();
+        const billMonth = data.month ? data.month.split(' ')[0] : data.month;
+        
+        // Only process bills for the selected month
+        if (billMonth !== monthToFilter) {
+          return;
+        }
+
         const consumption = data.consumption || 0;
         const amount = data.totalAmount || 0;
 
@@ -215,37 +282,19 @@ export default function DashboardScreen() {
         } else if (data.status === 'unpaid') {
           unpaidCount++;
           totalDue += amount;
-        }
-
-        // Track most recent month
-        if (data.month) {
-          const monthIndex = months.indexOf(data.month);
-          const createdAt = data.createdAt || '';
-          
-          if (monthIndex > latestMonthIndex || 
-              (monthIndex === latestMonthIndex && createdAt > latestCreatedAt)) {
-            latestMonthIndex = monthIndex;
-            latestCreatedAt = createdAt;
-            mostRecentMonth = data.month;
-          }
+        } else if (data.status === 'pending') {
+          pendingCount++;
         }
       });
 
-      const totalBills = paidCount + unpaidCount;
+      const totalBills = paidCount + unpaidCount + pendingCount;
       const collectionRate = totalBills > 0 ? (paidCount / totalBills) * 100 : 0;
-
-      // Set current month label (use most recent billing month or current calendar month)
-      if (!mostRecentMonth) {
-        const currentDate = new Date();
-        mostRecentMonth = months[currentDate.getMonth()];
-      }
-      setCurrentMonthLabel(mostRecentMonth);
 
       setStats({
         totalResidents: totalResidents,
         paidResidents: paidCount,
         unpaidResidents: unpaidCount,
-        pendingPayments: 0, // Will be calculated from payments collection if needed
+        pendingPayments: pendingCount,
         totalWaterConsumption: totalConsumption,
         totalWaterRate: totalConsumption * WATER_RATE_PER_CUBIC_METER,
         totalRevenue: totalRevenue,
@@ -267,7 +316,7 @@ export default function DashboardScreen() {
     } else {
       fetchDashboardStats();
     }
-  }, [user]);
+  }, [user, selectedMonth]);
 
   useEffect(() => {
     if (isResident && userId) {
@@ -943,6 +992,10 @@ export default function DashboardScreen() {
     greetingContainer: {
       marginBottom: 24,
     },
+    greetingHeader: {
+      flexDirection: 'column',
+      gap: 12,
+    },
     greetingText: {
       fontSize: 14,
       color: Colors[colorScheme ?? 'light'].text,
@@ -953,6 +1006,46 @@ export default function DashboardScreen() {
       fontSize: 28,
       fontWeight: 'bold',
       color: Colors[colorScheme ?? 'light'].text,
+    },
+    monthFilterButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme ?? 'light'].border,
+    },
+    monthFilterText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: Colors[colorScheme ?? 'light'].text,
+    },
+    monthOption: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 16,
+      borderRadius: 12,
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+      marginBottom: 8,
+      borderWidth: 2,
+      borderColor: 'transparent',
+    },
+    monthOptionSelected: {
+      borderColor: Colors[colorScheme ?? 'light'].primary,
+      backgroundColor: Colors[colorScheme ?? 'light'].accent,
+    },
+    monthOptionText: {
+      fontSize: 16,
+      color: Colors[colorScheme ?? 'light'].text,
+      fontWeight: '500',
+    },
+    monthOptionTextSelected: {
+      color: Colors[colorScheme ?? 'light'].primary,
+      fontWeight: '600',
     },
     statsContainer: {
       marginBottom: 24,
@@ -2692,10 +2785,27 @@ export default function DashboardScreen() {
         >
         {/* Greeting */}
         <View style={styles.greetingContainer}>
-          <Text style={styles.greetingText}>
-            {getGreeting()}! 👋
-          </Text>
-          <Text style={styles.greetingName}>{userName}</Text>
+          <View style={styles.greetingHeader}>
+            <View>
+              <Text style={styles.greetingText}>
+                {getGreeting()}! 👋
+              </Text>
+              <Text style={styles.greetingName}>{userName}</Text>
+            </View>
+            {/* Month Filter */}
+            {availableMonths.length > 0 && (
+              <TouchableOpacity
+                style={styles.monthFilterButton}
+                onPress={() => setMonthFilterVisible(true)}
+              >
+                <Ionicons name="calendar" size={20} color={Colors[colorScheme ?? 'light'].primary} />
+                <Text style={styles.monthFilterText}>
+                  {selectedMonth || currentMonthLabel}
+                </Text>
+                <Ionicons name="chevron-down" size={16} color={Colors[colorScheme ?? 'light'].text} />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {/* Metrics Grid - 2x2 Layout */}
@@ -2799,7 +2909,9 @@ export default function DashboardScreen() {
             
             {/* Pie Chart */}
             <View style={styles.chartCard}>
-              <Text style={styles.chartLabel}>Bill Status Distribution</Text>
+              <Text style={styles.chartLabel}>
+                Bill Status Distribution {selectedMonth || currentMonthLabel ? `- ${selectedMonth || currentMonthLabel}` : ''}
+              </Text>
               <PieChart
                 data={[
                   {
@@ -2848,6 +2960,60 @@ export default function DashboardScreen() {
      
 
       </ScrollView>
+
+      {/* Month Filter Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={monthFilterVisible}
+        onRequestClose={() => setMonthFilterVisible(false)}
+      >
+        <Pressable
+          style={styles.paymentModalOverlay}
+          onPress={() => setMonthFilterVisible(false)}
+        >
+          <View style={styles.paymentModalContent} onStartShouldSetResponder={() => true}>
+            <View style={styles.paymentModalHeader}>
+              <Text style={styles.paymentModalTitle}>Select Month</Text>
+              <TouchableOpacity
+                onPress={() => setMonthFilterVisible(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons
+                  name="close"
+                  size={24}
+                  color={Colors[colorScheme ?? 'light'].text}
+                />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.paymentModalBody}>
+              {availableMonths.map((month) => (
+                <TouchableOpacity
+                  key={month}
+                  style={[
+                    styles.monthOption,
+                    (selectedMonth === month || (!selectedMonth && currentMonthLabel === month)) && styles.monthOptionSelected
+                  ]}
+                  onPress={() => {
+                    setSelectedMonth(month);
+                    setMonthFilterVisible(false);
+                  }}
+                >
+                  <Text style={[
+                    styles.monthOptionText,
+                    (selectedMonth === month || (!selectedMonth && currentMonthLabel === month)) && styles.monthOptionTextSelected
+                  ]}>
+                    {month}
+                  </Text>
+                  {(selectedMonth === month || (!selectedMonth && currentMonthLabel === month)) && (
+                    <Ionicons name="checkmark" size={20} color={Colors[colorScheme ?? 'light'].primary} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </Pressable>
+      </Modal>
 
       {/* Password Change Modal */}
       <Modal
