@@ -77,7 +77,7 @@ export default function DashboardScreen() {
   const [userId, setUserId] = useState<string | null>(null);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'gcash' | 'other' | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'gcash' | 'cash' | 'other' | null>(null);
   const [otherMethod, setOtherMethod] = useState('');
   const [paymentProof, setPaymentProof] = useState<string | null>(null);
   const [submittingPayment, setSubmittingPayment] = useState(false);
@@ -406,10 +406,14 @@ export default function DashboardScreen() {
     setPaymentModalVisible(true);
   };
 
-  const handleSelectPaymentMethod = (method: 'gcash' | 'other') => {
+  const handleSelectPaymentMethod = (method: 'gcash' | 'cash' | 'other') => {
     setPaymentMethod(method);
     if (method !== 'other') {
       setOtherMethod('');
+    }
+    // Clear payment proof when switching to cash
+    if (method === 'cash') {
+      setPaymentProof(null);
     }
   };
 
@@ -508,37 +512,9 @@ export default function DashboardScreen() {
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const imageUri = result.assets[0].uri;
-        setValidatingReceipt(true);
-
-        try {
-          // Convert image to base64 for OCR
-          const manipulatedImage = await ImageManipulator.manipulateAsync(
-            imageUri,
-            [{ resize: { width: 800 } }], // Resize to reduce processing time
-            { compress: 0.5, format: ImageManipulator.SaveFormat.JPEG, base64: true }
-          );
-
-          // Validate receipt using hash comparison (faster than OCR)
-          const isValid = await validateReceiptWithHash(imageUri);
-
-          if (isValid) {
-            // Receipt is valid, set the payment proof
-            setPaymentProof(imageUri);
-            Alert.alert('Success', 'Receipt validated successfully!');
-          } else {
-            // Receipt validation failed
-            Alert.alert(
-              'Invalid Receipt',
-              'The uploaded image does not match a valid GCash receipt template. Please upload a clear image of your GCash payment receipt.',
-              [{ text: 'OK' }]
-            );
-          }
-        } catch (error) {
-          console.error('Error validating receipt:', error);
-          Alert.alert('Error', 'Failed to validate receipt. Please try again.');
-        } finally {
-          setValidatingReceipt(false);
-        }
+        // Temporarily removed validation - directly set payment proof
+        setPaymentProof(imageUri);
+        Alert.alert('Success', 'Payment proof uploaded successfully!');
       }
     } catch (error) {
       console.error('Error picking image:', error);
@@ -561,7 +537,8 @@ export default function DashboardScreen() {
       return;
     }
 
-    if (!paymentProof) {
+    // Payment proof is only required for non-cash methods
+    if (paymentMethod !== 'cash' && !paymentProof) {
       Alert.alert('Validation Error', 'Please upload payment proof');
       return;
     }
@@ -571,9 +548,12 @@ export default function DashboardScreen() {
     try {
       const finalPaymentMethod = paymentMethod === 'other' ? otherMethod : paymentMethod;
 
-      // Upload payment proof to Firebase Storage
-      const fileName = `payment-proofs/${userId}_${selectedBill.id}_${Date.now()}.jpg`;
-      const paymentProofURL = await uploadImageToStorage(paymentProof, fileName);
+      // Upload payment proof to Firebase Storage (only if not cash)
+      let paymentProofURL = '';
+      if (paymentMethod !== 'cash' && paymentProof) {
+        const fileName = `payment-proofs/${userId}_${selectedBill.id}_${Date.now()}.jpg`;
+        paymentProofURL = await uploadImageToStorage(paymentProof, fileName);
+      }
 
       // Prepare payment data with the Firebase Storage URL
       const paymentData = {
@@ -2488,6 +2468,23 @@ export default function DashboardScreen() {
                       ]}>GCash</Text>
                     </TouchableOpacity>
 
+                    <TouchableOpacity
+                      style={[
+                        styles.paymentMethodOption,
+                        paymentMethod === 'cash' && styles.paymentMethodSelected
+                      ]}
+                      onPress={() => handleSelectPaymentMethod('cash')}
+                    >
+                      <Ionicons
+                        name={paymentMethod === 'cash' ? 'radio-button-on' : 'radio-button-off'}
+                        size={24}
+                        color={paymentMethod === 'cash' ? Colors[colorScheme ?? 'light'].primary : Colors[colorScheme ?? 'light'].tabIconDefault}
+                      />
+                      <Text style={[
+                        styles.paymentMethodText,
+                        paymentMethod === 'cash' && styles.paymentMethodTextSelected
+                      ]}>Cash</Text>
+                    </TouchableOpacity>
 
                     {paymentMethod === 'other' && (
                       <TextInput
@@ -2500,7 +2497,8 @@ export default function DashboardScreen() {
                     )}
                   </View>
 
-                  {/* Payment Proof Upload */}
+                  {/* Payment Proof Upload - Only show for non-cash methods */}
+                  {paymentMethod !== 'cash' && (
                   <View style={styles.paymentProofSection}>
                     <Text style={styles.paymentSectionLabel}>Payment Proof</Text>
                     {validatingReceipt ? (
@@ -2544,6 +2542,7 @@ export default function DashboardScreen() {
                       </TouchableOpacity>
                     )}
                   </View>
+                  )}
                 </ScrollView>
               )}
 
