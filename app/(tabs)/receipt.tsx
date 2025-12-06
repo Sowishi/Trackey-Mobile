@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -26,6 +27,8 @@ export default function ReceiptScreen() {
   const receiptRef = useRef<View>(null);
   const [saving, setSaving] = useState(false);
   const [waterRate, setWaterRate] = useState<number>(20.00);
+  const [printers, setPrinters] = useState<string[]>([]);
+  const [currentPrinter, setCurrentPrinter] = useState('10:22:33:D7:05:DE');
 
   // Parse bill data from params
   const billData = params.billData ? JSON.parse(params.billData as string) : null;
@@ -77,6 +80,73 @@ export default function ReceiptScreen() {
       });
     } catch {
       return dateString;
+    }
+  };
+
+  const scanDevice = async () => {
+    try {
+      const text = 
+        '\x1B\x40' +          // Initialize printer
+        '\x1B\x61\x01' +      // Center alignment for "Water Bill Notice" and "Thank you for trusting"
+        ' WATER BILL NOTICE \n' +
+        ' Magahis III West Water System \n' + // Added address
+        ' Tuy, Batangas 4214 \n' + // Added address
+        '\x1B\x61\x01' +      // Center alignment for the line
+        '__________________________\n' + // Centered line
+        '\x1B\x61\x00' +      // Left alignment for customer information and bill details
+        ' Customer Information \n' +
+        '\x1B\x61\x00' +      // Left alignment for customer information details
+        'Name: ' + billData.userName + '\n' +
+        'Email: ' + billData.userEmail + '\n' +
+        (billData.meterNumber ? 'Meter Number: ' + billData.meterNumber + '\n' : '') +
+        '\x1B\x61\x01' +      // Center alignment for the line
+        '__________________________\n' + // Centered line
+        '\x1B\x61\x01' +      // Center alignment for "Billing Period" section
+        ' Billing Period \n' +
+        '\x1B\x61\x00' +      // Left alignment for the billing period details
+        'Month: ' + billData.month + '\n' +
+        'Coverage Period: ' + formatDate(billData.coverageDateFrom) + ' - ' + formatDate(billData.coverageDateTo) + '\n' +
+        'Due Date: ' + formatDate(billData.dueDate) + '\n' +
+        '\x1B\x61\x01' +      // Center alignment for the line
+        '__________________________\n' + // Centered line
+        '\x1B\x61\x01' +      // Center alignment for "Bill Details" section
+        ' Bill Details \n' +
+        '\x1B\x61\x00' +      // Left alignment for bill details
+        (billData.previousConsumption !== undefined ? 'Previous Consumption: ' + billData.previousConsumption + ' \n' : '') +
+        'Present Consumption: ' + billData.consumption + ' \n' +
+        (billData.consumptionUsed !== undefined ? 'Consumption Used: ' + billData.consumptionUsed.toFixed(2) + ' \n' : '') +
+        'Rate per m3: ' + waterRate.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '\n' +
+        'Status: ' + (billData.status === 'paid' ? 'Paid' : 'Unpaid') + '\n' +
+        '\x1B\x61\x01' +      // Center alignment for the line
+        '__________________________\n' + // Centered line
+        '\x1B\x61\x01' +      // Center alignment for total amount section
+        ' \n' +
+        '\x1B\x61\x00' +      // Left alignment for total amount value
+        'Total Amount: ' + '' + billData.totalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '\n' +
+        '\n' +
+        '\x1B\x61\x01' +      // Center alignment for "Paalala"
+        ' Paalala \n' +       // Centered "Paalala"
+        '\x1B\x61\x00' +      // Left alignment for the new message
+        ' * Mangyaring bayaran agad ang halagang nakasaad sa Water Bill Notice upang maiwasan ang agarang pagputol ng inyong serbisyo sa tubig nang walang karagdagang abiso. Maaari nang balewalain ang paalalang ito kung nakapagbayad na sa takdang oras. \n' +
+        '\n' +
+        '\x1B\x61\x01' +      // Center alignment for "Thank you" message
+        'Thank you for trusting Aqua-Bill\n' + // Footer message
+        '\n\n\n' +           // Feed lines
+        '\x1D\x56\x41\x03';  // Cut paper
+
+      const printParams = new URLSearchParams();
+      printParams.append('content', text);
+      printParams.append('encode_format', 'UTF-8');
+      printParams.append('device_address', currentPrinter);
+
+      // Use custom scheme (recommended)
+      const printUrl = `btprinter://print?${printParams.toString()};`;
+      console.log(printUrl, 'printUrl');
+      await Linking.openURL(printUrl);
+      Alert.alert('Success', 'Print command sent successfully!');
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Error', 'Failed to send print command');
     }
   };
 
@@ -492,6 +562,17 @@ export default function ReceiptScreen() {
               <Text style={styles.saveButtonText}>Save to Gallery</Text>
             </View>
           )}
+        </TouchableOpacity>
+
+        {/* Print Button */}
+        <TouchableOpacity
+          style={styles.saveButtonInReceipt}
+          onPress={() => scanDevice()}
+        >
+          <View style={styles.saveButtonContent}>
+            <Ionicons name="print" size={24} color={Colors[colorScheme ?? 'light'].primary} />
+            <Text style={styles.saveButtonText}>Print</Text>
+          </View>
         </TouchableOpacity>
       </ScrollView>
 
